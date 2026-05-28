@@ -15,6 +15,7 @@
 		20230AD97F5885D21E64CA05 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D51242137B1F8597625745E /* View+Extensions.swift */; };
 		23239E42D1F3B3CA44C8ECEF /* Charts in Frameworks */ = {isa = PBXBuildFile; fileRef = D6A78715684ABBEB502D55E2 /* Charts */; };
 		233F59322A7A81F6487EF3DF /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 445D893A69E7D38B6B8C7E75 /* InsightsView.swift */; };
+		2549A45C2FC8EF0A006CD546 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2549A45B2FC8EF0A006CD546 /* Assets.xcassets */; };
 		2E030EDD7DE7E2C321D0B7DE /* DailyLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2C9315ED942B187FB6B889 /* DailyLogView.swift */; };
 		30D5FC0958DF5823D7D5A9D6 /* WeeklyReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F477B83B1C570CD91200BB18 /* WeeklyReview.swift */; };
 		3831F66F2CF40135C9718707 /* SymptomTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B648EA00AEBF0DFCC18871A /* SymptomTag.swift */; };
@@ -54,6 +55,8 @@
 		1A7F46C62532314DD37DC860 /* HealthKitService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitService.swift; path = ./Cadence/Services/HealthKitService.swift; sourceTree = "<absolute>"; };
 		1C82A14983F2F53FA4220A9E /* ReviewFlowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ReviewFlowView.swift; path = ./Cadence/Features/WeeklyReview/ReviewFlowView.swift; sourceTree = "<absolute>"; };
 		20317D6C051870F466BF81F7 /* ExportView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExportView.swift; path = ./Cadence/Features/Export/ExportView.swift; sourceTree = "<absolute>"; };
+		2549A45A2FC8ED8D006CD546 /* Cadence.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Cadence.entitlements; sourceTree = "<group>"; };
+		2549A45B2FC8EF0A006CD546 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Cadence/Assets.xcassets; sourceTree = "<group>"; };
 		26D33A415B0A6E15E6DA6EA9 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = ./Cadence/App/Info.plist; sourceTree = "<absolute>"; };
 		3F0989CA66FE09F78B729A4E /* PatternEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PatternEngine.swift; path = ./Cadence/Services/PatternEngine.swift; sourceTree = "<absolute>"; };
 		445D893A69E7D38B6B8C7E75 /* InsightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightsView.swift; path = ./Cadence/Features/Insights/InsightsView.swift; sourceTree = "<absolute>"; };
@@ -129,6 +132,7 @@
 		277D24392416FE5F01264815 /* Cadence */ = {
 			isa = PBXGroup;
 			children = (
+				2549A45A2FC8ED8D006CD546 /* Cadence.entitlements */,
 				8279F06CF02E34A4DFBDAE2C /* App */,
 				7958486BAEBAB16194621DB2 /* Models */,
 				99B3CBF8A633EE052DCFEA0D /* Shared */,
@@ -212,6 +216,7 @@
 		873EF2622DC8CC352B007FB2 = {
 			isa = PBXGroup;
 			children = (
+				2549A45B2FC8EF0A006CD546 /* Assets.xcassets */,
 				4E4C6FC200133FE2F1445DD3 /* Products */,
 				952AD024FE81537D998956A8 /* Frameworks */,
 				277D24392416FE5F01264815 /* Cadence */,
@@ -345,6 +350,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2549A45C2FC8EF0A006CD546 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -533,6 +539,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Cadence/Cadence.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 4NWCR79S38;
@@ -562,6 +569,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Cadence/Cadence.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 4NWCR79S38;
