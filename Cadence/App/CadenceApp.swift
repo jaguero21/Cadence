@@ -67,8 +67,11 @@ struct CadenceApp: App {
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.modelContext) private var modelContext
     @State private var selectedTab: Tab = .dashboard
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
+
+    private let symptomSeedKey = "cadence.symptomTagsSeeded"
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -93,6 +96,7 @@ struct ContentView: View {
                 .tag(Tab.history)
         }
         .tint(CadenceColor.accent)
+        .task { seedSymptomTagsIfNeeded() }
         .sheet(isPresented: $appState.showingProPaywall) {
             ProPaywallView()
         }
@@ -101,6 +105,13 @@ struct ContentView: View {
         } message: {
             Text("Cadence couldn't open its database (a migration may be needed). Your data is safe, but changes made this session won't be saved. Try deleting and reinstalling the app if this persists.")
         }
+    }
+
+    private func seedSymptomTagsIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: symptomSeedKey) else { return }
+        for tag in SymptomTag.defaults { modelContext.insert(tag) }
+        try? modelContext.save()
+        UserDefaults.standard.set(true, forKey: symptomSeedKey)
     }
 }
 
