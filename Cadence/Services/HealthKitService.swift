@@ -47,7 +47,10 @@ final class HealthKitService {
         if snapshot.steps > 0          { log.hkSteps      = snapshot.steps }
         if let hr  = snapshot.restingHR { log.hkRestingHR  = hr }
         if let hrv = snapshot.hrv       { log.hkHRV        = hrv }
-        if snapshot.sleepHours > 0     { log.hkSleepHours = snapshot.sleepHours }
+        if snapshot.sleepHours > 0 {
+            log.hkSleepHours = snapshot.sleepHours
+            log.sleepHours   = snapshot.sleepHours
+        }
     }
 
     // MARK: - Private helpers
