@@ -14,6 +14,7 @@ struct LogInputFlow: View {
     // insertion, silently ignoring any future parent changes.
     @State private var mood: Int = 3
     @State private var energy: Int = 5
+    @State private var sleepHours: Double = 7.0
     @State private var painLevel: Int = 0
     @State private var brainFogLevel: Int = 0
     @State private var stressLevel: Int = 5
@@ -61,6 +62,7 @@ struct LogInputFlow: View {
                 isHydrated = true
                 mood            = log.mood
                 energy          = log.energy
+                sleepHours      = log.sleepHours
                 painLevel       = log.painLevel
                 brainFogLevel   = log.brainFogLevel
                 stressLevel     = log.stressLevel
@@ -155,13 +157,15 @@ struct LogInputFlow: View {
             VStack(spacing: 16) {
                 BodyMetricRow(label: "Energy",        value: $energy)
                 Divider()
+                SleepHoursRow(hours: $sleepHours)
+                Divider()
+                BodyMetricRow(label: "Sleep quality", value: $sleepQuality)
+                Divider()
                 BodyMetricRow(label: "Pain / ache",   value: $painLevel)
                 Divider()
                 BodyMetricRow(label: "Brain fog",     value: $brainFogLevel)
                 Divider()
                 BodyMetricRow(label: "Anxiety",       value: $stressLevel)
-                Divider()
-                BodyMetricRow(label: "Sleep quality", value: $sleepQuality)
             }
         }
         .cadenceCard()
@@ -326,6 +330,7 @@ struct LogInputFlow: View {
         let log = existingLog ?? DailyLog()
         log.mood            = mood
         log.energy          = energy
+        log.sleepHours      = sleepHours
         log.painLevel       = painLevel
         log.brainFogLevel   = brainFogLevel
         log.stressLevel     = stressLevel
@@ -363,6 +368,38 @@ private struct LogSectionHeader: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(Color(.systemFill), in: Capsule())
+        }
+    }
+}
+
+private struct SleepHoursRow: View {
+    @Binding var hours: Double
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Text("Sleep hours")
+                .font(.subheadline)
+                .frame(width: 100, alignment: .leading)
+            Slider(
+                value: Binding(
+                    get: { hours },
+                    set: { newVal in
+                        let snapped = (newVal * 2).rounded() / 2
+                        if snapped != hours {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            hours = snapped
+                        }
+                    }
+                ),
+                in: 0...12,
+                step: 0.5
+            )
+            .tint(CadenceColor.sleepPurple)
+            Text(String(format: "%.1f", hours))
+                .font(.headline.monospacedDigit())
+                .frame(width: 36, alignment: .trailing)
+                .contentTransition(.numericText())
+                .animation(CadenceAnimation.smooth, value: hours)
         }
     }
 }
