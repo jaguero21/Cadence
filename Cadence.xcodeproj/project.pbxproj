@@ -38,6 +38,7 @@
 		BB6405EE18F6B6D698226AB6 /* LogInputFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */; };
 		C49760CE40DE564E9402A446 /* CadenceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4C885C564C706B8D84B907 /* CadenceApp.swift */; };
 		C7A67B11D453A48F3C8FD239 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C644D07CF96C2AFA00637E3B /* SettingsView.swift */; };
+		E1B2C3D4F5A6B7C8D9E0F1A2 /* ProPaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* ProPaywallView.swift */; };
 		C7F20E34EA5B3C5F84042DA4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91AC27A765654C1A1DFFBD5 /* AppState.swift */; };
 		D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0989CA66FE09F78B729A4E /* PatternEngine.swift */; };
 		D45ECE5968E07CA77E8B26D5 /* StoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F51B62D7D39FC0309276D9D /* StoreService.swift */; };
@@ -76,6 +77,7 @@
 		ADCC6B77E8E1D5DB3D6A5BDA /* HealthKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogInputFlow.swift; path = ./Cadence/Features/DailyLog/LogInputFlow.swift; sourceTree = "<absolute>"; };
 		B5792500A97EE8C382CEFDD9 /* SymptomPickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SymptomPickerView.swift; path = ./Cadence/Features/DailyLog/SymptomPickerView.swift; sourceTree = "<absolute>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* ProPaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProPaywallView.swift; path = ./Cadence/Features/Settings/ProPaywallView.swift; sourceTree = "<absolute>"; };
 		C644D07CF96C2AFA00637E3B /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = ./Cadence/Features/Settings/SettingsView.swift; sourceTree = "<absolute>"; };
 		C7E81365F433003269081917 /* WeeklyReviewViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WeeklyReviewViewModel.swift; path = ./Cadence/Features/WeeklyReview/WeeklyReviewViewModel.swift; sourceTree = "<absolute>"; };
 		C91AC27A765654C1A1DFFBD5 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = ./Cadence/App/AppState.swift; sourceTree = "<absolute>"; };
@@ -165,6 +167,7 @@
 		566712BE75E891EF74090A51 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* ProPaywallView.swift */,
 				C644D07CF96C2AFA00637E3B /* SettingsView.swift */,
 			);
 			name = Settings;
@@ -386,6 +389,7 @@
 				D7F560CFF67830EE4B7964D0 /* ExportView.swift in Sources */,
 				0745304541CC789DE9CAECA8 /* PDFBuilder.swift in Sources */,
 				C7A67B11D453A48F3C8FD239 /* SettingsView.swift in Sources */,
+				E1B2C3D4F5A6B7C8D9E0F1A2 /* ProPaywallView.swift in Sources */,
 				D7C825C8710DDE261D377518 /* HealthKitService.swift in Sources */,
 				1D96522AE7200D9F795F68E8 /* NotificationService.swift in Sources */,
 				D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */,

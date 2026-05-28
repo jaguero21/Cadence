@@ -93,6 +93,9 @@ struct ContentView: View {
                 .tag(Tab.history)
         }
         .tint(CadenceColor.accent)
+        .sheet(isPresented: $appState.showingProPaywall) {
+            ProPaywallView()
+        }
         .alert("Storage Unavailable", isPresented: $showStorageWarning) {
             Button("OK", role: .cancel) {}
         } message: {
