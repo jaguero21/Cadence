@@ -1,2 +1,0 @@
-# Cadence
-Daily Health Log
