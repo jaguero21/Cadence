@@ -1,104 +1,118 @@
 import Testing
-import SwiftData
 import Foundation
+import SwiftData
 @testable import Cadence
 
-// MARK: - SwiftData Schema Migration – Documentation Tests
+// MARK: - SwiftData schema and container tests
 //
-// These tests document the CURRENT (known-incomplete) state of the migration plan.
-// CadenceSchemaV1 and CadenceSchemaV2 list identical model types, making the migration
-// a structural no-op. These tests will FAIL intentionally if someone:
-//   • Adds a model to one version but not the other
-//   • Adds or removes a migration stage
-//   • Breaks the lightweight migration constructor
-//
-// They are not testing that a real migration happens correctly — they document the
-// current state so regressions are caught immediately.
+// The app previously declared CadenceSchemaV1 / V2 and a lightweight migration plan, but both
+// schema versions referenced identical model lists, making the plan a no-op. That dead code has
+// been removed. SwiftData handles lightweight schema changes (new columns with default values)
+// automatically when the container is initialised without a migration plan.
 
-@Suite("CadenceSchema – version model parity")
-struct SchemaVersionParityTests {
+@Suite("SwiftData – schema and container")
+struct SchemaMigrationTests {
 
-    @Test("CadenceSchemaV1 and CadenceSchemaV2 have the same number of model types")
-    func schemaVersions_haveSameModelCount() {
-        let v1Count = CadenceSchemaV1.models.count
-        let v2Count = CadenceSchemaV2.models.count
-        #expect(v1Count == v2Count,
-                "V1 has \(v1Count) models, V2 has \(v2Count); they should be equal until a real migration is implemented")
+    // MARK: Model registration
+
+    @Test("Schema contains exactly the three expected model types")
+    func schema_containsExpectedModelTypes() {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
+        let typeNames = schema.entities.map(\.name)
+        #expect(typeNames.contains("DailyLog"))
+        #expect(typeNames.contains("WeeklyReview"))
+        #expect(typeNames.contains("SymptomTag"))
+        #expect(schema.entities.count == 3)
     }
 
-    @Test("Both schema versions list exactly 3 model types")
-    func schemaVersions_listThreeModelTypes() {
-        #expect(CadenceSchemaV1.models.count == 3)
-        #expect(CadenceSchemaV2.models.count == 3)
-    }
+    // MARK: In-memory container
 
-    @Test("CadenceSchemaV1 versionIdentifier is 1.0.0")
-    func schemaV1_versionIdentifier_is1_0_0() {
-        let version = CadenceSchemaV1.versionIdentifier
-        #expect(version == Schema.Version(1, 0, 0))
-    }
-
-    @Test("CadenceSchemaV2 versionIdentifier is 2.0.0")
-    func schemaV2_versionIdentifier_is2_0_0() {
-        let version = CadenceSchemaV2.versionIdentifier
-        #expect(version == Schema.Version(2, 0, 0))
-    }
-}
-
-@Suite("CadenceMigrationPlan – structure")
-struct MigrationPlanStructureTests {
-
-    @Test("Migration plan has exactly one stage")
-    func migrationPlan_hasExactlyOneStage() {
-        #expect(CadenceMigrationPlan.stages.count == 1)
-    }
-
-    @Test("Migration plan schema list contains exactly two versions")
-    func migrationPlan_schemaList_hasTwoVersions() {
-        #expect(CadenceMigrationPlan.schemas.count == 2)
-    }
-
-    @Test("In-memory ModelContainer with migration plan initialises without throwing")
-    func migrationPlan_inMemoryModelContainer_doesNotThrow() throws {
-        let schema = Schema(CadenceSchemaV2.models)
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        // The lightweight stage is a no-op (identical schemas), so this must not throw.
-        let container = try ModelContainer(
-            for: schema,
-            migrationPlan: CadenceMigrationPlan.self,
-            configurations: [config]
-        )
-        // Verify the container is usable by confirming its schema is non-nil
-        #expect(container.schema.entities.isEmpty == false)
-    }
-
-    @Test("In-memory ModelContainer without migration plan also initialises (baseline)")
-    func baselineSchema_inMemoryModelContainer_doesNotThrow() throws {
+    @Test("In-memory ModelContainer initialises without throwing")
+    func inMemoryContainer_initialisesSuccessfully() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
-        #expect(container.schema.entities.isEmpty == false)
-    }
-}
-
-@Suite("CadenceSchemaV2 models – types present")
-struct SchemaV2ModelTypesTests {
-
-    @Test("CadenceSchemaV2 models include DailyLog")
-    func schemaV2_includesDailyLog() {
-        let containsDailyLog = CadenceSchemaV2.models.contains { $0 == DailyLog.self }
-        #expect(containsDailyLog)
+        #expect(container.configurations.isEmpty == false)
     }
 
-    @Test("CadenceSchemaV2 models include WeeklyReview")
-    func schemaV2_includesWeeklyReview() {
-        let containsWeeklyReview = CadenceSchemaV2.models.contains { $0 == WeeklyReview.self }
-        #expect(containsWeeklyReview)
+    @Test("In-memory container accepts DailyLog insert and fetch")
+    func inMemoryContainer_acceptsDailyLogInsertAndFetch() throws {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+
+        let log = DailyLog()
+        context.insert(log)
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<DailyLog>())
+        #expect(fetched.count == 1)
     }
 
-    @Test("CadenceSchemaV2 models include SymptomTag")
-    func schemaV2_includesSymptomTag() {
-        let containsSymptomTag = CadenceSchemaV2.models.contains { $0 == SymptomTag.self }
-        #expect(containsSymptomTag)
+    @Test("In-memory container accepts WeeklyReview insert and fetch")
+    func inMemoryContainer_acceptsWeeklyReviewInsertAndFetch() throws {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+
+        let review = WeeklyReview(weekStartDate: .now)
+        context.insert(review)
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<WeeklyReview>())
+        #expect(fetched.count == 1)
+    }
+
+    @Test("In-memory container accepts SymptomTag insert and fetch")
+    func inMemoryContainer_acceptsSymptomTagInsertAndFetch() throws {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+
+        let tag = SymptomTag(name: "Headache", emoji: "🤕", isDefault: true)
+        context.insert(tag)
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<SymptomTag>())
+        #expect(fetched.count == 1)
+        #expect(fetched.first?.name == "Headache")
+    }
+
+    // MARK: DailyLog new fields
+
+    @Test("DailyLog didEditMood defaults to false")
+    func dailyLog_didEditMood_defaultsFalse() throws {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+
+        let log = DailyLog()
+        context.insert(log)
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<DailyLog>())
+        #expect(fetched.first?.didEditMood == false)
+    }
+
+    @Test("DailyLog hkSleepHours and sleepHours persist correctly")
+    func dailyLog_sleepFields_persistRoundTrip() throws {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+
+        let log = DailyLog()
+        log.hkSleepHours = 7.5
+        log.sleepHours = 7.5
+        context.insert(log)
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<DailyLog>())
+        #expect(fetched.first?.hkSleepHours == 7.5)
+        #expect(fetched.first?.sleepHours == 7.5)
     }
 }
