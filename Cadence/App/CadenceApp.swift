@@ -2,26 +2,6 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 
-// MARK: - Schema versions
-
-enum CadenceSchemaV1: VersionedSchema {
-    static var versionIdentifier = Schema.Version(1, 0, 0)
-    static var models: [any PersistentModel.Type] { [DailyLog.self, WeeklyReview.self, SymptomTag.self] }
-}
-
-enum CadenceSchemaV2: VersionedSchema {
-    static var versionIdentifier = Schema.Version(2, 0, 0)
-    static var models: [any PersistentModel.Type] { [DailyLog.self, WeeklyReview.self, SymptomTag.self] }
-}
-
-enum CadenceMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [CadenceSchemaV1.self, CadenceSchemaV2.self] }
-    static var stages: [MigrationStage] { [v1ToV2] }
-    static let v1ToV2 = MigrationStage.lightweight(
-        fromVersion: CadenceSchemaV1.self,
-        toVersion:   CadenceSchemaV2.self
-    )
-}
 
 @main
 struct CadenceApp: App {
@@ -39,13 +19,7 @@ struct CadenceApp: App {
         }
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
         let persistentConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        // Pass the migration plan so SwiftData can automatically add new columns
-        // (painLevel, brainFogLevel, basicsCompleted) without destroying existing data.
-        if let container = try? ModelContainer(
-            for: schema,
-            migrationPlan: CadenceMigrationPlan.self,
-            configurations: [persistentConfig]
-        ) {
+        if let container = try? ModelContainer(for: schema, configurations: [persistentConfig]) {
             return container
         }
         CadenceApp.usingFallbackStorage = true
