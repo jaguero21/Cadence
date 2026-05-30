@@ -58,7 +58,12 @@ enum PDFBuilder {
 
         "Cadence — Doctor Report".draw(in: CGRect(x: 40, y: 40, width: 515, height: 40), withAttributes: titleAttrs)
 
-        let dateRange = logs.isEmpty ? "No data" : "\(logs.last!.date.formatted(date: .abbreviated, time: .omitted)) – \(logs.first!.date.formatted(date: .abbreviated, time: .omitted))"
+        let dateRange: String
+        if let first = logs.first, let last = logs.last {
+            dateRange = "\(last.date.formatted(date: .abbreviated, time: .omitted)) – \(first.date.formatted(date: .abbreviated, time: .omitted))"
+        } else {
+            dateRange = "No data"
+        }
         dateRange.draw(in: CGRect(x: 40, y: 80, width: 515, height: 20), withAttributes: bodyAttrs)
 
         var y: CGFloat = 120
