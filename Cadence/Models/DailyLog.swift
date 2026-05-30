@@ -17,6 +17,7 @@ final class DailyLog {
     var foodNotes: String
     var freeNote: String
     var isComplete: Bool
+    var didEditMood: Bool
     var didEditMetrics: Bool
 
     // HealthKit-pulled data
@@ -42,6 +43,7 @@ final class DailyLog {
         self.foodNotes = ""
         self.freeNote = ""
         self.isComplete = false
+        self.didEditMood = false
         self.didEditMetrics = false
     }
 
@@ -54,7 +56,7 @@ final class DailyLog {
     var completionScore: Double {
         var filled = 0
         let total = 3
-        if mood != 3              { filled += 1 }
+        if didEditMood            { filled += 1 }
         if didEditMetrics         { filled += 1 }
         if !freeNote.isEmpty      { filled += 1 }
         return Double(filled) / Double(total)

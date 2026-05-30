@@ -13,6 +13,7 @@ struct LogInputFlow: View {
     // anti-pattern where the initialiser value is only read once on first
     // insertion, silently ignoring any future parent changes.
     @State private var mood: Int = 3
+    @State private var didEditMood = false
     @State private var energy: Int = 5
     @State private var sleepHours: Double = 7.0
     @State private var painLevel: Int = 0
@@ -61,6 +62,7 @@ struct LogInputFlow: View {
                 }
                 isHydrated = true
                 mood            = log.mood
+                didEditMood     = log.didEditMood
                 energy          = log.energy
                 sleepHours      = log.sleepHours
                 painLevel       = log.painLevel
@@ -114,6 +116,7 @@ struct LogInputFlow: View {
                 ForEach(1...5, id: \.self) { value in
                     Button {
                         withAnimation(CadenceAnimation.spring) { mood = value }
+                        didEditMood = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         Text(moodEmoji(value))
@@ -329,6 +332,7 @@ struct LogInputFlow: View {
     private func buildLog() -> DailyLog {
         let log = existingLog ?? DailyLog()
         log.mood            = mood
+        log.didEditMood     = didEditMood
         log.energy          = energy
         log.sleepHours      = sleepHours
         log.painLevel       = painLevel
