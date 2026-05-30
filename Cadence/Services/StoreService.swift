@@ -45,7 +45,10 @@ final class StoreService: ObservableObject {
         }
     }
 
-    var isPro: Bool { true } // TEST OVERRIDE — remove before shipping
+    var isPro: Bool {
+        purchasedProductIDs.contains(StoreKitID.proOneTime) ||
+        purchasedProductIDs.contains(StoreKitID.proMonthly)
+    }
 
     nonisolated private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
         switch result {
