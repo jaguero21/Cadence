@@ -28,11 +28,12 @@ struct CadenceApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var store = StoreService.shared
 
-    // True when the on-disk store failed to open (e.g. migration error) and
-    // we fell back to an in-memory container for this session.
+    // Set when the persistent store failed and we fell back to in-memory storage.
     static private(set) var usingFallbackStorage = false
+    // Set when even the in-memory fallback failed; app runs without SwiftData.
+    static private(set) var containerFailed = false
 
-    var sharedModelContainer: ModelContainer = {
+    var sharedModelContainer: ModelContainer? = {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
@@ -49,18 +50,26 @@ struct CadenceApp: App {
         }
         CadenceApp.usingFallbackStorage = true
         let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        return try! ModelContainer(for: schema, configurations: [fallbackConfig])
+        if let fallback = try? ModelContainer(for: schema, configurations: [fallbackConfig]) {
+            return fallback
+        }
+        CadenceApp.containerFailed = true
+        return nil
     }()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(appState)
-                .environmentObject(store)
-                .modelContainer(sharedModelContainer)
-                .task {
-                    appState.notificationsAuthorized = await NotificationService.shared.requestAuthorization()
-                }
+            if let container = sharedModelContainer {
+                ContentView()
+                    .environmentObject(appState)
+                    .environmentObject(store)
+                    .modelContainer(container)
+                    .task {
+                        appState.notificationsAuthorized = await NotificationService.shared.requestAuthorization()
+                    }
+            } else {
+                StorageFatalErrorView()
+            }
         }
     }
 }
@@ -112,6 +121,33 @@ struct ContentView: View {
         for tag in SymptomTag.defaults { modelContext.insert(tag) }
         try? modelContext.save()
         UserDefaults.standard.set(true, forKey: symptomSeedKey)
+    }
+}
+
+// Shown when both the persistent and in-memory ModelContainer fail to initialise.
+struct StorageFatalErrorView: View {
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "externaldrive.badge.exclamationmark")
+                .font(.system(size: 64))
+                .foregroundStyle(.red)
+
+            VStack(spacing: 8) {
+                Text("Cadence can't start")
+                    .font(.title2.bold())
+                Text("The app's data storage failed to initialise. Please force-quit and reopen. If the problem persists, reinstall the app — your health data in Apple Health is unaffected.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button("Force Quit") {
+                exit(1)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+        }
+        .padding(32)
     }
 }
 
