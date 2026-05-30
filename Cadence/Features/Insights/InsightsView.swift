@@ -51,9 +51,9 @@ struct InsightsView: View {
     private var filteredLogs: [DailyLog] {
         let cutoff: Date
         switch vm.chartRange {
-        case .sevenDay:  cutoff = Calendar.current.date(byAdding: .day, value: -7, to: .now)!
-        case .thirtyDay: cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now)!
-        case .ninetyDay: cutoff = Calendar.current.date(byAdding: .day, value: -90, to: .now)!
+        case .sevenDay:  cutoff = Calendar.current.date(byAdding: .day, value: -7,  to: .now) ?? .now
+        case .thirtyDay: cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+        case .ninetyDay: cutoff = Calendar.current.date(byAdding: .day, value: -90, to: .now) ?? .now
         }
         return logs.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
     }
