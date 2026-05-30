@@ -70,6 +70,11 @@ actor PatternEngine {
                 consecutiveStress = 0
             }
         }
+        // A streak ending at the last log has no following day to check for fatigue.
+        // Count it as checked so it contributes to the denominator (confidence stays accurate).
+        if consecutiveStress >= 3 {
+            streaksChecked += 1
+        }
 
         guard fatigueFollowed >= 2, streaksChecked > 0 else { return nil }
         let confidence = Double(fatigueFollowed) / Double(streaksChecked)

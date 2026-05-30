@@ -190,35 +190,27 @@ struct StressFatiguePatternTests {
         #expect(card?.title == "Extended stress streaks are followed by fatigue")
     }
 
-    // known: terminal streak not evaluated
-    // The loop only evaluates a streak when it ENDS (i.e. when it sees a non-stress day).
-    // A streak that extends all the way to the last log index is never checked because
-    // the loop exits without entering the `else` branch for the final run.
-    @Test("Known bug: terminal stress streak (ending at last log) is never evaluated")
-    func stressFatigue_terminalStreakAtLastIndex_neverEvaluated() async {
+    // Fixed: a stress streak ending at the last log index is now counted as a checked streak
+    // (streaksChecked += 1 after the loop). Because there is no following day, fatigueFollowed
+    // stays 0 for that streak, keeping the confidence denominator accurate.
+    @Test("Terminal stress streak (ending at last log) is now counted in streaksChecked")
+    func stressFatigue_terminalStreakAtLastIndex_isNowCounted() async {
         let engine = PatternEngine.shared
-        // Two streaks: first streak is properly terminated and followed by fatigue (×2 to pass guard),
-        // second streak runs to the very end of the log array — the bug means it is not evaluated.
-        // We expect: if the terminal streak WERE evaluated, fatigueFollowed would be at least 1 on
-        // the recovery day that never comes. Because the streak is not evaluated, the method
-        // only counts the first two terminated streaks.
-        //
-        // Construct a case where ONLY the terminal streak has a fatigue follow-up — but because
-        // the recovery day is missing, the bug means no streak is ever checked and nil is returned.
+        // 4 calm days then a 4-day terminal stress streak with no recovery day.
         var logs: [DailyLog] = []
-        // Terminal-only streak: 3 days of stress ending at the last log, no recovery day.
         logs.append(makeLog(daysAgo: 7, stressLevel: 3))
         logs.append(makeLog(daysAgo: 6, stressLevel: 3))
         logs.append(makeLog(daysAgo: 5, stressLevel: 3))
         logs.append(makeLog(daysAgo: 4, stressLevel: 3))
-        logs.append(makeLog(daysAgo: 3, stressLevel: 9)) // streak starts
+        logs.append(makeLog(daysAgo: 3, stressLevel: 9))
         logs.append(makeLog(daysAgo: 2, stressLevel: 9))
         logs.append(makeLog(daysAgo: 1, stressLevel: 9))
-        logs.append(makeLog(daysAgo: 0, stressLevel: 9)) // streak ends AT last index → never evaluated
+        logs.append(makeLog(daysAgo: 0, stressLevel: 9)) // terminal streak, no recovery day
 
         let insights = await engine.allInsights(from: logs)
         let card = insights.first { $0.category == .stress }
-        // known: terminal streak not evaluated — the guard (fatigueFollowed >= 2) is never satisfied
+        // streaksChecked == 1, fatigueFollowed == 0 → guard (fatigueFollowed >= 2) still fails,
+        // so no card is returned — but this is now because of insufficient data, not a missed streak.
         #expect(card == nil)
     }
 
@@ -392,24 +384,29 @@ struct DailyLogCompletionScoreTests {
         #expect(log.completionScore == 0.0)
     }
 
-    // known: neutral mood scores zero
-    // mood==3 is treated as "not changed from default" and contributes 0 to completionScore,
-    // even if the user explicitly selected neutral mood.
-    @Test("Known: neutral mood (mood=3) scores zero even when explicitly set")
-    func completionScore_neutralMoodExplicitlySet_scoresZero() {
+    // Fixed: completionScore now uses didEditMood instead of mood != 3.
+    // Explicitly tapping neutral mood (value 3) with didEditMood=true scores 1/3 for mood.
+    @Test("Neutral mood (mood=3) with didEditMood=true now scores 1/3")
+    func completionScore_neutralMoodWithDidEditMood_scoresOneThird() {
         let log = DailyLog()
-        log.mood = 3 // explicitly set to neutral — still zero contribution
-        log.didEditMetrics = true
-        log.freeNote = "some note"
-        // Only 2 of 3 criteria met: mood=3 counts as zero
-        let expected = 2.0 / 3.0
+        log.mood = 3        // neutral, but explicitly chosen
+        log.didEditMood = true
+        let expected = 1.0 / 3.0
         #expect(abs(log.completionScore - expected) < 0.001)
     }
 
-    @Test("Returns 0.33 (1/3) when only mood changed from default")
-    func completionScore_onlyMoodChanged_returnsOneThird() {
+    @Test("Mood slot scores zero when didEditMood is false, regardless of mood value")
+    func completionScore_moodNotEdited_moodSlotIsZero() {
         let log = DailyLog()
-        log.mood = 4 // changed from 3
+        log.mood = 4        // non-default value, but didEditMood was never set
+        log.didEditMood = false
+        #expect(log.completionScore == 0.0)
+    }
+
+    @Test("Returns 0.33 (1/3) when only didEditMood is true")
+    func completionScore_onlyDidEditMood_returnsOneThird() {
+        let log = DailyLog()
+        log.didEditMood = true
         let expected = 1.0 / 3.0
         #expect(abs(log.completionScore - expected) < 0.001)
     }
