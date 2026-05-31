@@ -24,6 +24,7 @@ struct SettingsView: View {
         }
         .task { await store.loadProducts() }
         .task { appState.notificationsAuthorized = await NotificationService.shared.checkAuthorizationStatus() }
+        .task { appState.healthKitAuthorized = HealthKitService.shared.isAuthorized }
     }
 
     // MARK: - Sections
@@ -133,11 +134,29 @@ struct SettingsView: View {
     private var healthKitSection: some View {
         Section {
             Button("Re-authorize HealthKit") {
-                Task { try? await HealthKitService.shared.requestAuthorization() }
+                Task {
+                    try? await HealthKitService.shared.requestAuthorization()
+                    appState.healthKitAuthorized = HealthKitService.shared.isAuthorized
+                }
             }
             .foregroundStyle(CadenceColor.accent)
         } header: {
             Label("HealthKit", systemImage: "heart.fill")
+        } footer: {
+            if !HealthKitService.shared.isAvailable {
+                Text("HealthKit is not available on this device.")
+            } else if appState.healthKitAuthorized {
+                Label("HealthKit access granted.", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(CadenceColor.successGreen)
+            } else {
+                HStack(spacing: 4) {
+                    Label("HealthKit access denied.", systemImage: "exclamationmark.circle.fill")
+                        .foregroundStyle(CadenceColor.stressRed)
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        Link("Open Settings", destination: url)
+                    }
+                }
+            }
         }
     }
 
