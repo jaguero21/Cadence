@@ -8,6 +8,14 @@ final class HealthKitService {
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
+    // HealthKit does not reveal granted read status (.notDetermined covers both "not asked" and
+    // "granted"). We return false only when the user has explicitly denied at least one type
+    // (.sharingDenied), which is the strongest signal HealthKit exposes for read-only requests.
+    var isAuthorized: Bool {
+        guard isAvailable else { return false }
+        return !readTypes.contains { store.authorizationStatus(for: $0) == .sharingDenied }
+    }
+
     private let readTypes: Set<HKObjectType> = {
         let quantity: [HKQuantityTypeIdentifier] = [
             .restingHeartRate, .heartRateVariabilitySDNN, .stepCount, .activeEnergyBurned,
