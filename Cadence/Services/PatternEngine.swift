@@ -36,12 +36,11 @@ actor PatternEngine {
         var poorSleepTotal = 0
 
         for i in logs.indices.dropLast() {
-            if logs[i].sleepHours < PatternThreshold.poorSleepHours {
-                poorSleepTotal += 1
-                if isNextCalendarDay(logs[i + 1].date, after: logs[i].date) &&
-                   logs[i + 1].symptoms.contains(where: { $0.name.localizedCaseInsensitiveContains("headache") }) {
-                    poorSleepThenHeadache += 1
-                }
+            guard logs[i].sleepHours < PatternThreshold.poorSleepHours,
+                  isNextCalendarDay(logs[i + 1].date, after: logs[i].date) else { continue }
+            poorSleepTotal += 1
+            if logs[i + 1].symptoms.contains(where: { $0.name.localizedCaseInsensitiveContains("headache") }) {
+                poorSleepThenHeadache += 1
             }
         }
 

@@ -47,6 +47,14 @@ struct SymptomPickerView: View {
             }
             .buttonStyle(.plain)
             .hapticFeedback(.medium)
+            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+            .accessibilityHint(isSelected ? "Double-tap and hold to adjust severity" : "Double-tap to select, then hold to rate severity")
+            .onLongPressGesture {
+                withAnimation(CadenceAnimation.spring) {
+                    expandedTag = expandedTag == tag.name ? nil : tag.name
+                }
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            }
 
             if isSelected && expandedTag == tag.name {
                 VStack(spacing: 4) {
@@ -60,16 +68,12 @@ struct SymptomPickerView: View {
                         in: 1...10, step: 1
                     )
                     .tint(CadenceColor.stressRed)
+                    .accessibilityLabel("\(tag.name) severity")
+                    .accessibilityValue("\(severity) out of 10")
                 }
                 .padding(.horizontal, 4)
                 .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             }
-        }
-        .onLongPressGesture {
-            withAnimation(CadenceAnimation.spring) {
-                expandedTag = expandedTag == tag.name ? nil : tag.name
-            }
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         }
     }
 

@@ -58,7 +58,7 @@ struct ReviewFlowView: View {
                 }
             }
             .onAppear {
-                if existingReview == nil {
+                if !review.isComplete {
                     vm.populateSummary(review: review, from: logs)
                 }
             }
