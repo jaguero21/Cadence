@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage("dailyReminderHour")   private var dailyHour: Int = 20
     @AppStorage("dailyReminderMinute") private var dailyMinute: Int = 0
     @AppStorage("weeklyReminderEnabled") private var weeklyEnabled: Bool = true
+    @State private var showingAddSymptom = false
 
     var body: some View {
         NavigationStack {
@@ -118,10 +119,13 @@ struct SettingsView: View {
                 offsets.forEach { modelContext.delete(toDelete[$0]) }
             }
 
-            NavigationLink("Add custom symptom") {
-                AddSymptomSheet(onSave: { _, _ in })
+            Button("Add custom symptom") {
+                showingAddSymptom = true
             }
             .foregroundStyle(CadenceColor.accent)
+            .sheet(isPresented: $showingAddSymptom) {
+                AddSymptomSheet(onSave: { _, _ in })
+            }
         } header: {
             Label("Symptoms", systemImage: "tag.fill")
         } footer: {

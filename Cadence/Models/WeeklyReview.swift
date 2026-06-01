@@ -30,8 +30,13 @@ final class WeeklyReview {
     }
 
     var weekLabel: String {
-        let fmt = Date.FormatStyle().month(.abbreviated).day()
-        return "\(weekStartDate.formatted(fmt)) – \(weekEndDate.formatted(fmt))"
+        let cal = Calendar.current
+        let fullFmt = Date.FormatStyle().month(.abbreviated).day().year()
+        let shortFmt = Date.FormatStyle().month(.abbreviated).day()
+        let startYear = cal.component(.year, from: weekStartDate)
+        let endYear   = cal.component(.year, from: weekEndDate)
+        let startFmt  = startYear != endYear ? fullFmt : shortFmt
+        return "\(weekStartDate.formatted(startFmt)) – \(weekEndDate.formatted(fullFmt))"
     }
 }
 

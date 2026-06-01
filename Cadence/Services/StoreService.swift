@@ -64,15 +64,11 @@ final class StoreService {
         }
     }
 
-    private func recordPurchase(_ productID: String) {
-        purchasedProductIDs.insert(productID)
-    }
-
     private func listenForTransactionUpdates() -> Task<Void, Never> {
         Task.detached(priority: .background) {
             for await result in Transaction.updates {
                 guard let transaction = try? self.checkVerified(result) else { continue }
-                await self.recordPurchase(transaction.productID)
+                await MainActor.run { _ = self.purchasedProductIDs.insert(transaction.productID) }
                 await transaction.finish()
             }
         }

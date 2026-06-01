@@ -28,13 +28,14 @@ final class DailyLogViewModel {
 
     @discardableResult
     func save(log: DailyLog, context: ModelContext) -> Bool {
+        log.isComplete = true
         do {
             try context.save()
         } catch {
+            log.isComplete = false
             saveError = "Your log couldn't be saved. Please try again."
             return false
         }
-        log.isComplete = true
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         NotificationService.shared.removeNotification(id: NotificationID.streakRisk)
         return true

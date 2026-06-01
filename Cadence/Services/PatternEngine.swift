@@ -23,6 +23,14 @@ actor PatternEngine {
 
     // MARK: - Pattern Detectors
 
+    private func isNextCalendarDay(_ date: Date, after previous: Date) -> Bool {
+        let cal = Calendar.current
+        guard let expectedNext = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: previous)) else {
+            return false
+        }
+        return cal.isDate(date, inSameDayAs: expectedNext)
+    }
+
     private func sleepHeadacheCorrelation(logs: [DailyLog]) -> InsightCard? {
         var poorSleepThenHeadache = 0
         var poorSleepTotal = 0
@@ -30,7 +38,8 @@ actor PatternEngine {
         for i in logs.indices.dropLast() {
             if logs[i].sleepHours < PatternThreshold.poorSleepHours {
                 poorSleepTotal += 1
-                if logs[i + 1].symptoms.contains(where: { $0.name.localizedCaseInsensitiveContains("headache") }) {
+                if isNextCalendarDay(logs[i + 1].date, after: logs[i].date) &&
+                   logs[i + 1].symptoms.contains(where: { $0.name.localizedCaseInsensitiveContains("headache") }) {
                     poorSleepThenHeadache += 1
                 }
             }
@@ -54,10 +63,19 @@ actor PatternEngine {
         var consecutiveStress = 0
         var streaksChecked = 0
         var fatigueFollowed = 0
+        var lastHighStressDate: Date? = nil
 
         for i in 0..<logs.count {
             if logs[i].stressLevel >= PatternThreshold.highStressLevel {
-                consecutiveStress += 1
+                let continuesStreak = lastHighStressDate.map {
+                    isNextCalendarDay(logs[i].date, after: $0)
+                } ?? false
+                // A calendar gap breaks the streak; count it if it qualified before resetting.
+                if !continuesStreak && consecutiveStress >= PatternThreshold.consecutiveStressDays {
+                    streaksChecked += 1
+                }
+                consecutiveStress = continuesStreak ? consecutiveStress + 1 : 1
+                lastHighStressDate = logs[i].date
             } else {
                 if consecutiveStress >= PatternThreshold.consecutiveStressDays {
                     streaksChecked += 1
@@ -66,6 +84,7 @@ actor PatternEngine {
                     }
                 }
                 consecutiveStress = 0
+                lastHighStressDate = nil
             }
         }
         // A streak ending at the last log has no following day to check for fatigue.
@@ -90,9 +109,9 @@ actor PatternEngine {
         // logs is sorted ascending; take the most recent window, split into two halves
         let halfWindow = PatternThreshold.energyTrendWindow / 2
         let recent = logs.suffix(PatternThreshold.energyTrendWindow)
+        guard recent.count == PatternThreshold.energyTrendWindow else { return nil }
         let firstHalf  = Array(recent.prefix(halfWindow)).map { Double($0.energy) }
         let secondHalf = Array(recent.suffix(halfWindow)).map { Double($0.energy) }
-        guard firstHalf.count == halfWindow, secondHalf.count == halfWindow else { return nil }
         let firstAvg = firstHalf.reduce(0,+) / Double(halfWindow)
         let secondAvg = secondHalf.reduce(0,+) / Double(halfWindow)
         let drop = firstAvg - secondAvg

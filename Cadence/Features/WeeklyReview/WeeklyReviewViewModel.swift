@@ -47,13 +47,14 @@ final class WeeklyReviewViewModel {
     @discardableResult
     func save(review: WeeklyReview, context: ModelContext) -> Bool {
         context.insert(review)   // no-op if already inserted; ensures new reviews are registered
+        review.isComplete = true
         do {
             try context.save()
         } catch {
+            review.isComplete = false
             saveError = "Your review couldn't be saved. Please try again."
             return false
         }
-        review.isComplete = true
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }

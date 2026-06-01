@@ -13,8 +13,6 @@ final class DailyLog {
     var sleepQuality: Int  // 0–10
     var stressLevel: Int   // 0–10  (Anxiety in UI)
     var basicsCompleted: [String]
-    var medications: [String]
-    var foodNotes: String
     var freeNote: String
     var isComplete: Bool
     var didEditMood: Bool
@@ -39,8 +37,6 @@ final class DailyLog {
         self.sleepQuality = 5
         self.stressLevel = 5
         self.basicsCompleted = []
-        self.medications = []
-        self.foodNotes = ""
         self.freeNote = ""
         self.isComplete = false
         self.didEditMood = false
@@ -70,8 +66,8 @@ struct SymptomEntry: Codable, Identifiable {
     var emoji: String
 }
 
-extension Comparable {
-    func clamped(to range: ClosedRange<Self>) -> Self {
-        min(max(self, range.lowerBound), range.upperBound)
+extension Int {
+    func clamped(to range: ClosedRange<Int>) -> Int {
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
