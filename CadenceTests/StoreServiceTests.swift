@@ -11,6 +11,7 @@ struct StoreServiceIsProTests {
     @MainActor
     func isPro_emptySet_returnsFalse() {
         let store = StoreService.shared
+        defer { store.purchasedProductIDs = [] }
         store.purchasedProductIDs = []
         #expect(store.isPro == false)
     }
@@ -19,27 +20,27 @@ struct StoreServiceIsProTests {
     @MainActor
     func isPro_containsProOneTime_returnsTrue() {
         let store = StoreService.shared
+        defer { store.purchasedProductIDs = [] }
         store.purchasedProductIDs = [StoreKitID.proOneTime]
         #expect(store.isPro == true)
-        store.purchasedProductIDs = []
     }
 
     @Test("isPro returns true when proMonthly is in purchasedProductIDs")
     @MainActor
     func isPro_containsProMonthly_returnsTrue() {
         let store = StoreService.shared
+        defer { store.purchasedProductIDs = [] }
         store.purchasedProductIDs = [StoreKitID.proMonthly]
         #expect(store.isPro == true)
-        store.purchasedProductIDs = []
     }
 
     @Test("isPro returns true when both product IDs are present")
     @MainActor
     func isPro_containsBoth_returnsTrue() {
         let store = StoreService.shared
+        defer { store.purchasedProductIDs = [] }
         store.purchasedProductIDs = [StoreKitID.proOneTime, StoreKitID.proMonthly]
         #expect(store.isPro == true)
-        store.purchasedProductIDs = []
     }
 }
 

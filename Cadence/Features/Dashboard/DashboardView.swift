@@ -38,7 +38,8 @@ struct DashboardView: View {
                 }
             }
             .onAppear { vm.refresh(logs: logs, reviews: reviews) }
-            .onChange(of: logs) { _, _ in vm.refresh(logs: logs, reviews: reviews) }
+            .onChange(of: logs)    { _, _ in vm.refresh(logs: logs, reviews: reviews) }
+            .onChange(of: reviews) { _, _ in vm.refresh(logs: logs, reviews: reviews) }
         }
     }
 

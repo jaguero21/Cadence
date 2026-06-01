@@ -24,6 +24,7 @@ struct LogInputFlow: View {
     @State private var basicsCompleted: [String] = []
     @State private var freeNote: String = ""
     @State private var isHydrated = false
+    @State private var createdLog: DailyLog?
 
     init(existingLog: DailyLog?) {
         self.existingLog = existingLog
@@ -357,7 +358,19 @@ struct LogInputFlow: View {
 
     @discardableResult
     private func buildLog() -> DailyLog {
-        let log = existingLog ?? DailyLog()
+        // Reuse an already-inserted log for new entries so repeated calls
+        // (e.g. save-retry) don't violate the unique-date constraint.
+        let log: DailyLog
+        if let existing = existingLog {
+            log = existing
+        } else if let created = createdLog {
+            log = created
+        } else {
+            let newLog = DailyLog()
+            modelContext.insert(newLog)
+            createdLog = newLog
+            log = newLog
+        }
         log.mood            = mood.clamped(to: 1...5)
         log.didEditMood     = didEditMood
         log.energy          = energy.clamped(to: 0...10)
@@ -369,7 +382,6 @@ struct LogInputFlow: View {
         log.basicsCompleted = basicsCompleted
         log.freeNote        = freeNote
         log.didEditMetrics  = didEditMetrics
-        if existingLog == nil { modelContext.insert(log) }
         return log
     }
 
