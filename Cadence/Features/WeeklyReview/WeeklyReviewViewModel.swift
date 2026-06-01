@@ -2,10 +2,11 @@ import SwiftUI
 import SwiftData
 
 @MainActor
-final class WeeklyReviewViewModel: ObservableObject {
-    @Published var currentPromptIndex: Int = 0
-    @Published var isComplete: Bool = false
-    @Published var saveError: String?
+@Observable
+final class WeeklyReviewViewModel {
+    var currentPromptIndex: Int = 0
+    var isComplete: Bool = false
+    var saveError: String?
 
     let prompts = Prompt.weeklyDefaults
 
@@ -46,14 +47,13 @@ final class WeeklyReviewViewModel: ObservableObject {
     @discardableResult
     func save(review: WeeklyReview, context: ModelContext) -> Bool {
         context.insert(review)   // no-op if already inserted; ensures new reviews are registered
-        review.isComplete = true
         do {
             try context.save()
         } catch {
-            review.isComplete = false
             saveError = "Your review couldn't be saved. Please try again."
             return false
         }
+        review.isComplete = true
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }

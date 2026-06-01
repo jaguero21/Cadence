@@ -4,8 +4,8 @@ import SwiftData
 struct ExportView: View {
     @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
-    @EnvironmentObject private var store: StoreService
-    @EnvironmentObject private var appState: AppState
+    @Environment(StoreService.self) private var store
+    @Environment(AppState.self) private var appState
     @State private var reportType: ReportType = .doctor
     @State private var startDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: .now) ?? .now
     @State private var endDate: Date = .now

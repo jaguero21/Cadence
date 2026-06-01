@@ -34,25 +34,28 @@ struct HistoryView: View {
     }
 
     private var monthPicker: some View {
-        HStack {
+        let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: selectedMonth)
+        let canGoForward = nextMonth.map { $0 <= .now } ?? false
+        return HStack {
             Button {
                 selectedMonth = Calendar.current.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
             } label: {
                 Image(systemName: "chevron.left")
                     .foregroundStyle(CadenceColor.accent)
             }
+            .accessibilityLabel("Previous month")
             Spacer()
             Text(selectedMonth.formatted(.dateTime.year().month(.wide)))
                 .font(.headline)
             Spacer()
             Button {
-                let next = Calendar.current.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
-                if next <= .now { selectedMonth = next }
+                if let next = nextMonth { selectedMonth = next }
             } label: {
                 Image(systemName: "chevron.right")
-                    .foregroundStyle((Calendar.current.date(byAdding: .month, value: 1, to: selectedMonth) ?? .now) <= .now
-                        ? CadenceColor.accent : .secondary)
+                    .foregroundStyle(canGoForward ? CadenceColor.accent : .secondary)
             }
+            .disabled(!canGoForward)
+            .accessibilityLabel("Next month")
         }
     }
 
@@ -61,9 +64,9 @@ struct HistoryView: View {
         let columns = Array(repeating: GridItem(.flexible()), count: 7)
 
         return VStack(spacing: 4) {
-            // Day headers
+            // Day headers — rotated to match the locale's first weekday
             HStack(spacing: 0) {
-                ForEach(Array(["M","T","W","T","F","S","S"].enumerated()), id: \.offset) { _, d in
+                ForEach(Array(localizedWeekdayHeaders.enumerated()), id: \.offset) { _, d in
                     Text(d)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -112,6 +115,15 @@ struct HistoryView: View {
         }
         .buttonStyle(.plain)
         .disabled(isFuture || log == nil)
+        .accessibilityLabel(dayCellLabel(day: day, log: log, isToday: isToday))
+        .accessibilityHint(log != nil && !isFuture ? "Double-tap to view details" : "")
+    }
+
+    private func dayCellLabel(day: Date, log: DailyLog?, isToday: Bool) -> String {
+        let dateText = isToday ? "Today" : day.formatted(.dateTime.weekday(.wide).month().day())
+        guard let log else { return "\(dateText), no log" }
+        let status = log.isComplete ? "complete" : "in progress"
+        return "\(dateText), logged \(status), mood \(log.mood) of 5"
     }
 
     private func cellBackground(log: DailyLog?, isSelected: Bool, isToday: Bool) -> Color {
@@ -163,14 +175,23 @@ struct HistoryView: View {
         }
     }
 
+    private var localizedWeekdayHeaders: [String] {
+        let cal = Calendar.current
+        let symbols = cal.veryShortWeekdaySymbols  // Sun-indexed, locale-aware
+        let offset = cal.firstWeekday - 1          // 0-based: 0=Sun, 1=Mon, …
+        return Array(symbols[offset...] + symbols[..<offset])
+    }
+
     private func daysForMonth(_ date: Date) -> [Date?] {
         let cal = Calendar.current
         let components = cal.dateComponents([.year, .month], from: date)
         guard let first = cal.date(from: components),
               let range = cal.range(of: .day, in: .month, for: first) else { return [] }
 
-        let weekday = (cal.component(.weekday, from: first) + 5) % 7
-        var days: [Date?] = Array(repeating: nil, count: weekday)
+        let dayIndex = cal.component(.weekday, from: first) - 1  // 0-based, Sun=0
+        let firstWeekdayIndex = cal.firstWeekday - 1
+        let leadingBlanks = (dayIndex - firstWeekdayIndex + 7) % 7
+        var days: [Date?] = Array(repeating: nil, count: leadingBlanks)
         for day in range {
             days.append(cal.date(byAdding: .day, value: day - 1, to: first))
         }

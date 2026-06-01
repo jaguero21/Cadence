@@ -4,15 +4,15 @@ import SwiftData
 struct ReviewFlowView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var vm = WeeklyReviewViewModel()
-    @State private var review: WeeklyReview = WeeklyReview(weekStartDate: Date().startOfWeek)
-    @State private var isHydrated = false
+    @State private var vm = WeeklyReviewViewModel()
+    @State private var review: WeeklyReview
     let existingReview: WeeklyReview?
     let logs: [DailyLog]
 
     init(existingReview: WeeklyReview?, logs: [DailyLog]) {
         self.existingReview = existingReview
         self.logs = logs
+        _review = State(initialValue: existingReview ?? WeeklyReview(weekStartDate: Date().startOfWeek))
     }
 
     var body: some View {
@@ -51,16 +51,16 @@ struct ReviewFlowView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Save & Close") {
-                        vm.save(review: review, context: modelContext)
-                        Task { @MainActor in dismiss() }
+                        if vm.save(review: review, context: modelContext) {
+                            Task { @MainActor in dismiss() }
+                        }
                     }
                 }
             }
             .onAppear {
-                guard !isHydrated else { return }
-                isHydrated = true
-                if let existing = existingReview { review = existing }
-                vm.populateSummary(review: review, from: logs)
+                if existingReview == nil {
+                    vm.populateSummary(review: review, from: logs)
+                }
             }
         }
     }

@@ -20,14 +20,23 @@ enum InsightCategory: String {
 }
 
 @MainActor
-final class InsightsViewModel: ObservableObject {
-    @Published var insights: [InsightCard] = []
-    @Published var chartRange: ChartRange = .sevenDay
+@Observable
+final class InsightsViewModel {
+    var insights: [InsightCard] = []
+    var chartRange: ChartRange = .sevenDay
 
     enum ChartRange: String, CaseIterable {
         case sevenDay  = "7D"
         case thirtyDay = "30D"
         case ninetyDay = "90D"
+
+        var voiceLabel: String {
+            switch self {
+            case .sevenDay:  return "7 days"
+            case .thirtyDay: return "30 days"
+            case .ninetyDay: return "90 days"
+            }
+        }
     }
 
     private var refreshTask: Task<Void, Never>?

@@ -26,3 +26,27 @@ enum StoreKitID {
     static let proOneTime = "com.carpecadence.pro.lifetime"
     static let proMonthly = "com.carpecadence.pro.monthly"
 }
+
+enum PatternThreshold {
+    // Minimum data requirements before running any pattern
+    static let minimumLogs: Int = 5
+    static let minimumPoorSleepEvents: Int = 3
+    static let minimumStressFatigueEvents: Int = 2
+    static let minimumMoodSleepPairs: Int = 7
+
+    // Detection levels
+    static let poorSleepHours: Double = 6       // below this is "poor sleep"
+    static let highStressLevel: Int = 7          // at or above is "high stress"
+    static let consecutiveStressDays: Int = 3    // streak length that triggers the pattern
+
+    // Confidence gates
+    static let minimumConfidence: Double = 0.5
+
+    // Energy trend
+    static let energyTrendWindow: Int = 14
+    static let energyDropThreshold: Double = 1.5
+    static let confidenceScale: Double = 5.0     // normalises a point-scale delta to 0–1
+
+    // Mood/sleep correlation
+    static let moodDiffThreshold: Double = 1.0
+}
