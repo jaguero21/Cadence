@@ -36,8 +36,7 @@ extension Color {
 
 extension Date {
     var startOfWeek: Date {
-        var cal = Calendar.current
-        cal.firstWeekday = 2
+        let cal = Calendar.current
         return cal.dateComponents([.calendar, .yearForWeekOfYear, .weekOfYear], from: self).date ?? self
     }
 

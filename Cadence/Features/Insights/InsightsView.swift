@@ -32,13 +32,21 @@ struct InsightsView: View {
 
     private var rangeSelector: some View {
         @Bindable var vm = vm
+        let availableRanges = InsightsViewModel.ChartRange.allCases.filter {
+            $0 != .ninetyDay || store.isPro
+        }
         return Picker("Range", selection: $vm.chartRange) {
-            ForEach(InsightsViewModel.ChartRange.allCases, id: \.self) { range in
+            ForEach(availableRanges, id: \.self) { range in
                 Text(range.rawValue).tag(range)
                     .accessibilityLabel(range.voiceLabel)
             }
         }
         .pickerStyle(.segmented)
+        .onChange(of: store.isPro) { _, isPro in
+            if !isPro && vm.chartRange == .ninetyDay {
+                vm.chartRange = .thirtyDay
+            }
+        }
     }
 
     private var chartsSection: some View {
@@ -65,7 +73,7 @@ struct InsightsView: View {
             Text("Pattern Insights")
                 .font(.headline)
             if vm.insights.isEmpty {
-                Text("Log at least 7 days to start seeing patterns.")
+                Text("Log at least \(PatternThreshold.minimumLogs) days to start seeing patterns.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .cadenceCard()

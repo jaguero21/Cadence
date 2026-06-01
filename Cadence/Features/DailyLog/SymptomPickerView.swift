@@ -24,8 +24,8 @@ struct SymptomPickerView: View {
     }
 
     private func symptomChip(tag: SymptomTag) -> some View {
-        let isSelected = selectedSymptoms.contains { $0.name == tag.name }
-        let severity = selectedSymptoms.first { $0.name == tag.name }?.severity ?? 5
+        let isSelected = selectedSymptoms.contains { $0.name.localizedCaseInsensitiveCompare(tag.name) == .orderedSame }
+        let severity = selectedSymptoms.first { $0.name.localizedCaseInsensitiveCompare(tag.name) == .orderedSame }?.severity ?? 5
 
         return VStack(spacing: 8) {
             Button {
@@ -95,7 +95,7 @@ struct SymptomPickerView: View {
     }
 
     private func toggleSymptom(tag: SymptomTag) {
-        if let idx = selectedSymptoms.firstIndex(where: { $0.name == tag.name }) {
+        if let idx = selectedSymptoms.firstIndex(where: { $0.name.localizedCaseInsensitiveCompare(tag.name) == .orderedSame }) {
             selectedSymptoms.remove(at: idx)
             if expandedTag == tag.name { expandedTag = nil }
         } else {
@@ -104,7 +104,7 @@ struct SymptomPickerView: View {
     }
 
     private func updateSeverity(tag: SymptomTag, value: Int) {
-        if let idx = selectedSymptoms.firstIndex(where: { $0.name == tag.name }) {
+        if let idx = selectedSymptoms.firstIndex(where: { $0.name.localizedCaseInsensitiveCompare(tag.name) == .orderedSame }) {
             selectedSymptoms[idx].severity = value.clamped(to: 1...10)
         }
     }

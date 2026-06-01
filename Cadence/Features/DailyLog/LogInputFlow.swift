@@ -14,6 +14,7 @@ struct LogInputFlow: View {
     // insertion, silently ignoring any future parent changes.
     @State private var mood: Int = 3
     @State private var didEditMood = false
+    @State private var didEditMetrics = false
     @State private var energy: Int = 5
     @State private var sleepHours: Double = 7.0
     @State private var painLevel: Int = 0
@@ -63,6 +64,7 @@ struct LogInputFlow: View {
                 isHydrated = true
                 mood            = log.mood
                 didEditMood     = log.didEditMood
+                didEditMetrics  = log.didEditMetrics
                 energy          = log.energy
                 sleepHours      = log.sleepHours
                 painLevel       = log.painLevel
@@ -188,6 +190,12 @@ struct LogInputFlow: View {
             }
         }
         .cadenceCard()
+        .onChange(of: energy)        { _, _ in didEditMetrics = true }
+        .onChange(of: sleepHours)    { _, _ in didEditMetrics = true }
+        .onChange(of: sleepQuality)  { _, _ in didEditMetrics = true }
+        .onChange(of: painLevel)     { _, _ in didEditMetrics = true }
+        .onChange(of: brainFogLevel) { _, _ in didEditMetrics = true }
+        .onChange(of: stressLevel)   { _, _ in didEditMetrics = true }
     }
 
     // MARK: - Basics Step
@@ -347,6 +355,7 @@ struct LogInputFlow: View {
 
     // MARK: - Helpers
 
+    @discardableResult
     private func buildLog() -> DailyLog {
         let log = existingLog ?? DailyLog()
         log.mood            = mood.clamped(to: 1...5)
@@ -359,19 +368,18 @@ struct LogInputFlow: View {
         log.sleepQuality    = sleepQuality.clamped(to: 0...10)
         log.basicsCompleted = basicsCompleted
         log.freeNote        = freeNote
-        log.didEditMetrics  = true
+        log.didEditMetrics  = didEditMetrics
         if existingLog == nil { modelContext.insert(log) }
         return log
     }
 
     private func partialSave() {
-        let log = buildLog()
+        buildLog()
         do {
             try modelContext.save()
         } catch {
             vm.saveError = "Your progress couldn't be saved. Please try again."
         }
-        _ = log
     }
 }
 
