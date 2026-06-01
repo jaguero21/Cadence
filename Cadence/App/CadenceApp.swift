@@ -95,8 +95,12 @@ struct ContentView: View {
     private func seedSymptomTagsIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: symptomSeedKey) else { return }
         for tag in SymptomTag.defaults { modelContext.insert(tag) }
-        try? modelContext.save()
-        UserDefaults.standard.set(true, forKey: symptomSeedKey)
+        do {
+            try modelContext.save()
+            UserDefaults.standard.set(true, forKey: symptomSeedKey)
+        } catch {
+            // Leave the flag unset so the next launch retries seeding.
+        }
     }
 }
 

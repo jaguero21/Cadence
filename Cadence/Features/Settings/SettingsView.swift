@@ -39,6 +39,11 @@ struct SettingsView: View {
                     Spacer()
                     Text("Active").foregroundStyle(CadenceColor.successGreen)
                 }
+                NavigationLink {
+                    ExportView()
+                } label: {
+                    Label("Export Report", systemImage: "doc.richtext.fill")
+                }
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Upgrade to Pro").font(.headline)

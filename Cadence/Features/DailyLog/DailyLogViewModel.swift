@@ -28,11 +28,12 @@ final class DailyLogViewModel {
 
     @discardableResult
     func save(log: DailyLog, context: ModelContext) -> Bool {
+        let wasComplete = log.isComplete
         log.isComplete = true
         do {
             try context.save()
         } catch {
-            log.isComplete = false
+            log.isComplete = wasComplete
             saveError = "Your log couldn't be saved. Please try again."
             return false
         }

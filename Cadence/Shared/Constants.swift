@@ -1,14 +1,29 @@
 import SwiftUI
+import UIKit
 
 enum CadenceColor {
-    static let accent       = Color(red: 0.200, green: 0.471, blue: 0.941)
-    static let background   = Color(.systemGroupedBackground)
-    static let cardBG       = Color(.secondarySystemGroupedBackground)
-    static let moodBlue     = Color(red: 0.27, green: 0.53, blue: 0.94)
-    static let energyOrange = Color(red: 0.98, green: 0.60, blue: 0.22)
-    static let sleepPurple  = Color(red: 0.58, green: 0.36, blue: 0.89)
-    static let stressRed    = Color(red: 0.94, green: 0.36, blue: 0.36)
-    static let successGreen = Color(red: 0.28, green: 0.78, blue: 0.49)
+    // System adaptive colors — already track light/dark automatically.
+    static let background = Color(.systemGroupedBackground)
+    static let cardBG     = Color(.secondarySystemGroupedBackground)
+
+    // Brand colors — slightly lighter in dark mode to maintain contrast
+    // against dark card backgrounds (UIColor dynamicProvider handles the shift).
+    static let accent       = Color(uiColor: .dynamic(light: (0.200, 0.471, 0.941), dark: (0.35, 0.57, 0.96)))
+    static let moodBlue     = Color(uiColor: .dynamic(light: (0.27,  0.53,  0.94),  dark: (0.40, 0.62, 0.97)))
+    static let energyOrange = Color(uiColor: .dynamic(light: (0.98,  0.60,  0.22),  dark: (1.00, 0.70, 0.35)))
+    static let sleepPurple  = Color(uiColor: .dynamic(light: (0.58,  0.36,  0.89),  dark: (0.70, 0.50, 0.95)))
+    static let stressRed    = Color(uiColor: .dynamic(light: (0.94,  0.36,  0.36),  dark: (1.00, 0.50, 0.50)))
+    static let successGreen = Color(uiColor: .dynamic(light: (0.28,  0.78,  0.49),  dark: (0.40, 0.88, 0.58)))
+}
+
+private extension UIColor {
+    static func dynamic(light: (CGFloat, CGFloat, CGFloat), dark: (CGFloat, CGFloat, CGFloat)) -> UIColor {
+        UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: dark.0,  green: dark.1,  blue: dark.2,  alpha: 1)
+                : UIColor(red: light.0, green: light.1, blue: light.2, alpha: 1)
+        }
+    }
 }
 
 enum CadenceLayout {

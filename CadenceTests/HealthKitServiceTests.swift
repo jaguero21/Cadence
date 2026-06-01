@@ -9,7 +9,7 @@ import Foundation
 // These tests cover only the pure-logic surface:
 //   • isAvailable: does not crash; returns false on the simulator
 //   • requestAuthorization: returns without throwing when isAvailable is false (early return guard)
-//   • HealthKitSnapshot: struct initialisation and default-zero field values
+//   • HealthKitSnapshot: struct initialisation — default is all-nil (no data), not zero
 
 @Suite("HealthKitService – isAvailable")
 struct HealthKitServiceIsAvailableTests {
@@ -48,36 +48,41 @@ struct HealthKitServiceAuthorizationTests {
 }
 
 // MARK: - HealthKitSnapshot – struct tests
+//
+// steps and sleepHours are Int? / Double? — nil means "no HealthKit data",
+// which is distinct from a genuine zero value.
 
-@Suite("HealthKitSnapshot – initialisation")
-struct HealthKitSnapshotInitTests {
+@Suite("HealthKitSnapshot – default initialisation")
+struct HealthKitSnapshotDefaultInitTests {
 
-    @Test("Default-zero snapshot has steps = 0")
-    func snapshot_steps_defaultsToZero() {
-        let snapshot = HealthKitSnapshot(steps: 0, restingHR: nil, hrv: nil, sleepHours: 0)
-        #expect(snapshot.steps == 0)
+    @Test("Default snapshot has steps = nil (no data)")
+    func snapshot_steps_defaultsToNil() {
+        let snapshot = HealthKitSnapshot()
+        #expect(snapshot.steps == nil)
     }
 
-    @Test("Default-zero snapshot has sleepHours = 0")
-    func snapshot_sleepHours_defaultsToZero() {
-        let snapshot = HealthKitSnapshot(steps: 0, restingHR: nil, hrv: nil, sleepHours: 0)
-        #expect(snapshot.sleepHours == 0.0)
+    @Test("Default snapshot has sleepHours = nil (no data)")
+    func snapshot_sleepHours_defaultsToNil() {
+        let snapshot = HealthKitSnapshot()
+        #expect(snapshot.sleepHours == nil)
     }
 
-    @Test("Default-zero snapshot has restingHR = nil")
+    @Test("Default snapshot has restingHR = nil")
     func snapshot_restingHR_defaultsToNil() {
-        let snapshot = HealthKitSnapshot(steps: 0, restingHR: nil, hrv: nil, sleepHours: 0)
-        #expect(snapshot.restingHR == nil)
+        #expect(HealthKitSnapshot().restingHR == nil)
     }
 
-    @Test("Default-zero snapshot has hrv = nil")
+    @Test("Default snapshot has hrv = nil")
     func snapshot_hrv_defaultsToNil() {
-        let snapshot = HealthKitSnapshot(steps: 0, restingHR: nil, hrv: nil, sleepHours: 0)
-        #expect(snapshot.hrv == nil)
+        #expect(HealthKitSnapshot().hrv == nil)
     }
+}
 
-    @Test("Snapshot stores non-zero values correctly")
-    func snapshot_storesNonZeroValues() {
+@Suite("HealthKitSnapshot – explicit values")
+struct HealthKitSnapshotValueTests {
+
+    @Test("Snapshot stores all non-nil values correctly")
+    func snapshot_storesNonNilValues() {
         let snapshot = HealthKitSnapshot(steps: 8432, restingHR: 62.5, hrv: 45.3, sleepHours: 7.25)
         #expect(snapshot.steps == 8432)
         #expect(snapshot.restingHR == 62.5)
@@ -85,12 +90,13 @@ struct HealthKitSnapshotInitTests {
         #expect(snapshot.sleepHours == 7.25)
     }
 
-    @Test("Snapshot with only steps populated leaves HR and HRV nil")
-    func snapshot_onlySteps_hrAndHrvAreNil() {
-        let snapshot = HealthKitSnapshot(steps: 10000, restingHR: nil, hrv: nil, sleepHours: 0)
+    @Test("Snapshot with only steps populated leaves other fields nil")
+    func snapshot_onlySteps_otherFieldsNil() {
+        let snapshot = HealthKitSnapshot(steps: 10000)
         #expect(snapshot.steps == 10000)
         #expect(snapshot.restingHR == nil)
         #expect(snapshot.hrv == nil)
+        #expect(snapshot.sleepHours == nil)
     }
 
     @Test("Snapshot is a value type — mutation does not affect original")
@@ -98,7 +104,7 @@ struct HealthKitSnapshotInitTests {
         var original = HealthKitSnapshot(steps: 100, restingHR: 65.0, hrv: 40.0, sleepHours: 6.5)
         var copy = original
         copy.steps = 9999
-        copy.sleepHours = 0
+        copy.sleepHours = nil
         #expect(original.steps == 100)
         #expect(original.sleepHours == 6.5)
     }

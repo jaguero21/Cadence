@@ -1,10 +1,27 @@
 import HealthKit
 import SwiftData
+import UIKit
 
 final class HealthKitService {
     static let shared = HealthKitService()
     private let store = HKHealthStore()
-    private init() {}
+    private var foregroundObserver: NSObjectProtocol?
+
+    private init() {
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.cachedIsAuthorized = nil
+        }
+    }
+
+    deinit {
+        if let observer = foregroundObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
@@ -105,7 +122,7 @@ final class HealthKitService {
                     cont.resume(returning: nil); return
                 }
                 let asleepValues: Set<Int> = [
-                    HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,
+                    HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,  // covers legacy .asleep (same raw value, renamed iOS 16)
                     HKCategoryValueSleepAnalysis.asleepCore.rawValue,
                     HKCategoryValueSleepAnalysis.asleepREM.rawValue,
                     HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
