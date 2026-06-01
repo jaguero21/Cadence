@@ -2,8 +2,8 @@ import SwiftUI
 import StoreKit
 
 struct ProPaywallView: View {
-    @EnvironmentObject private var store: StoreService
-    @EnvironmentObject private var appState: AppState
+    @Environment(StoreService.self) private var store
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
     @State private var isPurchasing = false
@@ -113,7 +113,20 @@ struct ProPaywallView: View {
                 )
             }
 
-            if store.products.isEmpty {
+            if store.productsLoadFailed {
+                VStack(spacing: 10) {
+                    Text("Couldn't load products. Check your connection.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Retry") {
+                        Task { await store.loadProducts() }
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            } else if store.products.isEmpty {
                 ProgressView("Loading…")
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)

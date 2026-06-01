@@ -2,11 +2,12 @@ import SwiftUI
 import Combine
 
 @MainActor
-final class AppState: ObservableObject {
-    @Published var hasCompletedOnboarding: Bool = false
-    @Published var showingProPaywall: Bool = false
-    @Published var notificationsAuthorized: Bool = false
-    @Published var healthKitAuthorized: Bool = false
+@Observable
+final class AppState {
+    var hasCompletedOnboarding: Bool = false
+    var showingProPaywall: Bool = false
+    var notificationsAuthorized: Bool = false
+    var healthKitAuthorized: Bool = false
 
     private let onboardingKey = "cadence.onboarded"
 

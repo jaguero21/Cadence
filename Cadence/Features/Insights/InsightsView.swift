@@ -3,9 +3,9 @@ import SwiftData
 
 struct InsightsView: View {
     @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
-    @StateObject private var vm = InsightsViewModel()
-    @EnvironmentObject private var store: StoreService
-    @EnvironmentObject private var appState: AppState
+    @State private var vm = InsightsViewModel()
+    @Environment(StoreService.self) private var store
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         NavigationStack {
@@ -31,9 +31,11 @@ struct InsightsView: View {
     }
 
     private var rangeSelector: some View {
-        Picker("Range", selection: $vm.chartRange) {
+        @Bindable var vm = vm
+        return Picker("Range", selection: $vm.chartRange) {
             ForEach(InsightsViewModel.ChartRange.allCases, id: \.self) { range in
                 Text(range.rawValue).tag(range)
+                    .accessibilityLabel(range.voiceLabel)
             }
         }
         .pickerStyle(.segmented)

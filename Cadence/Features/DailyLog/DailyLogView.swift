@@ -82,10 +82,14 @@ struct DailyLogView: View {
         }
     }
 
+    private var pastLogs: [DailyLog] {
+        Array(logs.drop(while: { Calendar.current.isDateInToday($0.date) }).prefix(14))
+    }
+
     private var recentLogs: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recent").font(.headline)
-            ForEach(logs.filter { !Calendar.current.isDateInToday($0.date) }.prefix(14)) { log in
+            ForEach(pastLogs) { log in
                 Button {
                     selectedLog = log
                 } label: {

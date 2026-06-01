@@ -62,9 +62,13 @@ struct WeeklyReviewView: View {
         }
     }
 
+    private var pastReviews: [WeeklyReview] {
+        Array(reviews.drop(while: { $0.weekStartDate.isThisWeek }))
+    }
+
     private var pastReviewsSection: some View {
         Section("Past Reviews") {
-            ForEach(reviews.filter { !$0.weekStartDate.isThisWeek }) { review in
+            ForEach(pastReviews) { review in
                 Button {
                     selectedReview = review
                 } label: {

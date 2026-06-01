@@ -4,7 +4,7 @@ import SwiftData
 struct LogInputFlow: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var vm = DailyLogViewModel()
+    @State private var vm = DailyLogViewModel()
 
     private let existingLog: DailyLog?
 
@@ -82,7 +82,10 @@ struct LogInputFlow: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Save & Close") { partialSave(); Task { @MainActor in dismiss() } }
+                    Button("Save & Close") {
+                        partialSave()
+                        if vm.saveError == nil { Task { @MainActor in dismiss() } }
+                    }
                 }
             }
         }
@@ -135,6 +138,8 @@ struct LogInputFlow: View {
                             )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(moodLabel(value))
+                    .accessibilityAddTraits(mood == value ? [.isSelected] : [])
                 }
             }
         }
@@ -149,6 +154,17 @@ struct LogInputFlow: View {
         case 4: return "🙂"
         case 5: return "😊"
         default: return "😐"
+        }
+    }
+
+    private func moodLabel(_ value: Int) -> String {
+        switch value {
+        case 1: return "Very sad, 1 of 5"
+        case 2: return "Sad, 2 of 5"
+        case 3: return "Neutral, 3 of 5"
+        case 4: return "Happy, 4 of 5"
+        case 5: return "Very happy, 5 of 5"
+        default: return "Neutral"
         }
     }
 
@@ -224,6 +240,8 @@ struct LogInputFlow: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(item.name)
+                    .accessibilityAddTraits(selected ? [.isSelected] : [])
                 }
             }
         }
@@ -331,14 +349,14 @@ struct LogInputFlow: View {
 
     private func buildLog() -> DailyLog {
         let log = existingLog ?? DailyLog()
-        log.mood            = mood
+        log.mood            = mood.clamped(to: 1...5)
         log.didEditMood     = didEditMood
-        log.energy          = energy
+        log.energy          = energy.clamped(to: 0...10)
         log.sleepHours      = sleepHours
-        log.painLevel       = painLevel
-        log.brainFogLevel   = brainFogLevel
-        log.stressLevel     = stressLevel
-        log.sleepQuality    = sleepQuality
+        log.painLevel       = painLevel.clamped(to: 0...10)
+        log.brainFogLevel   = brainFogLevel.clamped(to: 0...10)
+        log.stressLevel     = stressLevel.clamped(to: 0...10)
+        log.sleepQuality    = sleepQuality.clamped(to: 0...10)
         log.basicsCompleted = basicsCompleted
         log.freeNote        = freeNote
         log.didEditMetrics  = true
@@ -348,7 +366,11 @@ struct LogInputFlow: View {
 
     private func partialSave() {
         let log = buildLog()
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            vm.saveError = "Your progress couldn't be saved. Please try again."
+        }
         _ = log
     }
 }
@@ -399,6 +421,8 @@ private struct SleepHoursRow: View {
                 step: 0.5
             )
             .tint(CadenceColor.sleepPurple)
+            .accessibilityLabel("Sleep hours")
+            .accessibilityValue(String(format: "%.1f hours", hours))
             Text(String(format: "%.1f", hours))
                 .font(.headline.monospacedDigit())
                 .frame(width: 36, alignment: .trailing)
@@ -432,6 +456,8 @@ private struct BodyMetricRow: View {
                 step: 1
             )
             .tint(Color(.systemGray3))
+            .accessibilityLabel(label)
+            .accessibilityValue("\(value) out of 10")
             Text("\(value)")
                 .font(.headline.monospacedDigit())
                 .frame(width: 24, alignment: .trailing)

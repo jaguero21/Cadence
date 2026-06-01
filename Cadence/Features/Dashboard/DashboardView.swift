@@ -5,7 +5,7 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
-    @StateObject private var vm = DashboardViewModel()
+    @State private var vm = DashboardViewModel()
     @State private var showingDailyLog = false
     @State private var showingWeeklyReview = false
 
@@ -74,6 +74,7 @@ struct DashboardView: View {
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white)
                 }
+                .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Today's Log")
@@ -92,10 +93,12 @@ struct DashboardView: View {
                 Spacer()
                 Image(systemName: "chevron.right")
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
             .cadenceCard()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(todayCardAccessibilityLabel)
         .sheet(isPresented: $showingDailyLog) {
             LogInputFlow(existingLog: vm.todayLog)
         }
@@ -163,9 +166,10 @@ struct DashboardView: View {
     @ViewBuilder
     private var quickStats: some View {
         let recent = Array(logs.prefix(7))
-        if !recent.isEmpty {
-            let avgMood   = Int((Double(recent.map(\.mood).reduce(0, +)) / Double(recent.count)).rounded())
-            let avgEnergy = Int((Double(recent.map(\.energy).reduce(0, +)) / Double(recent.count)).rounded())
+        let count = Double(recent.count)
+        if count > 0 {
+            let avgMood   = Int((Double(recent.map(\.mood).reduce(0, +)) / count).rounded())
+            let avgEnergy = Int((Double(recent.map(\.energy).reduce(0, +)) / count).rounded())
             VStack(alignment: .leading, spacing: 12) {
                 Text("7-Day Snapshot")
                     .font(.headline)
@@ -193,6 +197,13 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(CadenceColor.cardBG, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var todayCardAccessibilityLabel: String {
+        if let log = vm.todayLog {
+            return log.isComplete ? "Today's Log, completed" : "Today's Log, in progress"
+        }
+        return "Today's Log, not started. Takes about 90 seconds."
     }
 
     private var greetingText: String {

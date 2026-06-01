@@ -1,23 +1,30 @@
 import StoreKit
 import SwiftUI
+import OSLog
 
 @MainActor
-final class StoreService: ObservableObject {
+@Observable
+final class StoreService {
     static let shared = StoreService()
-    @Published var products: [Product] = []
-    @Published var purchasedProductIDs: Set<String> = []
+    var products: [Product] = []
+    var purchasedProductIDs: Set<String> = []
+    var productsLoadFailed = false
     private var updates: Task<Void, Never>?
+    private static let log = Logger(subsystem: "com.carpecadence", category: "StoreService")
     private init() { updates = listenForTransactionUpdates() }
-    deinit { updates?.cancel() }
+    @MainActor deinit { updates?.cancel() }
 
     var lifetimeProduct: Product? { products.first { $0.id == StoreKitID.proOneTime } }
     var monthlyProduct: Product? { products.first { $0.id == StoreKitID.proMonthly } }
 
     func loadProducts() async {
+        productsLoadFailed = false
         do {
             products = try await Product.products(for: [StoreKitID.proOneTime, StoreKitID.proMonthly])
         } catch {
             products = []
+            productsLoadFailed = true
+            Self.log.error("Failed to load StoreKit products: \(error, privacy: .public)")
         }
     }
 
