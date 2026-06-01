@@ -6,12 +6,37 @@ enum ReportType: String, CaseIterable {
     case personal = "Personal Summary"
 }
 
-@MainActor
+struct DailyLogSnapshot: Sendable {
+    let date: Date
+    let mood: Int
+    let energy: Int
+    let sleepHours: Double
+    let symptoms: [SymptomEntry]
+
+    init(_ log: DailyLog) {
+        date      = log.date
+        mood      = log.mood
+        energy    = log.energy
+        sleepHours = log.sleepHours
+        symptoms  = log.symptoms
+    }
+}
+
+struct WeeklyReviewSnapshot: Sendable {
+    let weekLabel: String
+    let promptResponses: [PromptResponse]
+
+    init(_ review: WeeklyReview) {
+        weekLabel       = review.weekLabel
+        promptResponses = review.promptResponses
+    }
+}
+
 enum PDFBuilder {
-    static func build(type: ReportType, logs: [DailyLog], reviews: [WeeklyReview]) async -> URL? {
+    static func build(type: ReportType, logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot]) async -> URL? {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
-        let stamp = Int(Date.now.timeIntervalSince1970)
-        let filename = type == .doctor ? "cadence-doctor-report-\(stamp).pdf" : "cadence-personal-summary-\(stamp).pdf"
+        let uid = UUID().uuidString
+        let filename = type == .doctor ? "cadence-doctor-report-\(uid).pdf" : "cadence-personal-summary-\(uid).pdf"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
 
         do {
@@ -50,7 +75,7 @@ enum PDFBuilder {
 
     // MARK: - Renderers
 
-    private static func renderDoctorReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLog]) {
+    private static func renderDoctorReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot]) {
         ctx.beginPage()
         let titleAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 22, weight: .bold)]
         let sectionAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 14, weight: .semibold)]
@@ -102,7 +127,7 @@ enum PDFBuilder {
         }
     }
 
-    private static func renderPersonalSummary(ctx: UIGraphicsPDFRendererContext, reviews: [WeeklyReview]) {
+    private static func renderPersonalSummary(ctx: UIGraphicsPDFRendererContext, reviews: [WeeklyReviewSnapshot]) {
         let headerAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 18, weight: .bold)]
         let sectionAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 13, weight: .semibold)]
         let bodyAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 12)]

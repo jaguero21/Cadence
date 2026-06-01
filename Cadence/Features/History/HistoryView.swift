@@ -7,8 +7,17 @@ struct HistoryView: View {
     @State private var selectedLog: DailyLog?
 
     private var logsByDate: [Date: DailyLog] {
-        Dictionary(
-            logs.map { (Calendar.current.startOfDay(for: $0.date), $0) },
+        let cal = Calendar.current
+        let components = cal.dateComponents([.year, .month], from: selectedMonth)
+        guard let monthStart = cal.date(from: components),
+              let monthEnd = cal.date(byAdding: .month, value: 1, to: monthStart)
+        else { return [:] }
+        // logs are sorted newest-first; skip future months then stop at month start.
+        let monthLogs = logs
+            .drop(while:   { $0.date >= monthEnd })
+            .prefix(while: { $0.date >= monthStart })
+        return Dictionary(
+            monthLogs.map { (cal.startOfDay(for: $0.date), $0) },
             uniquingKeysWith: { first, _ in first }
         )
     }
@@ -227,19 +236,6 @@ struct LogDetailView: View {
                     }
                 }
 
-                if !log.medications.isEmpty {
-                    Section("Medications") {
-                        ForEach(log.medications, id: \.self) { med in
-                            Label(med, systemImage: "pill.fill")
-                        }
-                    }
-                }
-
-                if !log.foodNotes.isEmpty {
-                    Section("Food & Diet") {
-                        Text(log.foodNotes)
-                    }
-                }
 
                 if !log.freeNote.isEmpty {
                     Section("Notes") {

@@ -92,14 +92,18 @@ struct ExportView: View {
 
     private func generate() {
         isGenerating = true
-        let filteredLogs = logs.filter { $0.date >= startDate && $0.date <= endDate }
-        let filteredReviews = reviews.filter { $0.weekStartDate >= startDate && $0.weekStartDate <= endDate }
+        let logSnapshots = logs
+            .filter { $0.date >= startDate && $0.date <= endDate }
+            .map(DailyLogSnapshot.init)
+        let reviewSnapshots = reviews
+            .filter { $0.weekStartDate <= endDate && $0.weekEndDate >= startDate }
+            .map(WeeklyReviewSnapshot.init)
 
         Task.detached {
             let url = await PDFBuilder.build(
                 type: reportType,
-                logs: filteredLogs,
-                reviews: filteredReviews
+                logs: logSnapshots,
+                reviews: reviewSnapshots
             )
             await MainActor.run {
                 isGenerating = false
