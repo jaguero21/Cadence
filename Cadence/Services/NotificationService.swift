@@ -26,6 +26,7 @@ final class NotificationService {
     }
 
     func scheduleDailyReminder(at hour: Int, minute: Int) {
+        guard (0...23).contains(hour), (0...59).contains(minute) else { return }
         removeNotification(id: NotificationID.dailyLog)
         var components = DateComponents()
         components.hour = hour
@@ -42,6 +43,7 @@ final class NotificationService {
     }
 
     func scheduleWeeklyReviewReminder(weekday: Int = 1, hour: Int = 19) {
+        guard (1...7).contains(weekday), (0...23).contains(hour) else { return }
         removeNotification(id: NotificationID.weeklyReview)
         var components = DateComponents()
         components.weekday = weekday
@@ -57,11 +59,19 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
+    // Fires once at this hour (24 h). Guard and trigger components both derive from it
+    // so they can't silently diverge if the time is ever changed.
+    private static let streakRiskHour = 21
+
     func scheduleStreakAtRisk() {
-        guard Calendar.current.component(.hour, from: .now) < 21 else { return }
+        let calendar = Calendar.current
+        let now = Date.now
+        // Bail out if the firing time has already passed today; a non-repeating
+        // UNCalendarNotificationTrigger whose time is in the past fires tomorrow instead.
+        guard calendar.component(.hour, from: now) < Self.streakRiskHour else { return }
         removeNotification(id: NotificationID.streakRisk)
         var components = DateComponents()
-        components.hour = 21
+        components.hour = Self.streakRiskHour
         components.minute = 0
 
         // Non-repeating: fires once at 9 pm today. DashboardViewModel reschedules each

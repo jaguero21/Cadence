@@ -1,13 +1,13 @@
 import SwiftUI
 import SwiftData
-import Combine
 
 @MainActor
-final class DashboardViewModel: ObservableObject {
-    @Published var todayLog: DailyLog?
-    @Published var thisWeekReview: WeeklyReview?
-    @Published var streak: Int = 0
-    @Published var latestInsight: InsightCard?
+@Observable
+final class DashboardViewModel {
+    var todayLog: DailyLog?
+    var thisWeekReview: WeeklyReview?
+    var streak: Int = 0
+    var latestInsight: InsightCard?
 
     private var refreshTask: Task<Void, Never>?
 

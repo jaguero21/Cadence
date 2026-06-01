@@ -3,7 +3,7 @@ import SwiftData
 
 @Model
 final class WeeklyReview {
-    var weekStartDate: Date
+    @Attribute(.unique) var weekStartDate: Date
     var promptResponses: [PromptResponse]
     var overallRating: Int      // 1–5
 
@@ -15,7 +15,7 @@ final class WeeklyReview {
     var isComplete: Bool
 
     init(weekStartDate: Date) {
-        self.weekStartDate = weekStartDate
+        self.weekStartDate = weekStartDate.startOfWeek
         self.promptResponses = []
         self.overallRating = 0
         self.avgMood = 0

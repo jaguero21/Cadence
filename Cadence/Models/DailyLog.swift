@@ -3,7 +3,7 @@ import SwiftData
 
 @Model
 final class DailyLog {
-    var date: Date
+    @Attribute(.unique) var date: Date
     var symptoms: [SymptomEntry]
     var mood: Int          // 1–5 (emoji scale)
     var energy: Int        // 0–10
@@ -68,4 +68,10 @@ struct SymptomEntry: Codable, Identifiable {
     var name: String
     var severity: Int  // 1–10
     var emoji: String
+}
+
+extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
+    }
 }

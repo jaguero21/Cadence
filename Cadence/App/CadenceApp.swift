@@ -5,8 +5,8 @@ import UserNotifications
 
 @main
 struct CadenceApp: App {
-    @StateObject private var appState = AppState()
-    @StateObject private var store = StoreService.shared
+    @State private var appState = AppState()
+    @State private var store = StoreService.shared
 
     // Set when the persistent store failed and we fell back to in-memory storage.
     static private(set) var usingFallbackStorage = false
@@ -35,11 +35,12 @@ struct CadenceApp: App {
         WindowGroup {
             if let container = sharedModelContainer {
                 ContentView()
-                    .environmentObject(appState)
-                    .environmentObject(store)
+                    .environment(appState)
+                    .environment(store)
                     .modelContainer(container)
                     .task {
                         appState.notificationsAuthorized = await NotificationService.shared.requestAuthorization()
+                        appState.healthKitAuthorized = (try? await HealthKitService.shared.requestAuthorization()) ?? HealthKitService.shared.isAuthorized
                     }
             } else {
                 StorageFatalErrorView()
@@ -49,7 +50,7 @@ struct CadenceApp: App {
 }
 
 struct ContentView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     @Environment(\.modelContext) private var modelContext
     @State private var selectedTab: Tab = .dashboard
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
@@ -57,6 +58,7 @@ struct ContentView: View {
     private let symptomSeedKey = "cadence.symptomTagsSeeded"
 
     var body: some View {
+        @Bindable var appState = appState
         TabView(selection: $selectedTab) {
             DashboardView()
                 .tabItem { Label("Today", systemImage: "sun.max.fill") }

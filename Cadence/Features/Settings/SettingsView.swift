@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 
 struct SettingsView: View {
-    @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var store: StoreService
+    @Environment(AppState.self) private var appState
+    @Environment(StoreService.self) private var store
     @Query private var customSymptoms: [SymptomTag]
     @Environment(\.modelContext) private var modelContext
 
@@ -135,8 +135,7 @@ struct SettingsView: View {
         Section {
             Button("Re-authorize HealthKit") {
                 Task {
-                    try? await HealthKitService.shared.requestAuthorization()
-                    appState.healthKitAuthorized = HealthKitService.shared.isAuthorized
+                    appState.healthKitAuthorized = (try? await HealthKitService.shared.requestAuthorization()) ?? HealthKitService.shared.isAuthorized
                 }
             }
             .foregroundStyle(CadenceColor.accent)

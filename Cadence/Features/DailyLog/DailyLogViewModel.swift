@@ -2,10 +2,11 @@ import SwiftUI
 import SwiftData
 
 @MainActor
-final class DailyLogViewModel: ObservableObject {
-    @Published var currentStep: LogStep = .mood
-    @Published var isDone: Bool = false
-    @Published var saveError: String?
+@Observable
+final class DailyLogViewModel {
+    var currentStep: LogStep = .mood
+    var isDone: Bool = false
+    var saveError: String?
 
     func nextStep() {
         withAnimation(CadenceAnimation.spring) {
@@ -27,14 +28,13 @@ final class DailyLogViewModel: ObservableObject {
 
     @discardableResult
     func save(log: DailyLog, context: ModelContext) -> Bool {
-        log.isComplete = true
         do {
             try context.save()
         } catch {
-            log.isComplete = false
             saveError = "Your log couldn't be saved. Please try again."
             return false
         }
+        log.isComplete = true
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         NotificationService.shared.removeNotification(id: NotificationID.streakRisk)
         return true

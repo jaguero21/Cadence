@@ -28,12 +28,15 @@ final class HealthKitService {
         return Set(quantityTypes + categoryTypes)
     }()
 
-    func requestAuthorization() async throws {
-        guard isAvailable else { return }
+    @discardableResult
+    func requestAuthorization() async throws -> Bool {
+        guard isAvailable else { return false }
         try await store.requestAuthorization(toShare: [], read: readTypes)
+        return isAuthorized
     }
 
     func fetchYesterdayData() async -> HealthKitSnapshot {
+        guard isAuthorized else { return HealthKitSnapshot(steps: 0, restingHR: nil, hrv: nil, sleepHours: 0) }
         guard
             let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now),
             let end = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: yesterday))
@@ -51,6 +54,7 @@ final class HealthKitService {
 
     @MainActor
     func populate(log: DailyLog) async {
+        guard isAuthorized else { return }
         let snapshot = await fetchYesterdayData()
         if snapshot.steps > 0          { log.hkSteps      = snapshot.steps }
         if let hr  = snapshot.restingHR { log.hkRestingHR  = hr }
@@ -66,7 +70,8 @@ final class HealthKitService {
     private func fetchSum(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
         guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
-            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, stats, _ in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, stats, error in
+                guard error == nil else { cont.resume(returning: nil); return }
                 cont.resume(returning: stats?.sumQuantity()?.doubleValue(for: unit))
             }
             store.execute(query)
@@ -76,7 +81,8 @@ final class HealthKitService {
     private func fetchLatest(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
         guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
-            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { _, samples, _ in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { _, samples, error in
+                guard error == nil else { cont.resume(returning: nil); return }
                 let qty = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: unit)
                 cont.resume(returning: qty)
             }
@@ -88,7 +94,8 @@ final class HealthKitService {
         guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return 0 }
         let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         return await withCheckedContinuation { cont in
-            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                guard error == nil else { cont.resume(returning: 0); return }
                 let hours = (samples as? [HKCategorySample])?.filter {
                     $0.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue ||
                     $0.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue ||

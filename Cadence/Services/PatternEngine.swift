@@ -9,7 +9,7 @@ actor PatternEngine {
     }
 
     func allInsights(from logs: [DailyLog]) -> [InsightCard] {
-        guard logs.count >= 5 else { return [] }
+        guard logs.count >= PatternThreshold.minimumLogs else { return [] }
         let sorted = logs.sorted { $0.date < $1.date }
         var cards: [InsightCard] = []
 
@@ -27,23 +27,22 @@ actor PatternEngine {
         var poorSleepThenHeadache = 0
         var poorSleepTotal = 0
 
-        for i in 0..<logs.count - 1 {
-            if logs[i].sleepHours < 6 {
+        for i in logs.indices.dropLast() {
+            if logs[i].sleepHours < PatternThreshold.poorSleepHours {
                 poorSleepTotal += 1
-                let nextDaySymptoms = logs[i + 1].symptoms.map { $0.name.lowercased() }
-                if nextDaySymptoms.contains(where: { $0.contains("headache") }) {
+                if logs[i + 1].symptoms.contains(where: { $0.name.localizedCaseInsensitiveContains("headache") }) {
                     poorSleepThenHeadache += 1
                 }
             }
         }
 
-        guard poorSleepTotal >= 3 else { return nil }
+        guard poorSleepTotal >= PatternThreshold.minimumPoorSleepEvents else { return nil }
         let confidence = Double(poorSleepThenHeadache) / Double(poorSleepTotal)
-        guard confidence >= 0.5 else { return nil }
+        guard confidence >= PatternThreshold.minimumConfidence else { return nil }
 
         return InsightCard(
             title: "Poor sleep is linked to next-day headaches",
-            detail: "On \(Int(confidence * 100))% of days after sleeping under 6 hours, you logged a headache the next day.",
+            detail: "On \(Int(confidence * 100))% of days after sleeping under \(Int(PatternThreshold.poorSleepHours)) hours, you logged a headache the next day.",
             icon: "moon.zzz.fill",
             color: CadenceColor.sleepPurple,
             confidence: confidence,
@@ -57,13 +56,12 @@ actor PatternEngine {
         var fatigueFollowed = 0
 
         for i in 0..<logs.count {
-            if logs[i].stressLevel >= 7 {
+            if logs[i].stressLevel >= PatternThreshold.highStressLevel {
                 consecutiveStress += 1
             } else {
-                if consecutiveStress >= 3 {
+                if consecutiveStress >= PatternThreshold.consecutiveStressDays {
                     streaksChecked += 1
-                    let recoverySymptoms = logs[i].symptoms.map { $0.name.lowercased() }
-                    if recoverySymptoms.contains(where: { $0.contains("fatigue") || $0.contains("tired") }) {
+                    if logs[i].symptoms.contains(where: { $0.name.localizedCaseInsensitiveContains("fatigue") || $0.name.localizedCaseInsensitiveContains("tired") }) {
                         fatigueFollowed += 1
                     }
                 }
@@ -72,11 +70,11 @@ actor PatternEngine {
         }
         // A streak ending at the last log has no following day to check for fatigue.
         // Count it as checked so it contributes to the denominator (confidence stays accurate).
-        if consecutiveStress >= 3 {
+        if consecutiveStress >= PatternThreshold.consecutiveStressDays {
             streaksChecked += 1
         }
 
-        guard fatigueFollowed >= 2, streaksChecked > 0 else { return nil }
+        guard fatigueFollowed >= PatternThreshold.minimumStressFatigueEvents, streaksChecked > 0 else { return nil }
         let confidence = Double(fatigueFollowed) / Double(streaksChecked)
         return InsightCard(
             title: "Extended stress streaks are followed by fatigue",
@@ -89,16 +87,17 @@ actor PatternEngine {
     }
 
     private func energyTrendDecline(logs: [DailyLog]) -> InsightCard? {
-        // logs is sorted ascending; take the last 14 (most recent)
-        let recent = logs.suffix(14)
-        let firstHalf  = Array(recent.prefix(7)).map { Double($0.energy) }   // older 7
-        let secondHalf = Array(recent.suffix(7)).map { Double($0.energy) }   // recent 7
-        guard firstHalf.count == 7, secondHalf.count == 7 else { return nil }
-        let firstAvg = firstHalf.reduce(0,+) / 7
-        let secondAvg = secondHalf.reduce(0,+) / 7
+        // logs is sorted ascending; take the most recent window, split into two halves
+        let halfWindow = PatternThreshold.energyTrendWindow / 2
+        let recent = logs.suffix(PatternThreshold.energyTrendWindow)
+        let firstHalf  = Array(recent.prefix(halfWindow)).map { Double($0.energy) }
+        let secondHalf = Array(recent.suffix(halfWindow)).map { Double($0.energy) }
+        guard firstHalf.count == halfWindow, secondHalf.count == halfWindow else { return nil }
+        let firstAvg = firstHalf.reduce(0,+) / Double(halfWindow)
+        let secondAvg = secondHalf.reduce(0,+) / Double(halfWindow)
         let drop = firstAvg - secondAvg
-        guard drop > 1.5 else { return nil }
-        let confidence = min(drop / 5.0, 1.0)
+        guard drop > PatternThreshold.energyDropThreshold else { return nil }
+        let confidence = min(drop / PatternThreshold.confidenceScale, 1.0)
         return InsightCard(
             title: "Energy declining week-over-week",
             detail: "Your average energy dropped from \(String(format: "%.1f", firstAvg)) to \(String(format: "%.1f", secondAvg)) over the past two weeks.",
@@ -111,14 +110,14 @@ actor PatternEngine {
 
     private func moodSleepCorrelation(logs: [DailyLog]) -> InsightCard? {
         let pairs = logs.filter { $0.sleepHours > 0 && $0.didEditMetrics }
-        guard pairs.count >= 7 else { return nil }
+        guard pairs.count >= PatternThreshold.minimumMoodSleepPairs else { return nil }
         let sleepAvg = pairs.map(\.sleepHours).reduce(0,+) / Double(pairs.count)
         let goodSleepMood = pairs.filter { $0.sleepHours > sleepAvg }.map { Double($0.mood) }
         let poorSleepMood = pairs.filter { $0.sleepHours <= sleepAvg }.map { Double($0.mood) }
         guard !goodSleepMood.isEmpty, !poorSleepMood.isEmpty else { return nil }
         let diff = goodSleepMood.reduce(0,+)/Double(goodSleepMood.count) - poorSleepMood.reduce(0,+)/Double(poorSleepMood.count)
-        guard diff > 1.0 else { return nil }
-        let confidence = min(diff / 5.0, 1.0)
+        guard diff > PatternThreshold.moodDiffThreshold else { return nil }
+        let confidence = min(diff / PatternThreshold.confidenceScale, 1.0)
         return InsightCard(
             title: "More sleep correlates with better mood",
             detail: "On days with above-average sleep your mood is \(String(format: "%.1f", diff)) points higher on average.",

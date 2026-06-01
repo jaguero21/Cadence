@@ -105,7 +105,7 @@ struct SymptomPickerView: View {
 
     private func updateSeverity(tag: SymptomTag, value: Int) {
         if let idx = selectedSymptoms.firstIndex(where: { $0.name == tag.name }) {
-            selectedSymptoms[idx].severity = value
+            selectedSymptoms[idx].severity = value.clamped(to: 1...10)
         }
     }
 }
@@ -113,9 +113,16 @@ struct SymptomPickerView: View {
 struct AddSymptomSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query private var existingTags: [SymptomTag]
     let onSave: (String, String) -> Void
     @State private var name = ""
     @State private var emoji = "🔵"
+
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
+
+    private var isDuplicate: Bool {
+        existingTags.contains { $0.name.localizedCaseInsensitiveCompare(trimmedName) == .orderedSame }
+    }
 
     var body: some View {
         NavigationStack {
@@ -123,8 +130,17 @@ struct AddSymptomSheet: View {
                 Section("Symptom name") {
                     TextField("e.g. Nausea", text: $name)
                 }
+                if isDuplicate {
+                    Text("A symptom named \"\(trimmedName)\" already exists.")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
                 Section("Emoji") {
                     TextField("Emoji", text: $emoji)
+                        .onChange(of: emoji) { _, newValue in
+                            let clamped = newValue.first.map(String.init) ?? ""
+                            if emoji != clamped { emoji = clamped }
+                        }
                 }
             }
             .navigationTitle("New Symptom")
@@ -135,12 +151,12 @@ struct AddSymptomSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        let tag = SymptomTag(name: name, emoji: emoji)
+                        let tag = SymptomTag(name: trimmedName, emoji: emoji)
                         modelContext.insert(tag)
-                        onSave(name, emoji)
+                        onSave(trimmedName, emoji)
                         dismiss()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(trimmedName.isEmpty || emoji.isEmpty || isDuplicate)
                 }
             }
         }

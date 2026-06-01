@@ -106,13 +106,17 @@ struct StarRatingView: View {
                 .font(.title3.bold())
             HStack(spacing: 12) {
                 ForEach(1...5, id: \.self) { star in
-                    Image(systemName: star <= rating ? "star.fill" : "star")
-                        .font(.system(size: 36))
-                        .foregroundStyle(star <= rating ? Color.yellow : Color(.quaternaryLabel))
-                        .onTapGesture {
-                            withAnimation(CadenceAnimation.spring) { rating = star }
-                        }
-                        .hapticFeedback(.medium)
+                    Button {
+                        withAnimation(CadenceAnimation.spring) { rating = star }
+                    } label: {
+                        Image(systemName: star <= rating ? "star.fill" : "star")
+                            .font(.system(size: 36))
+                            .foregroundStyle(star <= rating ? Color.yellow : Color(.quaternaryLabel))
+                    }
+                    .buttonStyle(.plain)
+                    .hapticFeedback(.medium)
+                    .accessibilityLabel("\(star) \(star == 1 ? "star" : "stars") out of 5")
+                    .accessibilityAddTraits(star == rating ? [.isSelected] : [])
                 }
             }
         }
