@@ -7,7 +7,7 @@ enum NotificationID {
     static let insight      = "insight-notification"
 }
 
-final class NotificationService {
+final class NotificationService: NotificationServiceProtocol {
     static let shared = NotificationService()
     private init() {}
 

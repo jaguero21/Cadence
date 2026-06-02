@@ -11,7 +11,7 @@ final class DashboardViewModel {
 
     private var refreshTask: Task<Void, Never>?
 
-    func refresh(logs: [DailyLog], reviews: [WeeklyReview]) {
+    func refresh(logs: [DailyLog], reviews: [WeeklyReview], notifications: any NotificationServiceProtocol = NotificationService.shared) {
         todayLog = logs.first { Calendar.current.isDateInToday($0.date) }
         thisWeekReview = reviews.first { $0.weekStartDate.isThisWeek }
         streak = computeStreak(from: logs)
@@ -24,9 +24,9 @@ final class DashboardViewModel {
         }
 
         if streak > 0 && todayLog?.isComplete != true {
-            NotificationService.shared.scheduleStreakAtRisk()
+            notifications.scheduleStreakAtRisk()
         } else {
-            NotificationService.shared.removeNotification(id: NotificationID.streakRisk)
+            notifications.removeNotification(id: NotificationID.streakRisk)
         }
     }
 

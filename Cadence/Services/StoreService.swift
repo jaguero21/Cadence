@@ -11,7 +11,7 @@ final class StoreService {
     var productsLoadFailed = false
     private var updates: Task<Void, Never>?
     private static let log = Logger(subsystem: "com.carpecadence", category: "StoreService")
-    private init() { updates = listenForTransactionUpdates() }
+    init() { updates = listenForTransactionUpdates() }
     @MainActor deinit { updates?.cancel() }
 
     var lifetimeProduct: Product? { products.first { $0.id == StoreKitID.proOneTime } }

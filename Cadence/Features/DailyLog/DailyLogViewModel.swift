@@ -27,7 +27,7 @@ final class DailyLogViewModel {
     }
 
     @discardableResult
-    func save(log: DailyLog, context: ModelContext) -> Bool {
+    func save(log: DailyLog, context: ModelContext, notifications: any NotificationServiceProtocol = NotificationService.shared) -> Bool {
         let wasComplete = log.isComplete
         log.isComplete = true
         do {
@@ -38,7 +38,7 @@ final class DailyLogViewModel {
             return false
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        NotificationService.shared.removeNotification(id: NotificationID.streakRisk)
+        notifications.removeNotification(id: NotificationID.streakRisk)
         return true
     }
 }
@@ -47,6 +47,7 @@ enum LogStep: Int, CaseIterable {
     case mood = 0
     case bodyMetrics
     case basics
+    case symptoms
     case note
     case done
 
@@ -57,6 +58,7 @@ enum LogStep: Int, CaseIterable {
         case .mood:        return "Overall Mood"
         case .bodyMetrics: return "Body Metrics"
         case .basics:      return "Basics Done Today"
+        case .symptoms:    return "Symptoms"
         case .note:        return "One-Line Note"
         case .done:        return "All done!"
         }
@@ -67,6 +69,7 @@ enum LogStep: Int, CaseIterable {
         case .mood:        return "face.smiling"
         case .bodyMetrics: return "waveform.path.ecg"
         case .basics:      return "checklist"
+        case .symptoms:    return "bandage"
         case .note:        return "pencil.line"
         case .done:        return "checkmark.circle.fill"
         }
