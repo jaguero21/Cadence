@@ -7,6 +7,8 @@ struct SettingsView: View {
     @Query private var customSymptoms: [SymptomTag]
     @Environment(\.modelContext) private var modelContext
 
+    @Environment(\.healthKitService) private var healthKitService
+    @Environment(\.notificationService) private var notificationService
     @AppStorage("dailyReminderHour")   private var dailyHour: Int = 20
     @AppStorage("dailyReminderMinute") private var dailyMinute: Int = 0
     @AppStorage("weeklyReminderEnabled") private var weeklyEnabled: Bool = true
@@ -24,8 +26,8 @@ struct SettingsView: View {
             .navigationTitle("Settings")
         }
         .task { await store.loadProducts() }
-        .task { appState.notificationsAuthorized = await NotificationService.shared.checkAuthorizationStatus() }
-        .task { appState.healthKitAuthorized = HealthKitService.shared.isAuthorized }
+        .task { appState.notificationsAuthorized = await notificationService.checkAuthorizationStatus() }
+        .task { appState.healthKitAuthorized = healthKitService.isAuthorized }
     }
 
     // MARK: - Sections
@@ -82,7 +84,7 @@ struct SettingsView: View {
                     set: {
                         dailyHour = Calendar.current.component(.hour, from: $0)
                         dailyMinute = Calendar.current.component(.minute, from: $0)
-                        NotificationService.shared.scheduleDailyReminder(at: dailyHour, minute: dailyMinute)
+                        notificationService.scheduleDailyReminder(at: dailyHour, minute: dailyMinute)
                     }
                 ),
                 displayedComponents: .hourAndMinute
@@ -90,8 +92,8 @@ struct SettingsView: View {
 
             Toggle("Weekly review reminder (Sundays 7pm)", isOn: $weeklyEnabled)
                 .onChange(of: weeklyEnabled) { _, on in
-                    if on { NotificationService.shared.scheduleWeeklyReviewReminder() }
-                    else  { NotificationService.shared.removeNotification(id: NotificationID.weeklyReview) }
+                    if on { notificationService.scheduleWeeklyReviewReminder() }
+                    else  { notificationService.removeNotification(id: NotificationID.weeklyReview) }
                 }
         } header: {
             Label("Reminders", systemImage: "bell.fill")
@@ -144,14 +146,14 @@ struct SettingsView: View {
         Section {
             Button("Re-authorize HealthKit") {
                 Task {
-                    appState.healthKitAuthorized = (try? await HealthKitService.shared.requestAuthorization()) ?? HealthKitService.shared.isAuthorized
+                    appState.healthKitAuthorized = (try? await healthKitService.requestAuthorization()) ?? healthKitService.isAuthorized
                 }
             }
             .foregroundStyle(CadenceColor.accent)
         } header: {
             Label("HealthKit", systemImage: "heart.fill")
         } footer: {
-            if !HealthKitService.shared.isAvailable {
+            if !healthKitService.isAvailable {
                 Text("HealthKit is not available on this device.")
             } else if appState.healthKitAuthorized {
                 Label("HealthKit access granted.", systemImage: "checkmark.circle.fill")

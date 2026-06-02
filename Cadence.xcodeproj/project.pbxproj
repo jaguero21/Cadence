@@ -40,6 +40,9 @@
 		B6B76E4EF6D92F7B5179ADC8 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680C40C33549B696DF6BA3A5 /* WeeklyReviewView.swift */; };
 		B6EB3F0F0BE48CBDC5D5BA4A /* SwiftUI in Frameworks */ = {isa = PBXBuildFile; fileRef = A0D01DD5A2B033204335261E /* SwiftUI */; };
 		BB6405EE18F6B6D698226AB6 /* LogInputFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */; };
+		455141101502412D92E7CB50 /* ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493F590706A348D0857DA49A /* ServiceProtocols.swift */; };
+		9007904B6F984195944DC622 /* EnvironmentValues+Services.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D8C849E3B044CB78A9DB7B5 /* EnvironmentValues+Services.swift */; };
+		4B6391ABC53847B082A5D7CB /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AB8956A0FB74B69BE644D59 /* OnboardingView.swift */; };
 		C49760CE40DE564E9402A446 /* CadenceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4C885C564C706B8D84B907 /* CadenceApp.swift */; };
 		C7A67B11D453A48F3C8FD239 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C644D07CF96C2AFA00637E3B /* SettingsView.swift */; };
 		E1B2C3D4F5A6B7C8D9E0F1A2 /* ProPaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* ProPaywallView.swift */; };
@@ -73,7 +76,10 @@
 		4A51F97BA927E7299C9A1B07 /* PDFBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PDFBuilder.swift; path = ./Cadence/Features/Export/PDFBuilder.swift; sourceTree = "<absolute>"; };
 		4E79E8D29A40DF8EC23AE638 /* DashboardViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DashboardViewModel.swift; path = ./Cadence/Features/Dashboard/DashboardViewModel.swift; sourceTree = "<absolute>"; };
 		54EC79110025DF66E8C1F0A7 /* UserNotifications */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications; path = System/Library/Frameworks/UserNotifications.framework; sourceTree = SDKROOT; };
+		493F590706A348D0857DA49A /* ServiceProtocols.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ServiceProtocols.swift; path = ./Cadence/Services/ServiceProtocols.swift; sourceTree = "<absolute>"; };
 		5C4C885C564C706B8D84B907 /* CadenceApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CadenceApp.swift; path = ./Cadence/App/CadenceApp.swift; sourceTree = "<absolute>"; };
+		5D8C849E3B044CB78A9DB7B5 /* EnvironmentValues+Services.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "EnvironmentValues+Services.swift"; path = "./Cadence/Shared/Extensions/EnvironmentValues+Services.swift"; sourceTree = "<absolute>"; };
+		8AB8956A0FB74B69BE644D59 /* OnboardingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OnboardingView.swift; path = ./Cadence/Features/Onboarding/OnboardingView.swift; sourceTree = "<absolute>"; };
 		680C40C33549B696DF6BA3A5 /* WeeklyReviewView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WeeklyReviewView.swift; path = ./Cadence/Features/WeeklyReview/WeeklyReviewView.swift; sourceTree = "<absolute>"; };
 		7F51B62D7D39FC0309276D9D /* StoreService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StoreService.swift; path = ./Cadence/Services/StoreService.swift; sourceTree = "<absolute>"; };
 		8F825BAF03150A00C8047D70 /* StoreKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
@@ -293,6 +299,7 @@
 			isa = PBXGroup;
 			children = (
 				D55E0D4A1C0EC289C9F389C4 /* Constants.swift */,
+				5D8C849E3B044CB78A9DB7B5 /* EnvironmentValues+Services.swift */,
 				E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */,
 				0D51242137B1F8597625745E /* View+Extensions.swift */,
 			);
@@ -328,10 +335,20 @@
 				1A7F46C62532314DD37DC860 /* HealthKitService.swift */,
 				A292713D8D2930BB2E51C28C /* NotificationService.swift */,
 				3F0989CA66FE09F78B729A4E /* PatternEngine.swift */,
+				493F590706A348D0857DA49A /* ServiceProtocols.swift */,
 				7F51B62D7D39FC0309276D9D /* StoreService.swift */,
 			);
 			name = Services;
 			path = ./Cadence/Services;
+			sourceTree = "<group>";
+		};
+		509566C480DB428982A744DF /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				8AB8956A0FB74B69BE644D59 /* OnboardingView.swift */,
+			);
+			name = Onboarding;
+			path = ./Cadence/Features/Onboarding;
 			sourceTree = "<group>";
 		};
 		E94E9A362B05ED767DA7391F /* Features */ = {
@@ -339,6 +356,7 @@
 			children = (
 				9B6522391260C486E33059D2 /* Dashboard */,
 				6D98C919022194518FB6B180 /* DailyLog */,
+				509566C480DB428982A744DF /* Onboarding */,
 				C3961696F5819833B4F06C3C /* WeeklyReview */,
 				3BF4C09D4FC31AB4E3D6764B /* Insights */,
 				24BED48A7D70DA34D92FA5F7 /* History */,
@@ -443,6 +461,9 @@
 			files = (
 				C7F20E34EA5B3C5F84042DA4 /* AppState.swift in Sources */,
 				C49760CE40DE564E9402A446 /* CadenceApp.swift in Sources */,
+				455141101502412D92E7CB50 /* ServiceProtocols.swift in Sources */,
+				9007904B6F984195944DC622 /* EnvironmentValues+Services.swift in Sources */,
+				4B6391ABC53847B082A5D7CB /* OnboardingView.swift in Sources */,
 				3D207A23376DB2750B758A61 /* DailyLog.swift in Sources */,
 				3831F66F2CF40135C9718707 /* SymptomTag.swift in Sources */,
 				30D5FC0958DF5823D7D5A9D6 /* WeeklyReview.swift in Sources */,

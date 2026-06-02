@@ -2,7 +2,7 @@ import HealthKit
 import SwiftData
 import UIKit
 
-final class HealthKitService {
+final class HealthKitService: HealthKitServiceProtocol {
     static let shared = HealthKitService()
     private let store = HKHealthStore()
     private var foregroundObserver: NSObjectProtocol?
@@ -58,34 +58,23 @@ final class HealthKitService {
         return isAuthorized
     }
 
-    func fetchYesterdayData() async -> HealthKitSnapshot {
+    // Fetches the right HealthKit data for today's daily log:
+    // - Steps from today (daytime activity logged so far)
+    // - Resting HR, HRV, and sleep from yesterday (overnight metrics)
+    func fetchLogSnapshot() async -> HealthKitSnapshot {
         guard isAuthorized else { return HealthKitSnapshot() }
-        guard
-            let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now),
-            let end = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: yesterday))
-        else { return HealthKitSnapshot() }
-        let start = Calendar.current.startOfDay(for: yesterday)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+        let cal = Calendar.current
+        let todayStart    = cal.startOfDay(for: .now)
+        let yesterdayStart = cal.date(byAdding: .day, value: -1, to: todayStart) ?? todayStart
+        let todayPredicate     = HKQuery.predicateForSamples(withStart: todayStart, end: .now)
+        let yesterdayPredicate = HKQuery.predicateForSamples(withStart: yesterdayStart, end: todayStart)
 
-        async let steps = fetchSum(.stepCount, unit: .count(), predicate: predicate)
-        async let hr    = fetchLatest(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: predicate)
-        async let hrv   = fetchLatest(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), predicate: predicate)
-        async let sleep = fetchSleepHours(start: start, end: end)
+        async let steps = fetchSum(.stepCount, unit: .count(), predicate: todayPredicate)
+        async let hr    = fetchLatest(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: yesterdayPredicate)
+        async let hrv   = fetchLatest(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), predicate: yesterdayPredicate)
+        async let sleep = fetchSleepHours(start: yesterdayStart, end: todayStart)
 
         return await HealthKitSnapshot(steps: steps.map(Int.init), restingHR: hr, hrv: hrv, sleepHours: sleep)
-    }
-
-    @MainActor
-    func populate(log: DailyLog) async {
-        guard isAuthorized else { return }
-        let snapshot = await fetchYesterdayData()
-        if let steps = snapshot.steps       { log.hkSteps      = steps }
-        if let hr    = snapshot.restingHR   { log.hkRestingHR  = hr }
-        if let hrv   = snapshot.hrv         { log.hkHRV        = hrv }
-        if let sleep = snapshot.sleepHours  {
-            log.hkSleepHours = sleep
-            log.sleepHours   = sleep
-        }
     }
 
     // MARK: - Private helpers
