@@ -3,6 +3,7 @@ import SwiftData
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.notificationService) private var notificationService
     @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
     @State private var vm = DashboardViewModel()
@@ -37,9 +38,9 @@ struct DashboardView: View {
                     }
                 }
             }
-            .onAppear { vm.refresh(logs: logs, reviews: reviews) }
-            .onChange(of: logs)    { _, _ in vm.refresh(logs: logs, reviews: reviews) }
-            .onChange(of: reviews) { _, _ in vm.refresh(logs: logs, reviews: reviews) }
+            .onAppear { vm.refresh(logs: logs, reviews: reviews, notifications: notificationService) }
+            .onChange(of: logs)    { _, _ in vm.refresh(logs: logs, reviews: reviews, notifications: notificationService) }
+            .onChange(of: reviews) { _, _ in vm.refresh(logs: logs, reviews: reviews, notifications: notificationService) }
         }
     }
 

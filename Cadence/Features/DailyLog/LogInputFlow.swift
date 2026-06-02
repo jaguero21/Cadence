@@ -4,6 +4,8 @@ import SwiftData
 struct LogInputFlow: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.healthKitService) private var healthKitService
+    @Environment(\.notificationService) private var notificationService
     @State private var vm = DailyLogViewModel()
 
     private let existingLog: DailyLog?
@@ -21,8 +23,10 @@ struct LogInputFlow: View {
     @State private var brainFogLevel: Int = 0
     @State private var stressLevel: Int = 5
     @State private var sleepQuality: Int = 5
+    @State private var selectedSymptoms: [SymptomEntry] = []
     @State private var basicsCompleted: [String] = []
     @State private var freeNote: String = ""
+    @State private var hkSnapshot: HealthKitSnapshot?
     @State private var isHydrated = false
     @State private var createdLog: DailyLog?
 
@@ -40,6 +44,7 @@ struct LogInputFlow: View {
                         case .mood:        moodStep
                         case .bodyMetrics: bodyMetricsStep
                         case .basics:      basicsStep
+                        case .symptoms:    symptomStep
                         case .note:        noteStep
                         case .done:        doneStep
                         }
@@ -58,22 +63,24 @@ struct LogInputFlow: View {
             .navigationTitle(vm.currentStep.title)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                guard !isHydrated, let log = existingLog else {
-                    isHydrated = true
-                    return
-                }
+                guard !isHydrated else { return }
                 isHydrated = true
-                mood            = log.mood
-                didEditMood     = log.didEditMood
-                didEditMetrics  = log.didEditMetrics
-                energy          = log.energy
-                sleepHours      = log.sleepHours
-                painLevel       = log.painLevel
-                brainFogLevel   = log.brainFogLevel
-                stressLevel     = log.stressLevel
-                sleepQuality    = log.sleepQuality
-                basicsCompleted = log.basicsCompleted
-                freeNote        = log.freeNote
+                if let log = existingLog {
+                    mood             = log.mood
+                    didEditMood      = log.didEditMood
+                    didEditMetrics   = log.didEditMetrics
+                    energy           = log.energy
+                    sleepHours       = log.sleepHours
+                    painLevel        = log.painLevel
+                    brainFogLevel    = log.brainFogLevel
+                    stressLevel      = log.stressLevel
+                    sleepQuality     = log.sleepQuality
+                    basicsCompleted  = log.basicsCompleted
+                    selectedSymptoms = log.symptoms
+                    freeNote         = log.freeNote
+                } else {
+                    Task { await applyHealthKitData() }
+                }
             }
             .alert("Couldn't Save", isPresented: .init(
                 get: { vm.saveError != nil },
@@ -257,6 +264,16 @@ struct LogInputFlow: View {
         .cadenceCard()
     }
 
+    // MARK: - Symptoms Step
+
+    private var symptomStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            LogSectionHeader(icon: "bandage", title: "SYMPTOMS TODAY", time: "~30 sec")
+            SymptomPickerView(selectedSymptoms: $selectedSymptoms)
+        }
+        .cadenceCard()
+    }
+
     // MARK: - Note Step
 
     private var noteStep: some View {
@@ -332,7 +349,7 @@ struct LogInputFlow: View {
             if vm.currentStep != .done {
                 Button {
                     if vm.currentStep == .note {
-                        guard vm.save(log: buildLog(), context: modelContext) else { return }
+                        guard vm.save(log: buildLog(), context: modelContext, notifications: notificationService) else { return }
                     }
                     vm.nextStep()
                 } label: {
@@ -380,9 +397,26 @@ struct LogInputFlow: View {
         log.stressLevel     = stressLevel.clamped(to: 0...10)
         log.sleepQuality    = sleepQuality.clamped(to: 0...10)
         log.basicsCompleted = basicsCompleted
+        log.symptoms        = selectedSymptoms
         log.freeNote        = freeNote
         log.didEditMetrics  = didEditMetrics
+        if let snapshot = hkSnapshot {
+            if let steps = snapshot.steps      { log.hkSteps     = steps }
+            if let hr    = snapshot.restingHR  { log.hkRestingHR = hr }
+            if let hrv   = snapshot.hrv        { log.hkHRV       = hrv }
+            if let sleep = snapshot.sleepHours { log.hkSleepHours = sleep }
+        }
         return log
+    }
+
+    @MainActor
+    private func applyHealthKitData() async {
+        let snapshot = await healthKitService.fetchLogSnapshot()
+        hkSnapshot = snapshot
+        // Pre-fill sleep slider only if the user hasn't touched metrics yet.
+        if !didEditMetrics, let sleep = snapshot.sleepHours {
+            sleepHours = sleep
+        }
     }
 
     private func partialSave() {

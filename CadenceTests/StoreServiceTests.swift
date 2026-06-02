@@ -3,6 +3,9 @@ import Foundation
 @testable import Cadence
 
 // MARK: - StoreService: isPro computed property
+//
+// Each test constructs its own StoreService instance so mutations are
+// isolated — no shared singleton, no defer-based cleanup, no parallel-test leakage.
 
 @Suite("StoreService – isPro logic")
 struct StoreServiceIsProTests {
@@ -10,8 +13,7 @@ struct StoreServiceIsProTests {
     @Test("isPro returns false when purchasedProductIDs is empty")
     @MainActor
     func isPro_emptySet_returnsFalse() {
-        let store = StoreService.shared
-        defer { store.purchasedProductIDs = [] }
+        let store = StoreService()
         store.purchasedProductIDs = []
         #expect(store.isPro == false)
     }
@@ -19,8 +21,7 @@ struct StoreServiceIsProTests {
     @Test("isPro returns true when proOneTime is in purchasedProductIDs")
     @MainActor
     func isPro_containsProOneTime_returnsTrue() {
-        let store = StoreService.shared
-        defer { store.purchasedProductIDs = [] }
+        let store = StoreService()
         store.purchasedProductIDs = [StoreKitID.proOneTime]
         #expect(store.isPro == true)
     }
@@ -28,8 +29,7 @@ struct StoreServiceIsProTests {
     @Test("isPro returns true when proMonthly is in purchasedProductIDs")
     @MainActor
     func isPro_containsProMonthly_returnsTrue() {
-        let store = StoreService.shared
-        defer { store.purchasedProductIDs = [] }
+        let store = StoreService()
         store.purchasedProductIDs = [StoreKitID.proMonthly]
         #expect(store.isPro == true)
     }
@@ -37,8 +37,7 @@ struct StoreServiceIsProTests {
     @Test("isPro returns true when both product IDs are present")
     @MainActor
     func isPro_containsBoth_returnsTrue() {
-        let store = StoreService.shared
-        defer { store.purchasedProductIDs = [] }
+        let store = StoreService()
         store.purchasedProductIDs = [StoreKitID.proOneTime, StoreKitID.proMonthly]
         #expect(store.isPro == true)
     }

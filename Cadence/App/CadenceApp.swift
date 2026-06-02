@@ -34,14 +34,28 @@ struct CadenceApp: App {
     var body: some Scene {
         WindowGroup {
             if let container = sharedModelContainer {
-                ContentView()
-                    .environment(appState)
-                    .environment(store)
-                    .modelContainer(container)
-                    .task {
-                        appState.notificationsAuthorized = await NotificationService.shared.requestAuthorization()
-                        appState.healthKitAuthorized = (try? await HealthKitService.shared.requestAuthorization()) ?? HealthKitService.shared.isAuthorized
+                Group {
+                    if appState.hasCompletedOnboarding {
+                        ContentView()
+                            .task {
+                                appState.notificationsAuthorized = await NotificationService.shared.requestAuthorization()
+                                appState.healthKitAuthorized = (try? await HealthKitService.shared.requestAuthorization()) ?? HealthKitService.shared.isAuthorized
+                                if appState.notificationsAuthorized {
+                                    let ud     = UserDefaults.standard
+                                    let hour   = ud.object(forKey: "dailyReminderHour")   as? Int  ?? 20
+                                    let minute = ud.object(forKey: "dailyReminderMinute") as? Int  ?? 0
+                                    NotificationService.shared.scheduleDailyReminder(at: hour, minute: minute)
+                                    let weeklyOn = ud.object(forKey: "weeklyReminderEnabled") as? Bool ?? true
+                                    if weeklyOn { NotificationService.shared.scheduleWeeklyReviewReminder() }
+                                }
+                            }
+                    } else {
+                        OnboardingView()
                     }
+                }
+                .environment(appState)
+                .environment(store)
+                .modelContainer(container)
             } else {
                 StorageFatalErrorView()
             }
