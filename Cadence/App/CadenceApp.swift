@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import OSLog
 
 
 @main
@@ -70,6 +71,7 @@ struct ContentView: View {
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
 
     private let symptomSeedKey = "cadence.symptomTagsSeeded"
+    private static let log = Logger(subsystem: "com.carpecadence", category: "ContentView")
 
     var body: some View {
         @Bindable var appState = appState
@@ -114,6 +116,7 @@ struct ContentView: View {
             UserDefaults.standard.set(true, forKey: symptomSeedKey)
         } catch {
             // Leave the flag unset so the next launch retries seeding.
+            Self.log.error("Failed to seed SymptomTag defaults: \(error, privacy: .public)")
         }
     }
 }

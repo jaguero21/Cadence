@@ -121,6 +121,7 @@ struct AddSymptomSheet: View {
     let onSave: (String, String) -> Void
     @State private var name = ""
     @State private var emoji = "🔵"
+    @State private var saveError: String?
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
 
@@ -149,20 +150,38 @@ struct AddSymptomSheet: View {
             }
             .navigationTitle("New Symptom")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn't Save", isPresented: .init(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        let tag = SymptomTag(name: trimmedName, emoji: emoji)
-                        modelContext.insert(tag)
-                        onSave(trimmedName, emoji)
-                        dismiss()
-                    }
-                    .disabled(trimmedName.isEmpty || emoji.isEmpty || isDuplicate)
+                    Button("Add", action: addTag)
+                        .disabled(trimmedName.isEmpty || emoji.isEmpty || isDuplicate)
                 }
             }
+        }
+    }
+
+    private func addTag() {
+        let tag = SymptomTag(name: trimmedName, emoji: emoji)
+        modelContext.insert(tag)
+        do {
+            try modelContext.save()
+            onSave(trimmedName, emoji)
+            dismiss()
+        } catch {
+            // Roll the insert back so the failed tag doesn't sit in the context
+            // and trip up the next save attempt.
+            modelContext.delete(tag)
+            saveError = "Couldn't save the new symptom. Please try again."
         }
     }
 }

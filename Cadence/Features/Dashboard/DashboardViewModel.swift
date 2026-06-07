@@ -9,19 +9,13 @@ final class DashboardViewModel {
     var streak: Int = 0
     var latestInsight: InsightCard?
 
-    private var refreshTask: Task<Void, Never>?
-
     func refresh(logs: [DailyLog], reviews: [WeeklyReview], notifications: any NotificationServiceProtocol = NotificationService.shared) {
         todayLog = logs.first { Calendar.current.isDateInToday($0.date) }
         thisWeekReview = reviews.first { $0.weekStartDate.isThisWeek }
         streak = computeStreak(from: logs)
-        refreshTask?.cancel()
-        let snapshot = logs
-        refreshTask = Task {
-            let insight = await PatternEngine.shared.latestInsight(from: snapshot)
-            guard !Task.isCancelled else { return }
-            self.latestInsight = insight
-        }
+        // Snapshot @Model values on the main actor before handing them to PatternEngine,
+        // which is otherwise isolation-agnostic.
+        latestInsight = PatternEngine.latestInsight(from: logs.map(DailyLogSnapshot.init))
 
         if streak > 0 && todayLog?.isComplete != true {
             notifications.scheduleStreakAtRisk()

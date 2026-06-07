@@ -65,10 +65,13 @@ final class StoreService {
     }
 
     private func listenForTransactionUpdates() -> Task<Void, Never> {
-        Task.detached(priority: .background) {
+        // Inside an @MainActor class, Task { } inherits MainActor isolation —
+        // so the insert below runs on the main thread directly, no hop needed.
+        Task { [weak self] in
             for await result in Transaction.updates {
+                guard let self else { return }
                 guard let transaction = try? self.checkVerified(result) else { continue }
-                await MainActor.run { _ = self.purchasedProductIDs.insert(transaction.productID) }
+                self.purchasedProductIDs.insert(transaction.productID)
                 await transaction.finish()
             }
         }

@@ -11,14 +11,36 @@ struct DailyLogSnapshot: Sendable {
     let mood: Int
     let energy: Int
     let sleepHours: Double
+    let stressLevel: Int
     let symptoms: [SymptomEntry]
+    let didEditMetrics: Bool
 
     init(_ log: DailyLog) {
-        date      = log.date
-        mood      = log.mood
-        energy    = log.energy
-        sleepHours = log.sleepHours
-        symptoms  = log.symptoms
+        date           = log.date
+        mood           = log.mood
+        energy         = log.energy
+        sleepHours     = log.sleepHours
+        stressLevel    = log.stressLevel
+        symptoms       = log.symptoms
+        didEditMetrics = log.didEditMetrics
+    }
+
+    init(
+        date: Date,
+        mood: Int = 3,
+        energy: Int = 5,
+        sleepHours: Double = 7.0,
+        stressLevel: Int = 5,
+        symptoms: [SymptomEntry] = [],
+        didEditMetrics: Bool = false
+    ) {
+        self.date = date
+        self.mood = mood
+        self.energy = energy
+        self.sleepHours = sleepHours
+        self.stressLevel = stressLevel
+        self.symptoms = symptoms
+        self.didEditMetrics = didEditMetrics
     }
 }
 

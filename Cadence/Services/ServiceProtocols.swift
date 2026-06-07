@@ -2,6 +2,7 @@
 // codebase. Views and view models depend on these, not the concrete classes,
 // so tests can inject lightweight fakes without touching HealthKit or UNUserNotificationCenter.
 
+@MainActor
 protocol HealthKitServiceProtocol: AnyObject {
     var isAvailable: Bool { get }
     var isAuthorized: Bool { get }
@@ -9,6 +10,7 @@ protocol HealthKitServiceProtocol: AnyObject {
     func fetchLogSnapshot() async -> HealthKitSnapshot
 }
 
+@MainActor
 protocol NotificationServiceProtocol: AnyObject {
     func requestAuthorization() async -> Bool
     func checkAuthorizationStatus() async -> Bool
@@ -20,11 +22,11 @@ protocol NotificationServiceProtocol: AnyObject {
     func removeAll()
 }
 
-// Default-argument convenience: protocols cannot carry default values, so
-// the protocol extension provides them so callers can write
-// `notifications.scheduleWeeklyReviewReminder()` through the existential.
+// Default-argument convenience for existential callers: protocol
+// requirements can't carry defaults, so we expose a no-arg overload that
+// dispatches to the requirement with sensible defaults (Sunday at 7 pm).
 extension NotificationServiceProtocol {
-    func scheduleWeeklyReviewReminder(weekday: Int = 1, hour: Int = 19) {
-        scheduleWeeklyReviewReminder(weekday: weekday, hour: hour)
+    func scheduleWeeklyReviewReminder() {
+        scheduleWeeklyReviewReminder(weekday: 1, hour: 19)
     }
 }
