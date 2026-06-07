@@ -39,20 +39,9 @@ final class InsightsViewModel {
         }
     }
 
-    private var refreshTask: Task<Void, Never>?
-
     func refresh(logs: [DailyLog]) {
-        refreshTask?.cancel()
-        let snapshot = logs
-        refreshTask = Task {
-            let result = await PatternEngine.shared.allInsights(from: snapshot)
-            guard !Task.isCancelled else { return }
-            self.insights = result
-        }
-    }
-
-    func cancelRefresh() {
-        refreshTask?.cancel()
-        refreshTask = nil
+        // Snapshot @Model values on the main actor before handing them to PatternEngine,
+        // which is otherwise isolation-agnostic.
+        insights = PatternEngine.allInsights(from: logs.map(DailyLogSnapshot.init))
     }
 }

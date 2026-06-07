@@ -1,0 +1,28 @@
+{
+  "configurations" : [
+    {
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Cadence.xcodeproj",
+      "identifier" : "B4DC90E61DEB4E78C2EE8C78",
+      "name" : "Cadence"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Cadence.xcodeproj",
+        "identifier" : "AA11BB22CC33DD44EE55FFA0",
+        "name" : "CadenceTests"
+      }
+    }
+  ],
+  "version" : 1
+}
