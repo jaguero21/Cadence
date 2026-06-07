@@ -25,7 +25,6 @@ struct InsightsView: View {
             .background(CadenceColor.background)
             .navigationTitle("Insights")
             .onAppear { vm.refresh(logs: logs) }
-            .onDisappear { vm.cancelRefresh() }
             .onChange(of: logs) { _, _ in vm.refresh(logs: logs) }
         }
     }

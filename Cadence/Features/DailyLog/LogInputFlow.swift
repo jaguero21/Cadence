@@ -349,7 +349,9 @@ struct LogInputFlow: View {
             if vm.currentStep != .done {
                 Button {
                     if vm.currentStep == .note {
-                        guard vm.save(log: buildLog(), context: modelContext, notifications: notificationService) else { return }
+                        let log = ensureLog()
+                        apply(to: log)
+                        guard vm.save(log: log, context: modelContext, notifications: notificationService) else { return }
                     }
                     vm.nextStep()
                 } label: {
@@ -373,21 +375,21 @@ struct LogInputFlow: View {
 
     // MARK: - Helpers
 
-    @discardableResult
-    private func buildLog() -> DailyLog {
-        // Reuse an already-inserted log for new entries so repeated calls
-        // (e.g. save-retry) don't violate the unique-date constraint.
-        let log: DailyLog
-        if let existing = existingLog {
-            log = existing
-        } else if let created = createdLog {
-            log = created
-        } else {
-            let newLog = DailyLog()
-            modelContext.insert(newLog)
-            createdLog = newLog
-            log = newLog
-        }
+    // Returns the log for this flow — either the one we're editing, or a new
+    // one we create and insert exactly once. Idempotent: repeated calls reuse
+    // the same instance so save-retries don't violate the unique-date constraint.
+    private func ensureLog() -> DailyLog {
+        if let existing = existingLog { return existing }
+        if let created = createdLog { return created }
+        let newLog = DailyLog()
+        modelContext.insert(newLog)
+        createdLog = newLog
+        return newLog
+    }
+
+    // Copies the current step-machine state onto the given log. No insertion;
+    // call ensureLog() first.
+    private func apply(to log: DailyLog) {
         log.mood            = mood.clamped(to: 1...5)
         log.didEditMood     = didEditMood
         log.energy          = energy.clamped(to: 0...10)
@@ -406,7 +408,6 @@ struct LogInputFlow: View {
             if let hrv   = snapshot.hrv        { log.hkHRV       = hrv }
             if let sleep = snapshot.sleepHours { log.hkSleepHours = sleep }
         }
-        return log
     }
 
     @MainActor
@@ -420,7 +421,7 @@ struct LogInputFlow: View {
     }
 
     private func partialSave() {
-        buildLog()
+        apply(to: ensureLog())
         do {
             try modelContext.save()
         } catch {

@@ -2,18 +2,24 @@ import HealthKit
 import SwiftData
 import UIKit
 
+@MainActor
 final class HealthKitService: HealthKitServiceProtocol {
     static let shared = HealthKitService()
     private let store = HKHealthStore()
     private var foregroundObserver: NSObjectProtocol?
 
     private init() {
+        // .main queue ensures the callback fires on the main thread; the
+        // assumeIsolated hop tells the compiler this @MainActor instance
+        // is safe to mutate here without an async hop.
         foregroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.cachedIsAuthorized = nil
+            MainActor.assumeIsolated {
+                self?.cachedIsAuthorized = nil
+            }
         }
     }
 
@@ -23,12 +29,13 @@ final class HealthKitService: HealthKitServiceProtocol {
         }
     }
 
-    var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
+    nonisolated var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
     // HealthKit does not reveal granted read status (.notDetermined covers both "not asked" and
     // "granted"). We return false only when the user has explicitly denied at least one type
     // (.sharingDenied), which is the strongest signal HealthKit exposes for read-only requests.
-    // Cached because this iterates all readTypes on every call; invalidated after requestAuthorization.
+    // Cached because this iterates all readTypes on every call; invalidated after requestAuthorization
+    // and on app foreground (the user may have toggled permissions in Settings).
     private var cachedIsAuthorized: Bool?
     var isAuthorized: Bool {
         if let cached = cachedIsAuthorized { return cached }
@@ -78,8 +85,12 @@ final class HealthKitService: HealthKitServiceProtocol {
     }
 
     // MARK: - Private helpers
+    //
+    // These are nonisolated because they execute HKQuery callbacks on HealthKit's
+    // internal queue and don't touch any @MainActor state. Marking them
+    // nonisolated avoids unnecessary main-thread hops while results are pending.
 
-    private func fetchSum(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
+    nonisolated private func fetchSum(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
         guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, stats, error in
@@ -90,7 +101,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         }
     }
 
-    private func fetchLatest(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
+    nonisolated private func fetchLatest(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
         guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { _, samples, error in
@@ -102,7 +113,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         }
     }
 
-    private func fetchSleepHours(start: Date, end: Date) async -> Double? {
+    nonisolated private func fetchSleepHours(start: Date, end: Date) async -> Double? {
         guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return nil }
         let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         return await withCheckedContinuation { cont in

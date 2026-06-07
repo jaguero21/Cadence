@@ -1,21 +1,10 @@
 import SwiftUI
 
-private struct HealthKitServiceKey: EnvironmentKey {
-    static let defaultValue: any HealthKitServiceProtocol = HealthKitService.shared
-}
-
-private struct NotificationServiceKey: EnvironmentKey {
-    static let defaultValue: any NotificationServiceProtocol = NotificationService.shared
-}
-
+// The @Entry macro (iOS 17+) generates the EnvironmentKey conformance plus the
+// getter/setter, and emits a Sendable-correct key under Swift 6 strict
+// concurrency. The defaults reference @MainActor singletons, which are
+// implicitly Sendable.
 extension EnvironmentValues {
-    var healthKitService: any HealthKitServiceProtocol {
-        get { self[HealthKitServiceKey.self] }
-        set { self[HealthKitServiceKey.self] = newValue }
-    }
-
-    var notificationService: any NotificationServiceProtocol {
-        get { self[NotificationServiceKey.self] }
-        set { self[NotificationServiceKey.self] = newValue }
-    }
+    @Entry var healthKitService: any HealthKitServiceProtocol = HealthKitService.shared
+    @Entry var notificationService: any NotificationServiceProtocol = NotificationService.shared
 }
