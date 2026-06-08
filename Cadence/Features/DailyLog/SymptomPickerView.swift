@@ -4,6 +4,8 @@ import SwiftData
 struct SymptomPickerView: View {
     @Binding var selectedSymptoms: [SymptomEntry]
     @Query(sort: \SymptomTag.sortOrder) private var allTags: [SymptomTag]
+    @Environment(StoreService.self) private var store
+    @Environment(AppState.self) private var appState
     @State private var expandedTag: String?
     @State private var showingAddSheet = false
     @State private var newSymptomName = ""
@@ -79,13 +81,17 @@ struct SymptomPickerView: View {
 
     private var addChip: some View {
         Button {
-            showingAddSheet = true
+            if store.isPro {
+                showingAddSheet = true
+            } else {
+                appState.showingProPaywall = true
+            }
         } label: {
             VStack(spacing: 6) {
-                Image(systemName: "plus.circle.fill")
+                Image(systemName: store.isPro ? "plus.circle.fill" : "lock.fill")
                     .font(.title2)
-                    .foregroundStyle(CadenceColor.moodBlue)
-                Text("Add")
+                    .foregroundStyle(store.isPro ? CadenceColor.moodBlue : CadenceColor.sleepPurple)
+                Text(store.isPro ? "Add" : "Pro")
                     .font(.subheadline.weight(.medium))
             }
             .frame(maxWidth: .infinity)
@@ -93,6 +99,7 @@ struct SymptomPickerView: View {
             .background(CadenceColor.cardBG, in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(store.isPro ? "Add custom symptom" : "Add custom symptom — Pro feature")
         .sheet(isPresented: $showingAddSheet) {
             AddSymptomSheet(onSave: { _, _ in showingAddSheet = false })
         }
