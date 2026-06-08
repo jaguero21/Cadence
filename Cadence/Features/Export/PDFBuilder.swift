@@ -2,7 +2,7 @@ import SwiftUI
 import PDFKit
 
 enum ReportType: String, CaseIterable {
-    case doctor   = "Doctor Report"
+    case doctor   = "Cadence Trend"
     case personal = "Personal Summary"
 }
 
@@ -55,16 +55,20 @@ struct WeeklyReviewSnapshot: Sendable {
 }
 
 enum PDFBuilder {
-    static func build(type: ReportType, logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot]) async -> URL? {
+    static func build(type: ReportType, logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], headerTitle: String? = nil) async -> URL? {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
         let uid = UUID().uuidString
         let filename = type == .doctor ? "cadence-doctor-report-\(uid).pdf" : "cadence-personal-summary-\(uid).pdf"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
 
+        // Insights run once here so the renderer doesn't need to know about
+        // PatternEngine — and personal-summary builds don't pay the cost.
+        let insights = type == .doctor ? PatternEngine.allInsights(from: logs) : []
+
         do {
             try renderer.writePDF(to: url) { ctx in
                 switch type {
-                case .doctor:   renderDoctorReport(ctx: ctx, logs: logs)
+                case .doctor:   renderDoctorReport(ctx: ctx, logs: logs, insights: insights, headerTitle: headerTitle)
                 case .personal: renderPersonalSummary(ctx: ctx, reviews: reviews)
                 }
             }
@@ -97,13 +101,15 @@ enum PDFBuilder {
 
     // MARK: - Renderers
 
-    private static func renderDoctorReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot]) {
+    private static func renderDoctorReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], insights: [InsightCard], headerTitle: String?) {
         ctx.beginPage()
         let titleAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 22, weight: .bold)]
         let sectionAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 14, weight: .semibold)]
         let bodyAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 12)]
+        let insightTitleAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 12, weight: .semibold)]
 
-        "Cadence — Doctor Report".draw(in: CGRect(x: 40, y: 40, width: 515, height: 40), withAttributes: titleAttrs)
+        let header = headerTitle ?? "Cadence Trend"
+        header.draw(in: CGRect(x: 40, y: 40, width: 515, height: 40), withAttributes: titleAttrs)
 
         let dateRange: String
         if let first = logs.first, let last = logs.last {
@@ -145,6 +151,30 @@ enum PDFBuilder {
                 breakIfNeeded(y: &y, needing: h, ctx: ctx)
                 line.draw(in: CGRect(x: 50, y: y, width: 505, height: h), withAttributes: bodyAttrs)
                 y += h + 2
+            }
+        }
+
+        y += 16
+        breakIfNeeded(y: &y, needing: 44, ctx: ctx)
+        "Pattern Insights".draw(in: CGRect(x: 40, y: y, width: 515, height: 20), withAttributes: sectionAttrs)
+        y += 24
+        if insights.isEmpty {
+            let line = "No patterns detected from the current log set."
+            let h = textHeight(line, attrs: bodyAttrs, width: 505)
+            breakIfNeeded(y: &y, needing: h, ctx: ctx)
+            line.draw(in: CGRect(x: 50, y: y, width: 505, height: h), withAttributes: bodyAttrs)
+            y += h + 2
+        } else {
+            for insight in insights {
+                let header = "\(insight.title) — \(Int(insight.confidence * 100))% confidence"
+                let headerH = textHeight(header, attrs: insightTitleAttrs, width: 505)
+                let detailH = textHeight(insight.detail, attrs: bodyAttrs, width: 495)
+                let blockH  = headerH + 2 + detailH + 10
+                breakIfNeeded(y: &y, needing: blockH, ctx: ctx)
+                header.draw(in: CGRect(x: 50, y: y, width: 505, height: headerH), withAttributes: insightTitleAttrs)
+                y += headerH + 2
+                insight.detail.draw(in: CGRect(x: 60, y: y, width: 495, height: detailH), withAttributes: bodyAttrs)
+                y += detailH + 10
             }
         }
     }
