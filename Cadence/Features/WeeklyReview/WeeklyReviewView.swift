@@ -3,9 +3,25 @@ import SwiftData
 
 struct WeeklyReviewView: View {
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
-    @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
-    @State private var showingFlow = false
-    @State private var selectedReview: WeeklyReview?
+    @Query private var logs: [DailyLog]
+    @State private var activeSheet: ActiveSheet?
+
+    init() {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -14, to: .now) ?? .distantPast
+        _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
+    }
+
+    private enum ActiveSheet: Identifiable {
+        case reviewFlow
+        case viewingReview(WeeklyReview)
+
+        var id: String {
+            switch self {
+            case .reviewFlow: "reviewFlow"
+            case .viewingReview: "viewingReview"
+            }
+        }
+    }
 
     private var thisWeekReview: WeeklyReview? {
         reviews.first { $0.weekStartDate.isThisWeek }
@@ -22,17 +38,19 @@ struct WeeklyReviewView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        showingFlow = true
+                        activeSheet = .reviewFlow
                     } label: {
                         Image(systemName: "plus.circle.fill")
                     }
                 }
             }
-            .sheet(isPresented: $showingFlow) {
-                ReviewFlowView(existingReview: thisWeekReview, logs: logs)
-            }
-            .sheet(item: $selectedReview) { review in
-                ReviewDetailView(review: review)
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .reviewFlow:
+                    ReviewFlowView(existingReview: thisWeekReview, logs: logs)
+                case .viewingReview(let review):
+                    ReviewDetailView(review: review)
+                }
             }
         }
     }
@@ -43,9 +61,9 @@ struct WeeklyReviewView: View {
             if let review = thisWeekReview {
                 Button {
                     if review.isComplete {
-                        selectedReview = review
+                        activeSheet = .viewingReview(review)
                     } else {
-                        showingFlow = true
+                        activeSheet = .reviewFlow
                     }
                 } label: {
                     ReviewRowView(review: review)
@@ -53,7 +71,7 @@ struct WeeklyReviewView: View {
                 .buttonStyle(.plain)
             } else {
                 Button {
-                    showingFlow = true
+                    activeSheet = .reviewFlow
                 } label: {
                     Label("Start this week's review", systemImage: "calendar.badge.plus")
                         .foregroundStyle(CadenceColor.sleepPurple)
@@ -70,7 +88,7 @@ struct WeeklyReviewView: View {
         Section("Past Reviews") {
             ForEach(pastReviews) { review in
                 Button {
-                    selectedReview = review
+                    activeSheet = .viewingReview(review)
                 } label: {
                     ReviewRowView(review: review)
                 }

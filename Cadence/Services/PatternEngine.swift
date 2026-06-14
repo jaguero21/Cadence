@@ -59,36 +59,66 @@ enum PatternEngine {
     }
 
     private static func stressFatiguePattern(logs: [DailyLogSnapshot]) -> InsightCard? {
-        var consecutiveStress = 0
+        let cal = Calendar.current
+
+        // Phase 1: Find stress streaks (3+ high-stress entries, tolerating
+        // 1-day logging gaps so Mon-Wed-Thu still counts as consecutive).
+        struct Streak { let endDate: Date; let endIndex: Int }
+        var streaks: [Streak] = []
+        var runLength = 0
+        var runLastDate: Date?
+        var runEndIndex: Int?
+
+        for (i, log) in logs.enumerated() {
+            let isHigh = log.stressLevel >= PatternThreshold.highStressLevel
+            let gap = runLastDate.flatMap {
+                cal.dateComponents([.day], from: cal.startOfDay(for: $0), to: cal.startOfDay(for: log.date)).day
+            } ?? Int.max
+
+            if isHigh {
+                if gap <= 2 {
+                    runLength += 1
+                } else {
+                    if runLength >= PatternThreshold.consecutiveStressDays,
+                       let endDate = runLastDate, let endIdx = runEndIndex {
+                        streaks.append(Streak(endDate: endDate, endIndex: endIdx))
+                    }
+                    runLength = 1
+                }
+                runLastDate = log.date
+                runEndIndex = i
+            } else {
+                if runLength >= PatternThreshold.consecutiveStressDays,
+                   let endDate = runLastDate, let endIdx = runEndIndex {
+                    streaks.append(Streak(endDate: endDate, endIndex: endIdx))
+                }
+                runLength = 0
+                runLastDate = nil
+                runEndIndex = nil
+            }
+        }
+        if runLength >= PatternThreshold.consecutiveStressDays,
+           let endDate = runLastDate, let endIdx = runEndIndex {
+            streaks.append(Streak(endDate: endDate, endIndex: endIdx))
+        }
+
+        // Phase 2: For each streak, check the next logged entry within 3
+        // calendar days for fatigue symptoms.
         var streaksChecked = 0
         var fatigueFollowed = 0
-        var lastHighStressDate: Date? = nil
 
-        // Only count a streak in the denominator when we actually observe its
-        // follow-up day in the log set. Streaks broken by a calendar gap, and
-        // streaks ending at the last log, have no observed follow-up — counting
-        // them would bias confidence (low under the previous implementation,
-        // since fatigue could never increment without a follow-up day).
-        for i in 0..<logs.count {
-            if logs[i].stressLevel >= PatternThreshold.highStressLevel {
-                let continuesStreak = lastHighStressDate.map {
-                    isNextCalendarDay(logs[i].date, after: $0)
-                } ?? false
-                consecutiveStress = continuesStreak ? consecutiveStress + 1 : 1
-                lastHighStressDate = logs[i].date
-            } else {
-                // The streak's true follow-up is the day immediately after it ended.
-                // Only credit this log to the streak if it's that calendar-next-day.
-                if consecutiveStress >= PatternThreshold.consecutiveStressDays,
-                   let lastDate = lastHighStressDate,
-                   isNextCalendarDay(logs[i].date, after: lastDate) {
-                    streaksChecked += 1
-                    if logs[i].symptoms.contains(where: { $0.name.localizedCaseInsensitiveContains("fatigue") || $0.name.localizedCaseInsensitiveContains("tired") }) {
-                        fatigueFollowed += 1
-                    }
-                }
-                consecutiveStress = 0
-                lastHighStressDate = nil
+        for streak in streaks {
+            guard streak.endIndex + 1 < logs.count,
+                  let windowEnd = cal.date(byAdding: .day, value: 3, to: cal.startOfDay(for: streak.endDate))
+            else { continue }
+            let followUp = logs[streak.endIndex + 1]
+            guard cal.startOfDay(for: followUp.date) <= windowEnd else { continue }
+            streaksChecked += 1
+            if followUp.symptoms.contains(where: {
+                $0.name.localizedCaseInsensitiveContains("fatigue") ||
+                $0.name.localizedCaseInsensitiveContains("tired")
+            }) {
+                fatigueFollowed += 1
             }
         }
 

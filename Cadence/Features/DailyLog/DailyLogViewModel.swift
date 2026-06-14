@@ -1,9 +1,11 @@
 import SwiftUI
 import SwiftData
+import OSLog
 
 @MainActor
 @Observable
 final class DailyLogViewModel {
+    private static let log = Logger(subsystem: "com.carpecadence", category: "DailyLog")
     var currentStep: LogStep = .mood
     var isDone: Bool = false
     var saveError: String?
@@ -34,6 +36,7 @@ final class DailyLogViewModel {
             try context.save()
         } catch {
             log.isComplete = wasComplete
+            Self.log.error("Failed to save daily log: \(error.localizedDescription)")
             saveError = "Your log couldn't be saved. Please try again."
             return false
         }

@@ -1,18 +1,20 @@
 import SwiftUI
 import SwiftData
+import OSLog
 
 @MainActor
 @Observable
 final class WeeklyReviewViewModel {
+    private static let log = Logger(subsystem: "com.carpecadence", category: "WeeklyReview")
     var currentPromptIndex: Int = 0
     var isComplete: Bool = false
     var saveError: String?
 
     let prompts = Prompt.weeklyDefaults
 
-    var currentPrompt: Prompt { prompts[min(currentPromptIndex, prompts.count - 1)] }
-    var progress: Double { Double(currentPromptIndex) / Double(prompts.count) }
-    var isLastPrompt: Bool { currentPromptIndex >= prompts.count - 1 }
+    var currentPrompt: Prompt { prompts[min(currentPromptIndex, max(prompts.count - 1, 0))] }
+    var progress: Double { prompts.isEmpty ? 1 : Double(currentPromptIndex) / Double(prompts.count) }
+    var isLastPrompt: Bool { prompts.isEmpty || currentPromptIndex >= prompts.count - 1 }
 
     func next() {
         withAnimation(CadenceAnimation.spring) {
@@ -53,6 +55,7 @@ final class WeeklyReviewViewModel {
             try context.save()
         } catch {
             review.isComplete = wasComplete
+            Self.log.error("Failed to save weekly review: \(error.localizedDescription)")
             saveError = "Your review couldn't be saved. Please try again."
             return false
         }

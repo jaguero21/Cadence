@@ -49,6 +49,7 @@ struct SymptomPickerView: View {
             }
             .buttonStyle(.plain)
             .hapticFeedback(.medium)
+            .accessibilityLabel(tag.name)
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             .accessibilityHint(isSelected ? "Double-tap and hold to adjust severity" : "Double-tap to select, then hold to rate severity")
             .onLongPressGesture {

@@ -43,10 +43,10 @@ struct CadenceApp: App {
                                 appState.healthKitAuthorized = (try? await HealthKitService.shared.requestAuthorization()) ?? HealthKitService.shared.isAuthorized
                                 if appState.notificationsAuthorized {
                                     let ud     = UserDefaults.standard
-                                    let hour   = ud.object(forKey: "dailyReminderHour")   as? Int  ?? 20
-                                    let minute = ud.object(forKey: "dailyReminderMinute") as? Int  ?? 0
+                                    let hour   = ud.object(forKey: UserDefaultsKey.dailyReminderHour)   as? Int  ?? 20
+                                    let minute = ud.object(forKey: UserDefaultsKey.dailyReminderMinute) as? Int  ?? 0
                                     NotificationService.shared.scheduleDailyReminder(at: hour, minute: minute)
-                                    let weeklyOn = ud.object(forKey: "weeklyReminderEnabled") as? Bool ?? true
+                                    let weeklyOn = ud.object(forKey: UserDefaultsKey.weeklyReminderEnabled) as? Bool ?? true
                                     if weeklyOn { NotificationService.shared.scheduleWeeklyReviewReminder() }
                                 }
                             }
@@ -70,7 +70,7 @@ struct ContentView: View {
     @State private var selectedTab: Tab = .dashboard
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
 
-    private let symptomSeedKey = "cadence.symptomTagsSeeded"
+    private let symptomSeedKey = UserDefaultsKey.symptomTagsSeeded
     private static let log = Logger(subsystem: "com.carpecadence", category: "ContentView")
 
     var body: some View {

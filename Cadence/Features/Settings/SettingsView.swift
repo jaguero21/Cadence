@@ -12,9 +12,9 @@ struct SettingsView: View {
 
     @Environment(\.healthKitService) private var healthKitService
     @Environment(\.notificationService) private var notificationService
-    @AppStorage("dailyReminderHour")   private var dailyHour: Int = 20
-    @AppStorage("dailyReminderMinute") private var dailyMinute: Int = 0
-    @AppStorage("weeklyReminderEnabled") private var weeklyEnabled: Bool = true
+    @AppStorage(UserDefaultsKey.dailyReminderHour)    private var dailyHour: Int = 20
+    @AppStorage(UserDefaultsKey.dailyReminderMinute)  private var dailyMinute: Int = 0
+    @AppStorage(UserDefaultsKey.weeklyReminderEnabled) private var weeklyEnabled: Bool = true
     @State private var showingAddSymptom = false
 
     #if DEBUG
