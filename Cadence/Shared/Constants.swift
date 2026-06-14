@@ -31,6 +31,14 @@ enum StoreKitID {
     static let proMonthly = "com.carpecadence.pro.monthly"
 }
 
+enum UserDefaultsKey {
+    static let onboarded            = "cadence.onboarded"
+    static let symptomTagsSeeded    = "cadence.symptomTagsSeeded"
+    static let dailyReminderHour    = "dailyReminderHour"
+    static let dailyReminderMinute  = "dailyReminderMinute"
+    static let weeklyReminderEnabled = "weeklyReminderEnabled"
+}
+
 enum PatternThreshold {
     // Minimum data requirements before running any pattern
     static let minimumLogs: Int = 5

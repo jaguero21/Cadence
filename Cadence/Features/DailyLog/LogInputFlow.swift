@@ -29,6 +29,8 @@ struct LogInputFlow: View {
     @State private var hkSnapshot: HealthKitSnapshot?
     @State private var isHydrated = false
     @State private var createdLog: DailyLog?
+    @State private var logPersisted = false
+    @State private var hkTask: Task<Void, Never>?
 
     init(existingLog: DailyLog?) {
         self.existingLog = existingLog
@@ -79,9 +81,10 @@ struct LogInputFlow: View {
                     selectedSymptoms = log.symptoms
                     freeNote         = log.freeNote
                 } else {
-                    Task { await applyHealthKitData() }
+                    hkTask = Task { await applyHealthKitData() }
                 }
             }
+            .onDisappear { hkTask?.cancel() }
             .alert("Couldn't Save", isPresented: .init(
                 get: { vm.saveError != nil },
                 set: { if !$0 { vm.saveError = nil } }
@@ -351,7 +354,15 @@ struct LogInputFlow: View {
                     if vm.currentStep == .note {
                         let log = ensureLog()
                         apply(to: log)
-                        guard vm.save(log: log, context: modelContext, notifications: notificationService) else { return }
+                        if existingLog == nil { modelContext.insert(log) }
+                        guard vm.save(log: log, context: modelContext, notifications: notificationService) else {
+                            if existingLog == nil, !logPersisted {
+                                modelContext.delete(log)
+                                createdLog = nil
+                            }
+                            return
+                        }
+                        logPersisted = true
                     }
                     vm.nextStep()
                 } label: {
@@ -382,7 +393,6 @@ struct LogInputFlow: View {
         if let existing = existingLog { return existing }
         if let created = createdLog { return created }
         let newLog = DailyLog()
-        modelContext.insert(newLog)
         createdLog = newLog
         return newLog
     }
@@ -412,19 +422,35 @@ struct LogInputFlow: View {
 
     @MainActor
     private func applyHealthKitData() async {
-        let snapshot = await healthKitService.fetchLogSnapshot()
+        let service = healthKitService
+        let snapshot = await withTaskGroup(of: HealthKitSnapshot?.self) { group in
+            group.addTask { await service.fetchLogSnapshot() }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(5))
+                return nil
+            }
+            defer { group.cancelAll() }
+            return await group.next() ?? nil
+        }
+        guard let snapshot, !Task.isCancelled else { return }
         hkSnapshot = snapshot
-        // Pre-fill sleep slider only if the user hasn't touched metrics yet.
         if !didEditMetrics, let sleep = snapshot.sleepHours {
             sleepHours = sleep
         }
     }
 
     private func partialSave() {
-        apply(to: ensureLog())
+        let log = ensureLog()
+        apply(to: log)
+        if existingLog == nil { modelContext.insert(log) }
         do {
             try modelContext.save()
+            logPersisted = true
         } catch {
+            if existingLog == nil, !logPersisted {
+                modelContext.delete(log)
+                createdLog = nil
+            }
             vm.saveError = "Your progress couldn't be saved. Please try again."
         }
     }

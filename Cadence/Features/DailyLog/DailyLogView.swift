@@ -2,9 +2,25 @@ import SwiftUI
 import SwiftData
 
 struct DailyLogView: View {
-    @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
-    @State private var showingInputFlow = false
-    @State private var selectedLog: DailyLog?
+    @Query private var logs: [DailyLog]
+    @State private var activeSheet: ActiveSheet?
+
+    init() {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
+        _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
+    }
+
+    private enum ActiveSheet: Identifiable {
+        case inputFlow
+        case viewingLog(DailyLog)
+
+        var id: String {
+            switch self {
+            case .inputFlow: "inputFlow"
+            case .viewingLog: "viewingLog"
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -21,18 +37,20 @@ struct DailyLogView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        showingInputFlow = true
+                        activeSheet = .inputFlow
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
                     }
                 }
             }
-            .sheet(isPresented: $showingInputFlow) {
-                LogInputFlow(existingLog: todayLog)
-            }
-            .sheet(item: $selectedLog) { log in
-                LogDetailView(log: log)
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .inputFlow:
+                    LogInputFlow(existingLog: todayLog)
+                case .viewingLog(let log):
+                    LogDetailView(log: log)
+                }
             }
         }
     }
@@ -55,14 +73,14 @@ struct DailyLogView: View {
 
             if let log = todayLog {
                 Button {
-                    selectedLog = log
+                    activeSheet = .viewingLog(log)
                 } label: {
                     LogRowView(log: log)
                 }
                 .buttonStyle(.plain)
             } else {
                 Button {
-                    showingInputFlow = true
+                    activeSheet = .inputFlow
                 } label: {
                     HStack {
                         Image(systemName: "plus.circle")
@@ -91,7 +109,7 @@ struct DailyLogView: View {
             Text("Recent").font(.headline)
             ForEach(pastLogs) { log in
                 Button {
-                    selectedLog = log
+                    activeSheet = .viewingLog(log)
                 } label: {
                     LogRowView(log: log)
                 }

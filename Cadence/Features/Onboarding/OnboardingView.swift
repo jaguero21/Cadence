@@ -57,10 +57,10 @@ struct OnboardingView: View {
                     if appState.notificationsAuthorized {
                         let ud = UserDefaults.standard
                         notificationService.scheduleDailyReminder(
-                            at:     ud.object(forKey: "dailyReminderHour")   as? Int ?? 20,
-                            minute: ud.object(forKey: "dailyReminderMinute") as? Int ?? 0
+                            at:     ud.object(forKey: UserDefaultsKey.dailyReminderHour)   as? Int ?? 20,
+                            minute: ud.object(forKey: UserDefaultsKey.dailyReminderMinute) as? Int ?? 0
                         )
-                        let weeklyOn = ud.object(forKey: "weeklyReminderEnabled") as? Bool ?? true
+                        let weeklyOn = ud.object(forKey: UserDefaultsKey.weeklyReminderEnabled) as? Bool ?? true
                         if weeklyOn { notificationService.scheduleWeeklyReviewReminder() }
                     }
                     isRequestingPermission = false

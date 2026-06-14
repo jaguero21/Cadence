@@ -4,11 +4,16 @@ import SwiftData
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.notificationService) private var notificationService
-    @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
+    @Query private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
     @State private var vm = DashboardViewModel()
     @State private var showingDailyLog = false
     @State private var showingWeeklyReview = false
+
+    init() {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: .now) ?? .distantPast
+        _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
+    }
 
     var body: some View {
         NavigationStack {
