@@ -2,8 +2,13 @@ import SwiftUI
 import SwiftData
 
 struct InsightsView: View {
-    @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
+    @Query private var logs: [DailyLog]
     @State private var vm = InsightsViewModel()
+
+    init() {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: .now) ?? .distantPast
+        _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
+    }
     @Environment(StoreService.self) private var store
     @Environment(AppState.self) private var appState
 

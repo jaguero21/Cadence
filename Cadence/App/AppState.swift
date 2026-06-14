@@ -8,14 +8,12 @@ final class AppState {
     var notificationsAuthorized: Bool = false
     var healthKitAuthorized: Bool = false
 
-    private let onboardingKey = "cadence.onboarded"
-
     init() {
-        hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
+        hasCompletedOnboarding = UserDefaults.standard.bool(forKey: UserDefaultsKey.onboarded)
     }
 
     func completeOnboarding() {
         hasCompletedOnboarding = true
-        UserDefaults.standard.set(true, forKey: onboardingKey)
+        UserDefaults.standard.set(true, forKey: UserDefaultsKey.onboarded)
     }
 }

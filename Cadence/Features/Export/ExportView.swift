@@ -12,6 +12,7 @@ struct ExportView: View {
     @State private var isGenerating = false
     @State private var shareItem: URL?
     @State private var showingShare = false
+    @State private var generationTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -59,6 +60,7 @@ struct ExportView: View {
                     ShareSheet(items: [url])
                 }
             }
+            .onDisappear { generationTask?.cancel() }
         }
     }
 
@@ -99,12 +101,14 @@ struct ExportView: View {
             .filter { $0.weekStartDate <= endDate && $0.weekEndDate >= startDate }
             .map(WeeklyReviewSnapshot.init)
 
-        Task.detached {
+        generationTask?.cancel()
+        generationTask = Task.detached {
             let url = await PDFBuilder.build(
                 type: reportType,
                 logs: logSnapshots,
                 reviews: reviewSnapshots
             )
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 isGenerating = false
                 shareItem = url

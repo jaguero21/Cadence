@@ -12,10 +12,7 @@ struct HistoryView: View {
         guard let monthStart = cal.date(from: components),
               let monthEnd = cal.date(byAdding: .month, value: 1, to: monthStart)
         else { return [:] }
-        // logs are sorted newest-first; skip future months then stop at month start.
-        let monthLogs = logs
-            .drop(while:   { $0.date >= monthEnd })
-            .prefix(while: { $0.date >= monthStart })
+        let monthLogs = logs.filter { $0.date >= monthStart && $0.date < monthEnd }
         return Dictionary(
             monthLogs.map { (cal.startOfDay(for: $0.date), $0) },
             uniquingKeysWith: { first, _ in first }

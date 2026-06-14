@@ -9,6 +9,8 @@ struct MetricSlider: View {
     var labelLow: String = "Low"
     var labelHigh: String = "High"
 
+    private let haptic = UIImpactFeedbackGenerator(style: .light)
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -32,7 +34,7 @@ struct MetricSlider: View {
                         set: { newVal in
                             let rounded = Int(newVal.rounded())
                             if rounded != value {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                haptic.impactOccurred()
                                 value = rounded
                             }
                         }
