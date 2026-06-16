@@ -41,7 +41,7 @@ struct TrendChartView: View {
                 .foregroundStyle(metric.color)
                 .symbolSize(25)
             }
-            .chartYScale(domain: 0...10)
+            .chartYScale(domain: metric.yDomain)
             .chartXAxis {
                 AxisMarks(preset: .aligned, values: .stride(by: .day, count: range == .sevenDay ? 1 : 7)) { _ in
                     AxisGridLine()
@@ -87,6 +87,13 @@ enum ChartMetric: CaseIterable {
         case .energy: return CadenceColor.energyOrange
         case .sleep:  return CadenceColor.sleepPurple
         case .stress: return CadenceColor.stressRed
+        }
+    }
+
+    var yDomain: ClosedRange<Double> {
+        switch self {
+        case .mood:   return 1...5
+        case .energy, .sleep, .stress: return 0...10
         }
     }
 

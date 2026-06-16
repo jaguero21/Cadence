@@ -67,8 +67,10 @@ struct CadenceApp: App {
 struct ContentView: View {
     @Environment(AppState.self) var appState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .dashboard
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
+    @State private var dayId = Calendar.current.startOfDay(for: .now)
 
     private let symptomSeedKey = UserDefaultsKey.symptomTagsSeeded
     private static let log = Logger(subsystem: "com.carpecadence", category: "ContentView")
@@ -77,10 +79,12 @@ struct ContentView: View {
         @Bindable var appState = appState
         TabView(selection: $selectedTab) {
             DashboardView()
+                .id(dayId)
                 .tabItem { Label("Today", systemImage: "sun.max.fill") }
                 .tag(Tab.dashboard)
 
             DailyLogView()
+                .id(dayId)
                 .tabItem { Label("Log", systemImage: "pencil.and.list.clipboard") }
                 .tag(Tab.dailyLog)
 
@@ -89,6 +93,7 @@ struct ContentView: View {
                 .tag(Tab.weeklyReview)
 
             InsightsView()
+                .id(dayId)
                 .tabItem { Label("Insights", systemImage: "chart.line.uptrend.xyaxis") }
                 .tag(Tab.insights)
 
@@ -97,6 +102,11 @@ struct ContentView: View {
                 .tag(Tab.history)
         }
         .tint(CadenceColor.accent)
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            let today = Calendar.current.startOfDay(for: .now)
+            if today != dayId { dayId = today }
+        }
         .task { seedSymptomTagsIfNeeded() }
         .sheet(isPresented: $appState.showingProPaywall) {
             ProPaywallView()

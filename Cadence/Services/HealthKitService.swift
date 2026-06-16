@@ -1,12 +1,14 @@
 import HealthKit
 import SwiftData
 import UIKit
+import OSLog
 
 @MainActor
 final class HealthKitService: HealthKitServiceProtocol {
     static let shared = HealthKitService()
     private let store = HKHealthStore()
     private var foregroundObserver: NSObjectProtocol?
+    nonisolated private static let log = Logger(subsystem: "com.carpecadence", category: "HealthKit")
 
     private init() {
         // .main queue ensures the callback fires on the main thread; the
@@ -94,6 +96,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, stats, error in
+                if let error { Self.log.error("fetchSum(\(id.rawValue, privacy: .public)) failed: \(error, privacy: .public)") }
                 guard error == nil else { cont.resume(returning: nil); return }
                 cont.resume(returning: stats?.sumQuantity()?.doubleValue(for: unit))
             }
@@ -105,6 +108,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { _, samples, error in
+                if let error { Self.log.error("fetchLatest(\(id.rawValue, privacy: .public)) failed: \(error, privacy: .public)") }
                 guard error == nil else { cont.resume(returning: nil); return }
                 let qty = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: unit)
                 cont.resume(returning: qty)
@@ -118,6 +122,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         return await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                if let error { Self.log.error("fetchSleepHours failed: \(error, privacy: .public)") }
                 guard error == nil, let samples = samples as? [HKCategorySample] else {
                     cont.resume(returning: nil); return
                 }
