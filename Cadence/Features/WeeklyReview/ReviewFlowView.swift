@@ -51,7 +51,7 @@ struct ReviewFlowView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Save & Close") {
-                        if vm.save(review: review, context: modelContext) {
+                        if vm.save(review: review, context: modelContext, isNew: existingReview == nil) {
                             Task { @MainActor in dismiss() }
                         }
                     }
@@ -113,7 +113,7 @@ struct ReviewFlowView: View {
             Spacer()
             Button {
                 if vm.isLastPrompt {
-                    guard vm.save(review: review, context: modelContext) else { return }
+                    guard vm.save(review: review, context: modelContext, isNew: existingReview == nil) else { return }
                 }
                 vm.next()
             } label: {

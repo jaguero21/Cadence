@@ -55,7 +55,7 @@ struct WeeklyReviewSnapshot: Sendable {
 }
 
 enum PDFBuilder {
-    static func build(type: ReportType, logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], headerTitle: String? = nil) async -> URL? {
+    @MainActor static func build(type: ReportType, logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], headerTitle: String? = nil) async -> URL? {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
         let uid = UUID().uuidString
         let filename = type == .doctor ? "cadence-doctor-report-\(uid).pdf" : "cadence-personal-summary-\(uid).pdf"

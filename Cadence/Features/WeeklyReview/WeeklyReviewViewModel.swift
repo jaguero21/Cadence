@@ -47,14 +47,15 @@ final class WeeklyReviewViewModel {
     }
 
     @discardableResult
-    func save(review: WeeklyReview, context: ModelContext) -> Bool {
-        context.insert(review)   // no-op if already inserted; ensures new reviews are registered
+    func save(review: WeeklyReview, context: ModelContext, isNew: Bool) -> Bool {
+        context.insert(review)
         let wasComplete = review.isComplete
         review.isComplete = true
         do {
             try context.save()
         } catch {
             review.isComplete = wasComplete
+            if isNew { context.delete(review) }
             Self.log.error("Failed to save weekly review: \(error.localizedDescription)")
             saveError = "Your review couldn't be saved. Please try again."
             return false
