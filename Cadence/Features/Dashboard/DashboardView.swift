@@ -25,7 +25,11 @@ struct DashboardView: View {
                     if let insight = vm.latestInsight {
                         insightPreviewCard(insight)
                     }
-                    quickStats
+                    if logs.isEmpty {
+                        emptyState
+                    } else {
+                        quickStats
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 32)
@@ -204,6 +208,18 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(CadenceColor.cardBG, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Text("Log your first day to see insights")
+                .font(.subheadline.weight(.medium))
+            Text("Tap Today's Log above to get started.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .cadenceCard()
     }
 
     private var todayCardAccessibilityLabel: String {

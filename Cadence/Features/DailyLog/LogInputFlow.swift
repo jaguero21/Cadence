@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import OSLog
 
 struct LogInputFlow: View {
     @Environment(\.modelContext) private var modelContext
@@ -31,6 +32,8 @@ struct LogInputFlow: View {
     @State private var createdLog: DailyLog?
     @State private var logPersisted = false
     @State private var hkTask: Task<Void, Never>?
+
+    private static let log = Logger(subsystem: "com.carpecadence", category: "LogInputFlow")
 
     init(existingLog: DailyLog?) {
         self.existingLog = existingLog
@@ -424,13 +427,19 @@ struct LogInputFlow: View {
     private func applyHealthKitData() async {
         let service = healthKitService
         let snapshot = await withTaskGroup(of: HealthKitSnapshot?.self) { group in
-            group.addTask { await service.fetchLogSnapshot() }
+            group.addTask {
+                let result = await service.fetchLogSnapshot()
+                return Task.isCancelled ? nil : result
+            }
             group.addTask {
                 try? await Task.sleep(for: .seconds(5))
                 return nil
             }
             defer { group.cancelAll() }
-            return await group.next() ?? nil
+            for await result in group where result != nil {
+                return result
+            }
+            return nil
         }
         guard let snapshot, !Task.isCancelled else { return }
         hkSnapshot = snapshot
@@ -447,6 +456,7 @@ struct LogInputFlow: View {
             try modelContext.save()
             logPersisted = true
         } catch {
+            Self.log.error("Partial save failed: \(error, privacy: .public)")
             if existingLog == nil, !logPersisted {
                 modelContext.delete(log)
                 createdLog = nil

@@ -108,6 +108,7 @@ enum PatternEngine {
         var fatigueFollowed = 0
 
         for streak in streaks {
+            assert(logs[streak.endIndex].stressLevel >= PatternThreshold.highStressLevel)
             guard streak.endIndex + 1 < logs.count,
                   let windowEnd = cal.date(byAdding: .day, value: 3, to: cal.startOfDay(for: streak.endDate))
             else { continue }
