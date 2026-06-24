@@ -1,6 +1,22 @@
+import SwiftData
+
 // Minimal protocols covering only the methods and properties called across the
 // codebase. Views and view models depend on these, not the concrete classes,
 // so tests can inject lightweight fakes without touching HealthKit or UNUserNotificationCenter.
+
+// Seam over ModelContext's persistence surface so view models can be tested
+// against a stub whose save() throws — exercising the rollback / cleanup
+// branches that a real in-memory ModelContext can't be made to fail. The
+// requirements match ModelContext's existing signatures, so it conforms with
+// an empty extension. Left non-isolated to mirror ModelContext (the @MainActor
+// view models call it without friction).
+protocol ModelPersisting {
+    func insert<T: PersistentModel>(_ model: T)
+    func delete<T: PersistentModel>(_ model: T)
+    func save() throws
+}
+
+extension ModelContext: ModelPersisting {}
 
 @MainActor
 protocol HealthKitServiceProtocol: AnyObject {

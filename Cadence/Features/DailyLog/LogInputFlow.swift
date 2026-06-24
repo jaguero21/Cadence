@@ -8,6 +8,7 @@ struct LogInputFlow: View {
     @Environment(\.healthKitService) private var healthKitService
     @Environment(\.notificationService) private var notificationService
     @State private var vm = DailyLogViewModel()
+    @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
 
     private let existingLog: DailyLog?
 
@@ -26,6 +27,8 @@ struct LogInputFlow: View {
     @State private var sleepQuality: Int = 5
     @State private var selectedSymptoms: [SymptomEntry] = []
     @State private var basicsCompleted: [String] = []
+    @State private var selectedFactors: [String] = []
+    @State private var customValues: [UUID: Int] = [:]
     @State private var freeNote: String = ""
     @State private var hkSnapshot: HealthKitSnapshot?
     @State private var isHydrated = false
@@ -50,6 +53,7 @@ struct LogInputFlow: View {
                         case .bodyMetrics: bodyMetricsStep
                         case .basics:      basicsStep
                         case .symptoms:    symptomStep
+                        case .factors:     factorsStep
                         case .note:        noteStep
                         case .done:        doneStep
                         }
@@ -82,6 +86,8 @@ struct LogInputFlow: View {
                     sleepQuality     = log.sleepQuality
                     basicsCompleted  = log.basicsCompleted
                     selectedSymptoms = log.symptoms
+                    selectedFactors  = log.factors
+                    customValues     = Dictionary(log.customMetrics.map { ($0.trackerID, $0.value) }, uniquingKeysWith: { a, _ in a })
                     freeNote         = log.freeNote
                 } else {
                     hkTask = Task { await applyHealthKitData() }
@@ -89,8 +95,9 @@ struct LogInputFlow: View {
             }
             .onDisappear {
                 hkTask?.cancel()
-                // Save progress on any dismissal (including midnight .id() resets)
-                // only when a log is already in progress to avoid phantom entries.
+                // Safety net: persist progress on any dismissal (backgrounding,
+                // swipe-away) but only when a log is already in progress, to
+                // avoid phantom entries.
                 if existingLog != nil || createdLog != nil {
                     partialSave()
                 }
@@ -208,6 +215,18 @@ struct LogInputFlow: View {
                 BodyMetricRow(label: "Brain fog",     value: $brainFogLevel)
                 Divider()
                 BodyMetricRow(label: "Anxiety",       value: $stressLevel)
+                ForEach(customTrackers) { tracker in
+                    Divider()
+                    CustomMetricRow(
+                        label: tracker.name,
+                        unit: tracker.unit,
+                        range: tracker.range,
+                        value: Binding(
+                            get: { customValues[tracker.id] ?? tracker.midpoint },
+                            set: { customValues[tracker.id] = $0; didEditMetrics = true }
+                        )
+                    )
+                }
             }
         }
         .cadenceCard()
@@ -266,6 +285,68 @@ struct LogInputFlow: View {
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(selected ? CadenceColor.successGreen.opacity(0.4) : Color.clear, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(item.name)
+                    .accessibilityAddTraits(selected ? [.isSelected] : [])
+                }
+            }
+        }
+        .cadenceCard()
+    }
+
+    // MARK: - Factors Step
+
+    private static let factorItems: [(name: String, icon: String)] = [
+        ("Alcohol",          "wineglass"),
+        ("Caffeine",         "cup.and.saucer.fill"),
+        ("Skipped meal",     "takeoutbag.and.cup.and.straw"),
+        ("Intense exercise", "figure.run"),
+        ("Travel",           "airplane"),
+        ("Stressful event",  "exclamationmark.bubble"),
+        ("Poor sleep",       "bed.double"),
+        ("Late screen time", "iphone"),
+        ("Weather change",   "cloud.sun"),
+        ("Menstrual cycle",  "drop.fill"),
+    ]
+
+    private var factorsStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            LogSectionHeader(icon: "exclamationmark.triangle", title: "POSSIBLE TRIGGERS", time: "~30 sec")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(Self.factorItems, id: \.name) { item in
+                    let selected = selectedFactors.contains(item.name)
+                    Button {
+                        withAnimation(CadenceAnimation.spring) {
+                            if selected {
+                                selectedFactors.removeAll { $0 == item.name }
+                            } else {
+                                selectedFactors.append(item.name)
+                            }
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
+                                .foregroundStyle(selected ? CadenceColor.stressRed : .secondary)
+                                .frame(width: 20)
+                            Text(item.name)
+                                .font(.subheadline)
+                                .foregroundStyle(selected ? CadenceColor.stressRed : .primary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 14)
+                        .background(
+                            selected
+                                ? CadenceColor.stressRed.opacity(0.1)
+                                : Color(.secondarySystemGroupedBackground),
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(selected ? CadenceColor.stressRed.opacity(0.4) : Color.clear, lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -420,6 +501,8 @@ struct LogInputFlow: View {
         log.sleepQuality    = sleepQuality.clamped(to: 0...10)
         log.basicsCompleted = basicsCompleted
         log.symptoms        = selectedSymptoms
+        log.factors         = selectedFactors
+        log.customMetrics   = customValues.map { MetricEntry(trackerID: $0.key, value: $0.value) }
         log.freeNote        = freeNote
         log.didEditMetrics  = didEditMetrics
         if let snapshot = hkSnapshot {
@@ -465,7 +548,7 @@ struct LogInputFlow: View {
                 modelContext.delete(log)
                 createdLog = nil
             }
-            vm.saveError = "Your progress couldn't be saved. Please try again."
+            vm.saveError = String(localized: "Your progress couldn't be saved. Please try again.")
         }
     }
 }
@@ -523,6 +606,44 @@ private struct SleepHoursRow: View {
                 .frame(width: 36, alignment: .trailing)
                 .contentTransition(.numericText())
                 .animation(CadenceAnimation.smooth, value: hours)
+        }
+    }
+}
+
+private struct CustomMetricRow: View {
+    let label: String
+    let unit: String
+    let range: ClosedRange<Int>
+    @Binding var value: Int
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Text(label)
+                .font(.subheadline)
+                .frame(width: 100, alignment: .leading)
+                .lineLimit(2)
+            Slider(
+                value: Binding(
+                    get: { Double(value) },
+                    set: { newVal in
+                        let rounded = Int(newVal.rounded())
+                        if rounded != value {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            value = rounded
+                        }
+                    }
+                ),
+                in: Double(range.lowerBound)...Double(range.upperBound),
+                step: 1
+            )
+            .tint(Color(.systemGray3))
+            .accessibilityLabel(label)
+            .accessibilityValue(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
+            Text(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
+                .font(.headline.monospacedDigit())
+                .frame(minWidth: 32, alignment: .trailing)
+                .contentTransition(.numericText())
+                .animation(CadenceAnimation.smooth, value: value)
         }
     }
 }

@@ -181,7 +181,7 @@ struct ProPaywallView: View {
             let purchased = try await store.purchase(product)
             if purchased { dismiss() }
         } catch {
-            errorMessage = "Something went wrong. Please try again."
+            errorMessage = String(localized: "Something went wrong. Please try again.")
         }
     }
 }

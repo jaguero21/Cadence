@@ -32,7 +32,10 @@ struct SettingsView: View {
             List {
                 proSection
                 remindersSection
+                medicationsSection
+                flaresSection
                 symptomsSection
+                customTrackersSection
                 healthKitSection
                 aboutSection
                 #if DEBUG
@@ -176,6 +179,44 @@ struct SettingsView: View {
             if !store.isPro {
                 Text("Custom symptoms beyond 5 defaults require Pro.")
             }
+        }
+    }
+
+    private var medicationsSection: some View {
+        Section {
+            NavigationLink {
+                MedicationsView()
+            } label: {
+                Label("Medications", systemImage: "pills.fill")
+            }
+        } header: {
+            Label("Medications", systemImage: "pills.fill")
+        } footer: {
+            Text("Track what you take so Cadence can correlate it with your symptoms.")
+        }
+    }
+
+    private var customTrackersSection: some View {
+        Section {
+            NavigationLink {
+                CustomTrackersView()
+            } label: {
+                Label("Custom Trackers", systemImage: "slider.horizontal.3")
+            }
+        } footer: {
+            Text("Define your own metrics to log alongside the built-in ones.")
+        }
+    }
+
+    private var flaresSection: some View {
+        Section {
+            NavigationLink {
+                FlaresView()
+            } label: {
+                Label("Flares", systemImage: "flame.fill")
+            }
+        } footer: {
+            Text("Log multi-day symptom flares to track their frequency and duration.")
         }
     }
 

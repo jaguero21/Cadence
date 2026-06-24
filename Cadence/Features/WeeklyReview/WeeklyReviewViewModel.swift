@@ -48,7 +48,7 @@ final class WeeklyReviewViewModel {
     }
 
     @discardableResult
-    func save(review: WeeklyReview, context: ModelContext) -> Bool {
+    func save(review: WeeklyReview, context: any ModelPersisting) -> Bool {
         context.insert(review)
         let wasComplete = review.isComplete
         review.isComplete = true
@@ -57,7 +57,7 @@ final class WeeklyReviewViewModel {
         } catch {
             review.isComplete = wasComplete
             Self.log.error("Failed to save weekly review: \(error.localizedDescription)")
-            saveError = "Your review couldn't be saved. Please try again."
+            saveError = String(localized: "Your review couldn't be saved. Please try again.")
             return false
         }
         savedSuccessfully = true
