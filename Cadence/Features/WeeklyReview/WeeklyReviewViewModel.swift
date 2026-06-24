@@ -9,6 +9,7 @@ final class WeeklyReviewViewModel {
     var currentPromptIndex: Int = 0
     var isComplete: Bool = false
     var saveError: String?
+    var savedSuccessfully = false
 
     let prompts = Prompt.weeklyDefaults
 
@@ -47,7 +48,7 @@ final class WeeklyReviewViewModel {
     }
 
     @discardableResult
-    func save(review: WeeklyReview, context: ModelContext, isNew: Bool) -> Bool {
+    func save(review: WeeklyReview, context: ModelContext) -> Bool {
         context.insert(review)
         let wasComplete = review.isComplete
         review.isComplete = true
@@ -55,11 +56,11 @@ final class WeeklyReviewViewModel {
             try context.save()
         } catch {
             review.isComplete = wasComplete
-            if isNew { context.delete(review) }
             Self.log.error("Failed to save weekly review: \(error.localizedDescription)")
             saveError = "Your review couldn't be saved. Please try again."
             return false
         }
+        savedSuccessfully = true
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }
