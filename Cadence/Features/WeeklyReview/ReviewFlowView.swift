@@ -51,7 +51,7 @@ struct ReviewFlowView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Save & Close") {
-                        if vm.save(review: review, context: modelContext, isNew: existingReview == nil) {
+                        if vm.save(review: review, context: modelContext) {
                             Task { @MainActor in dismiss() }
                         }
                     }
@@ -60,6 +60,12 @@ struct ReviewFlowView: View {
             .onAppear {
                 if !review.isComplete {
                     vm.populateSummary(review: review, from: logs)
+                }
+            }
+            .onDisappear {
+                // Clean up a new review that was inserted but never successfully saved.
+                if existingReview == nil, !vm.savedSuccessfully, review.modelContext != nil {
+                    modelContext.delete(review)
                 }
             }
         }
@@ -113,7 +119,7 @@ struct ReviewFlowView: View {
             Spacer()
             Button {
                 if vm.isLastPrompt {
-                    guard vm.save(review: review, context: modelContext, isNew: existingReview == nil) else { return }
+                    guard vm.save(review: review, context: modelContext) else { return }
                 }
                 vm.next()
             } label: {

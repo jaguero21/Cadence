@@ -87,7 +87,14 @@ struct LogInputFlow: View {
                     hkTask = Task { await applyHealthKitData() }
                 }
             }
-            .onDisappear { hkTask?.cancel() }
+            .onDisappear {
+                hkTask?.cancel()
+                // Save progress on any dismissal (including midnight .id() resets)
+                // only when a log is already in progress to avoid phantom entries.
+                if existingLog != nil || createdLog != nil {
+                    partialSave()
+                }
+            }
             .alert("Couldn't Save", isPresented: .init(
                 get: { vm.saveError != nil },
                 set: { if !$0 { vm.saveError = nil } }
@@ -427,17 +434,14 @@ struct LogInputFlow: View {
     private func applyHealthKitData() async {
         let service = healthKitService
         let snapshot = await withTaskGroup(of: HealthKitSnapshot?.self) { group in
-            group.addTask {
-                let result = await service.fetchLogSnapshot()
-                return Task.isCancelled ? nil : result
-            }
+            group.addTask { await service.fetchLogSnapshot() }
             group.addTask {
                 try? await Task.sleep(for: .seconds(5))
                 return nil
             }
             defer { group.cancelAll() }
-            for await result in group where result != nil {
-                return result
+            for await result in group {
+                return result  // first completer wins; nil means timeout fired
             }
             return nil
         }
