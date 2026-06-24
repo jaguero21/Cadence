@@ -1,8 +1,10 @@
 import SwiftUI
+import OSLog
 
 // Stateless pattern detector. Takes Sendable snapshots so it can be invoked
 // from any isolation context — and won't race with SwiftData on @Model fields.
 enum PatternEngine {
+    private static let log = Logger(subsystem: "com.carpecadence", category: "PatternEngine")
 
     static func latestInsight(from logs: [DailyLogSnapshot]) -> InsightCard? {
         allInsights(from: logs).first
@@ -108,7 +110,10 @@ enum PatternEngine {
         var fatigueFollowed = 0
 
         for streak in streaks {
-            assert(logs[streak.endIndex].stressLevel >= PatternThreshold.highStressLevel)
+            guard logs[streak.endIndex].stressLevel >= PatternThreshold.highStressLevel else {
+                Self.log.error("Streak endIndex \(streak.endIndex) is not high-stress; skipping")
+                continue
+            }
             guard streak.endIndex + 1 < logs.count,
                   let windowEnd = cal.date(byAdding: .day, value: 3, to: cal.startOfDay(for: streak.endDate))
             else { continue }

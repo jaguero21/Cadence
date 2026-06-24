@@ -89,6 +89,7 @@ struct ContentView: View {
                 .tag(Tab.dailyLog)
 
             WeeklyReviewView()
+                .id(dayId)
                 .tabItem { Label("Review", systemImage: "calendar.badge.checkmark") }
                 .tag(Tab.weeklyReview)
 
