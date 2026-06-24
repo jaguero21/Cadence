@@ -1,10 +1,52 @@
 import SwiftUI
 import SwiftData
 
+enum HistoryFilter: String, CaseIterable, Identifiable {
+    case all         = "All days"
+    case completed   = "Completed"
+    case inProgress  = "In progress"
+    case hasSymptoms = "Has symptoms"
+    var id: String { rawValue }
+}
+
 struct HistoryView: View {
     @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
     @State private var selectedMonth: Date = Calendar.current.startOfDay(for: .now)
     @State private var selectedLog: DailyLog?
+    @State private var searchText = ""
+    @State private var filter: HistoryFilter = .all
+
+    private var isFiltering: Bool { !searchText.isEmpty || filter != .all }
+
+    private var filteredLogs: [DailyLog] {
+        logs.filter {
+            Self.logMatches(
+                isComplete: $0.isComplete,
+                symptomNames: $0.symptoms.map(\.name),
+                factors: $0.factors,
+                note: $0.freeNote,
+                filter: filter,
+                query: searchText
+            )
+        }
+    }
+
+    // Pure match predicate, extracted so it's unit-testable without a ModelContext.
+    static func logMatches(isComplete: Bool, symptomNames: [String], factors: [String], note: String, filter: HistoryFilter, query: String) -> Bool {
+        let passesFilter: Bool
+        switch filter {
+        case .all:         passesFilter = true
+        case .completed:   passesFilter = isComplete
+        case .inProgress:  passesFilter = !isComplete
+        case .hasSymptoms: passesFilter = !symptomNames.isEmpty
+        }
+        guard passesFilter else { return false }
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return true }
+        return symptomNames.contains { $0.localizedCaseInsensitiveContains(q) }
+            || factors.contains { $0.localizedCaseInsensitiveContains(q) }
+            || note.localizedCaseInsensitiveContains(q)
+    }
 
     private var logsByDate: [Date: DailyLog] {
         let cal = Calendar.current
@@ -23,20 +65,86 @@ struct HistoryView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: CadenceLayout.sectionSpacing) {
-                    monthPicker
-                    calendarGrid
-                    if let log = selectedLog {
-                        selectedLogPreview(log)
+                    if isFiltering {
+                        resultsList
+                    } else {
+                        monthPicker
+                        calendarGrid
+                        if let log = selectedLog {
+                            selectedLogPreview(log)
+                        }
                     }
                 }
                 .padding(.horizontal)
+                .padding(.top, isFiltering ? 8 : 0)
             }
             .background(CadenceColor.background)
             .navigationTitle("History")
+            .searchable(text: $searchText, prompt: "Search symptoms, factors, notes")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { filterMenu }
+            }
             .sheet(item: $selectedLog) { log in
                 LogDetailView(log: log)
             }
         }
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            Picker("Filter", selection: $filter) {
+                ForEach(HistoryFilter.allCases) { Text($0.rawValue).tag($0) }
+            }
+        } label: {
+            Image(systemName: filter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                .foregroundStyle(CadenceColor.accent)
+        }
+        .accessibilityLabel("Filter")
+    }
+
+    @ViewBuilder
+    private var resultsList: some View {
+        if filteredLogs.isEmpty {
+            ContentUnavailableView(
+                "No matching days",
+                systemImage: "magnifyingglass",
+                description: Text("Try a different search term or filter.")
+            )
+            .padding(.top, 60)
+        } else {
+            LazyVStack(spacing: 10) {
+                ForEach(filteredLogs) { log in
+                    Button { selectedLog = log } label: { resultRow(log) }
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func resultRow(_ log: DailyLog) -> some View {
+        let snippet = log.symptoms.map(\.name) + log.factors
+        return HStack(spacing: 12) {
+            Circle()
+                .fill(log.isComplete ? CadenceColor.successGreen : CadenceColor.energyOrange)
+                .frame(width: 8, height: 8)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(log.dateLabel).font(.subheadline.weight(.medium))
+                if !snippet.isEmpty {
+                    Text(snippet.joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else if !log.freeNote.isEmpty {
+                    Text(log.freeNote)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+        }
+        .cadenceCard()
     }
 
     private var monthPicker: some View {
@@ -233,6 +341,14 @@ struct LogDetailView: View {
                     }
                 }
 
+
+                if !log.factors.isEmpty {
+                    Section("Possible Triggers") {
+                        ForEach(log.factors, id: \.self) { factor in
+                            Label(factor, systemImage: "exclamationmark.triangle")
+                        }
+                    }
+                }
 
                 if !log.freeNote.isEmpty {
                     Section("Notes") {

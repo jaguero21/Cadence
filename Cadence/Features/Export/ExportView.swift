@@ -4,8 +4,12 @@ import SwiftData
 struct ExportView: View {
     @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
+    @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
+    @Query(sort: \Flare.startDate, order: .reverse) private var flares: [Flare]
+    @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
     @Environment(StoreService.self) private var store
     @Environment(AppState.self) private var appState
+    @AppStorage(UserDefaultsKey.lastVisitDate) private var lastVisitInterval: Double = 0
     @State private var reportType: ReportType = .doctor
     @State private var startDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: .now) ?? .now
     @State private var endDate: Date = .now
@@ -31,6 +35,8 @@ struct ExportView: View {
                     DatePicker("To",   selection: $endDate,   in: startDate..., displayedComponents: .date)
                 }
 
+                appointmentSection
+
                 Section("Includes") {
                     includes
                 }
@@ -49,6 +55,13 @@ struct ExportView: View {
                             }
                         }
                         .disabled(isGenerating)
+
+                        Button {
+                            exportCSV()
+                        } label: {
+                            Label("Export Spreadsheet (CSV)", systemImage: "tablecells")
+                        }
+                        .disabled(isGenerating)
                     } else {
                         proPrompt
                     }
@@ -61,6 +74,35 @@ struct ExportView: View {
                 }
             }
             .onDisappear { generationTask?.cancel() }
+        }
+    }
+
+    private var lastVisitDate: Date? {
+        lastVisitInterval > 0 ? Date(timeIntervalSinceReferenceDate: lastVisitInterval) : nil
+    }
+
+    @ViewBuilder
+    private var appointmentSection: some View {
+        Section {
+            if let last = lastVisitDate {
+                HStack {
+                    Text("Last visit")
+                    Spacer()
+                    Text(last.formatted(date: .abbreviated, time: .omitted))
+                        .foregroundStyle(.secondary)
+                }
+                Button("Set range to since last visit") {
+                    startDate = last
+                    endDate = .now
+                }
+            }
+            Button("Mark today as last visit") {
+                lastVisitInterval = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
+            }
+        } header: {
+            Text("Appointment")
+        } footer: {
+            Text("Mark a visit, then quickly scope your next report to everything since then.")
         }
     }
 
@@ -92,6 +134,16 @@ struct ExportView: View {
         }
     }
 
+    private func exportCSV() {
+        let logSnapshots = logs
+            .filter { $0.date >= startDate && $0.date <= endDate }
+            .map(DailyLogSnapshot.init)
+        if let url = CSVBuilder.build(logs: logSnapshots) {
+            shareItem = url
+            showingShare = true
+        }
+    }
+
     private func generate() {
         isGenerating = true
         let logSnapshots = logs
@@ -100,13 +152,25 @@ struct ExportView: View {
         let reviewSnapshots = reviews
             .filter { $0.weekStartDate <= endDate && $0.weekEndDate >= startDate }
             .map(WeeklyReviewSnapshot.init)
+        // Include any medication whose course overlaps the export range.
+        let medicationSnapshots = medications
+            .filter { $0.startDate <= endDate && ($0.endDate ?? .distantFuture) >= startDate }
+            .map(MedicationSnapshot.init)
+        // Include any flare overlapping the export range.
+        let flareSnapshots = flares
+            .filter { $0.startDate <= endDate && ($0.endDate ?? .distantFuture) >= startDate }
+            .map(FlareSnapshot.init)
+        let trackerSnapshots = customTrackers.map(CustomTrackerSnapshot.init)
 
         generationTask?.cancel()
         generationTask = Task.detached {
             let url = await PDFBuilder.build(
                 type: reportType,
                 logs: logSnapshots,
-                reviews: reviewSnapshots
+                reviews: reviewSnapshots,
+                medications: medicationSnapshots,
+                flares: flareSnapshots,
+                customTrackers: trackerSnapshots
             )
             guard !Task.isCancelled else { return }
             await MainActor.run {

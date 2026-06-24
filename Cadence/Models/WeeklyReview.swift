@@ -45,3 +45,14 @@ struct PromptResponse: Codable {
     var prompt: String
     var response: String
 }
+
+// Sendable projection of WeeklyReview for off-main-actor PDF export.
+struct WeeklyReviewSnapshot: Sendable {
+    let weekLabel: String
+    let promptResponses: [PromptResponse]
+
+    init(_ review: WeeklyReview) {
+        weekLabel       = review.weekLabel
+        promptResponses = review.promptResponses
+    }
+}

@@ -12,6 +12,7 @@ import Foundation
 //   • HealthKitSnapshot: struct initialisation — default is all-nil (no data), not zero
 
 @Suite("HealthKitService – isAvailable")
+@MainActor
 struct HealthKitServiceIsAvailableTests {
 
     @Test("isAvailable does not crash and returns a Bool")
@@ -33,6 +34,7 @@ struct HealthKitServiceIsAvailableTests {
 }
 
 @Suite("HealthKitService – requestAuthorization guard")
+@MainActor
 struct HealthKitServiceAuthorizationTests {
 
     @Test("requestAuthorization guard: when isAvailable is false, returns without throwing")
@@ -101,7 +103,7 @@ struct HealthKitSnapshotValueTests {
 
     @Test("Snapshot is a value type — mutation does not affect original")
     func snapshot_isValueType_mutationDoesNotAffectOriginal() {
-        var original = HealthKitSnapshot(steps: 100, restingHR: 65.0, hrv: 40.0, sleepHours: 6.5)
+        let original = HealthKitSnapshot(steps: 100, restingHR: 65.0, hrv: 40.0, sleepHours: 6.5)
         var copy = original
         copy.steps = 9999
         copy.sleepHours = nil

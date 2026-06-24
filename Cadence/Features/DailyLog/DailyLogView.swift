@@ -5,8 +5,12 @@ struct DailyLogView: View {
     @Query private var logs: [DailyLog]
     @State private var activeSheet: ActiveSheet?
 
-    init() {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
+    // referenceDate anchors the query window so a midnight rollover refreshes
+    // the @Query in place instead of forcing a full view rebuild (which would
+    // dismiss an open log sheet — the cause of the prior midnight data loss).
+    init(referenceDate: Date = .now) {
+        let day = Calendar.current.startOfDay(for: referenceDate)
+        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: day) ?? .distantPast
         _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
     }
 

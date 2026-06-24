@@ -28,8 +28,12 @@ final class DailyLogViewModel {
         }
     }
 
+    // notifications defaults to nil and is resolved to the shared service inside
+    // this @MainActor body — referencing the @MainActor singleton in a default
+    // argument would be evaluated in a nonisolated context (Swift 6 error).
     @discardableResult
-    func save(log: DailyLog, context: ModelContext, notifications: any NotificationServiceProtocol = NotificationService.shared) -> Bool {
+    func save(log: DailyLog, context: any ModelPersisting, notifications: (any NotificationServiceProtocol)? = nil) -> Bool {
+        let notifications = notifications ?? NotificationService.shared
         let wasComplete = log.isComplete
         log.isComplete = true
         do {
@@ -37,7 +41,7 @@ final class DailyLogViewModel {
         } catch {
             log.isComplete = wasComplete
             Self.log.error("Failed to save daily log: \(error.localizedDescription)")
-            saveError = "Your log couldn't be saved. Please try again."
+            saveError = String(localized: "Your log couldn't be saved. Please try again.")
             return false
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -51,6 +55,7 @@ enum LogStep: Int, CaseIterable {
     case bodyMetrics
     case basics
     case symptoms
+    case factors
     case note
     case done
 
@@ -62,6 +67,7 @@ enum LogStep: Int, CaseIterable {
         case .bodyMetrics: return "Body Metrics"
         case .basics:      return "Basics Done Today"
         case .symptoms:    return "Symptoms"
+        case .factors:     return "Possible Triggers"
         case .note:        return "One-Line Note"
         case .done:        return "All done!"
         }
@@ -73,6 +79,7 @@ enum LogStep: Int, CaseIterable {
         case .bodyMetrics: return "waveform.path.ecg"
         case .basics:      return "checklist"
         case .symptoms:    return "bandage"
+        case .factors:     return "exclamationmark.triangle"
         case .note:        return "pencil.line"
         case .done:        return "checkmark.circle.fill"
         }

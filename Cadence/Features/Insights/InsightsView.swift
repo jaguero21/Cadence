@@ -3,10 +3,14 @@ import SwiftData
 
 struct InsightsView: View {
     @Query private var logs: [DailyLog]
+    @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
     @State private var vm = InsightsViewModel()
 
-    init() {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: .now) ?? .distantPast
+    // referenceDate anchors the 90-day window so it refreshes in place at a
+    // midnight rollover rather than via a full view rebuild.
+    init(referenceDate: Date = .now) {
+        let day = Calendar.current.startOfDay(for: referenceDate)
+        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: day) ?? .distantPast
         _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
     }
     @Environment(StoreService.self) private var store
@@ -29,8 +33,9 @@ struct InsightsView: View {
             }
             .background(CadenceColor.background)
             .navigationTitle("Insights")
-            .onAppear { vm.refresh(logs: logs) }
-            .onChange(of: logs) { _, _ in vm.refresh(logs: logs) }
+            .onAppear { vm.refresh(logs: logs, medications: medications) }
+            .onChange(of: logs) { _, _ in vm.refresh(logs: logs, medications: medications) }
+            .onChange(of: medications) { _, _ in vm.refresh(logs: logs, medications: medications) }
         }
     }
 

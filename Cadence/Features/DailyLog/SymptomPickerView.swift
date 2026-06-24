@@ -189,7 +189,7 @@ struct AddSymptomSheet: View {
             // Roll the insert back so the failed tag doesn't sit in the context
             // and trip up the next save attempt.
             modelContext.delete(tag)
-            saveError = "Couldn't save the new symptom. Please try again."
+            saveError = String(localized: "Couldn't save the new symptom. Please try again.")
         }
     }
 }
