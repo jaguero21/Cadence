@@ -13,6 +13,7 @@ private func makeSnapshot(
     energy: Int = 5,
     stressLevel: Int = 5,
     symptoms: [SymptomEntry] = [],
+    factors: [String] = [],
     didEditMetrics: Bool = false
 ) -> DailyLogSnapshot {
     let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)!
@@ -23,6 +24,7 @@ private func makeSnapshot(
         sleepHours: sleepHours,
         stressLevel: stressLevel,
         symptoms: symptoms,
+        factors: factors,
         didEditMetrics: didEditMetrics
     )
 }
@@ -93,9 +95,11 @@ struct SleepHeadacheCorrelationTests {
         #expect(card == nil)
     }
 
-    @Test("Returns card when ≥3 poor-sleep nights and ≥50% headache follow-through")
-    func sleepHeadache_threeOrMorePoorSleepAndHighConfidence_returnsCard() {
-        // 3 poor-sleep nights, all 3 followed by headache → confidence = 1.0
+    @Test("Returns card when ≥3 poor-sleep nights all followed by headache")
+    func sleepHeadache_threeOrMorePoorSleepAndHighConfidence_returnsCard() throws {
+        // 3 poor-sleep nights, all 3 followed by headache. Observed rate = 1.0,
+        // but the Wilson lower bound for 3/3 is ~0.75 — high enough to surface,
+        // and deliberately below 1.0 so a tiny sample can't read as certain.
         var logs: [DailyLogSnapshot] = []
         logs.append(makeSnapshot(daysAgo: 6, sleepHours: 5.0))
         logs.append(makeSnapshot(daysAgo: 5, sleepHours: 7.0, symptoms: [headacheEntry()]))
@@ -109,12 +113,16 @@ struct SleepHeadacheCorrelationTests {
         let card = insights.first { $0.category == .sleep }
         #expect(card != nil)
         #expect(card?.title == "Poor sleep is linked to next-day headaches")
-        #expect((card?.confidence ?? 0) >= 0.5)
+        let confidence = try #require(card?.confidence)
+        #expect(confidence >= 0.5)
+        #expect(confidence < 1.0) // 3/3 is no longer reported as 100% confidence
     }
 
-    @Test("Returns card at exactly 50% confidence")
-    func sleepHeadache_exactlyFiftyPercentConfidence_returnsCard() throws {
-        // 4 poor-sleep nights, 2 followed by headache → confidence = 0.5
+    // Under raw proportion this was a 50% follow-through that surfaced a card.
+    // The Wilson lower bound for 2/4 is ~0.28, below the 0.5 gate, so a moderate
+    // rate over a thin sample is now correctly suppressed.
+    @Test("Suppresses a 50% follow-through over a small sample (Wilson shrinkage)")
+    func sleepHeadache_moderateRateSmallSample_isSuppressed() {
         var logs: [DailyLogSnapshot] = []
         logs.append(makeSnapshot(daysAgo: 8, sleepHours: 5.0))
         logs.append(makeSnapshot(daysAgo: 7, sleepHours: 7.0, symptoms: [headacheEntry()])) // headache
@@ -128,9 +136,273 @@ struct SleepHeadacheCorrelationTests {
 
         let insights = PatternEngine.allInsights(from: logs)
         let card = insights.first { $0.category == .sleep }
+        #expect(card == nil)
+    }
+}
+
+// MARK: - PatternEngine: medicationEffects
+
+@Suite("PatternEngine – medicationEffects")
+struct MedicationEffectsTests {
+
+    // 6 logs with ~2 symptoms/day before the med, 6 with ~0 after → clear drop.
+    @Test("Surfaces a 'fewer symptoms' card when symptom load drops after the start date")
+    func medEffect_symptomDropAfterStart_returnsImprovementCard() {
+        let start = Calendar.current.date(byAdding: .day, value: -6, to: Calendar.current.startOfDay(for: .now))!
+        var logs: [DailyLogSnapshot] = []
+        for d in 7...12 { logs.append(makeSnapshot(daysAgo: d, symptoms: [headacheEntry(), fatigueEntry()])) } // before
+        for d in 0...5  { logs.append(makeSnapshot(daysAgo: d, symptoms: [])) }                                // after
+        let med = MedicationSnapshot(name: "Propranolol", dosage: "40 mg", startDate: start)
+
+        let insights = PatternEngine.allInsights(from: logs, medications: [med])
+        let card = insights.first { $0.category == .symptom }
         #expect(card != nil)
-        let confidence = try #require(card?.confidence)
-        #expect(confidence == 0.5)
+        #expect(card?.title == "Fewer symptoms since starting Propranolol")
+    }
+
+    @Test("No card when there aren't enough logged days before the start date")
+    func medEffect_insufficientBeforeWindow_returnsNoCard() {
+        let start = Calendar.current.date(byAdding: .day, value: -8, to: Calendar.current.startOfDay(for: .now))!
+        var logs: [DailyLogSnapshot] = []
+        // Only 2 days before start (< minimumMedEffectDays), plenty after.
+        for d in 9...10 { logs.append(makeSnapshot(daysAgo: d, symptoms: [headacheEntry(), fatigueEntry()])) }
+        for d in 0...6  { logs.append(makeSnapshot(daysAgo: d, symptoms: [])) }
+        let med = MedicationSnapshot(name: "Propranolol", startDate: start)
+
+        let insights = PatternEngine.allInsights(from: logs, medications: [med])
+        #expect(insights.first { $0.category == .symptom } == nil)
+    }
+
+    @Test("No medication card when symptom load is unchanged")
+    func medEffect_noChange_returnsNoCard() {
+        let start = Calendar.current.date(byAdding: .day, value: -6, to: Calendar.current.startOfDay(for: .now))!
+        var logs: [DailyLogSnapshot] = []
+        for d in 7...12 { logs.append(makeSnapshot(daysAgo: d, symptoms: [headacheEntry()])) }
+        for d in 0...5  { logs.append(makeSnapshot(daysAgo: d, symptoms: [headacheEntry()])) }
+        let med = MedicationSnapshot(name: "Vitamin D", startDate: start)
+
+        let insights = PatternEngine.allInsights(from: logs, medications: [med])
+        #expect(insights.first { $0.category == .symptom } == nil)
+    }
+}
+
+// MARK: - PatternEngine: factorCorrelations
+
+@Suite("PatternEngine – factorCorrelations")
+struct FactorCorrelationsTests {
+
+    @Test("Surfaces a trigger card when a factor's days have more symptoms")
+    func factor_moreSymptomsOnFactorDays_returnsCard() {
+        var logs: [DailyLogSnapshot] = []
+        // 4 factor days with 2 symptoms each.
+        for d in 0...3 { logs.append(makeSnapshot(daysAgo: d, symptoms: [headacheEntry(), fatigueEntry()], factors: ["Alcohol"])) }
+        // 4 non-factor days with 0 symptoms.
+        for d in 4...7 { logs.append(makeSnapshot(daysAgo: d, symptoms: [], factors: [])) }
+
+        let insights = PatternEngine.allInsights(from: logs)
+        let card = insights.first { $0.title.contains("Alcohol") }
+        #expect(card != nil)
+        #expect(card?.category == .symptom)
+    }
+
+    @Test("No card when too few days carry the factor")
+    func factor_insufficientFactorDays_returnsNoCard() {
+        var logs: [DailyLogSnapshot] = []
+        // Only 2 factor days (< minimumFactorDays).
+        for d in 0...1 { logs.append(makeSnapshot(daysAgo: d, symptoms: [headacheEntry(), fatigueEntry()], factors: ["Alcohol"])) }
+        for d in 2...7 { logs.append(makeSnapshot(daysAgo: d, symptoms: [], factors: [])) }
+
+        let insights = PatternEngine.allInsights(from: logs)
+        #expect(insights.first { $0.title.contains("Alcohol") } == nil)
+    }
+
+    @Test("No card when factor days are not worse than other days")
+    func factor_noSymptomDifference_returnsNoCard() {
+        var logs: [DailyLogSnapshot] = []
+        for d in 0...3 { logs.append(makeSnapshot(daysAgo: d, symptoms: [headacheEntry()], factors: ["Caffeine"])) }
+        for d in 4...7 { logs.append(makeSnapshot(daysAgo: d, symptoms: [headacheEntry()], factors: [])) }
+
+        let insights = PatternEngine.allInsights(from: logs)
+        #expect(insights.first { $0.title.contains("Caffeine") } == nil)
+    }
+}
+
+// MARK: - HistoryView filtering
+
+@Suite("HistoryView – logMatches")
+struct HistoryFilterTests {
+
+    @Test("All filter with empty query matches everything")
+    func match_allFilterEmptyQuery_matches() {
+        #expect(HistoryView.logMatches(isComplete: false, symptomNames: [], factors: [], note: "", filter: .all, query: ""))
+    }
+
+    @Test("Completed/in-progress filters respect completion state")
+    func match_completionFilters() {
+        #expect(HistoryView.logMatches(isComplete: true, symptomNames: [], factors: [], note: "", filter: .completed, query: ""))
+        #expect(!HistoryView.logMatches(isComplete: false, symptomNames: [], factors: [], note: "", filter: .completed, query: ""))
+        #expect(HistoryView.logMatches(isComplete: false, symptomNames: [], factors: [], note: "", filter: .inProgress, query: ""))
+    }
+
+    @Test("hasSymptoms filter requires at least one symptom")
+    func match_hasSymptomsFilter() {
+        #expect(HistoryView.logMatches(isComplete: true, symptomNames: ["Headache"], factors: [], note: "", filter: .hasSymptoms, query: ""))
+        #expect(!HistoryView.logMatches(isComplete: true, symptomNames: [], factors: [], note: "", filter: .hasSymptoms, query: ""))
+    }
+
+    @Test("Query matches symptoms, factors, or note case-insensitively")
+    func match_querySearchesAllFields() {
+        #expect(HistoryView.logMatches(isComplete: true, symptomNames: ["Headache"], factors: [], note: "", filter: .all, query: "head"))
+        #expect(HistoryView.logMatches(isComplete: true, symptomNames: [], factors: ["Alcohol"], note: "", filter: .all, query: "alc"))
+        #expect(HistoryView.logMatches(isComplete: true, symptomNames: [], factors: [], note: "Rough day at work", filter: .all, query: "WORK"))
+        #expect(!HistoryView.logMatches(isComplete: true, symptomNames: ["Headache"], factors: [], note: "", filter: .all, query: "nausea"))
+    }
+
+    @Test("Filter and query are combined (AND)")
+    func match_filterAndQueryCombine() {
+        // Matches the query but fails the completion filter.
+        #expect(!HistoryView.logMatches(isComplete: false, symptomNames: ["Headache"], factors: [], note: "", filter: .completed, query: "head"))
+    }
+}
+
+// MARK: - CSVBuilder
+
+@Suite("CSVBuilder – csvString")
+struct CSVBuilderTests {
+
+    @Test("Emits a header plus one row per log, oldest first")
+    func csv_headerAndRowOrder() {
+        let logs = [
+            makeSnapshot(daysAgo: 0, symptoms: [headacheEntry()]),
+            makeSnapshot(daysAgo: 2),
+        ]
+        let lines = CSVBuilder.csvString(from: logs).split(separator: "\n", omittingEmptySubsequences: false)
+        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Stress,Symptoms,Factors")
+        #expect(lines.count == 3) // header + 2 rows
+        // Oldest first: the day -2 row precedes the day 0 row.
+        #expect(lines[1] < lines[2]) // ISO yyyy-MM-dd sorts chronologically as text
+    }
+
+    @Test("Quotes and escapes fields containing commas or quotes")
+    func csv_escapesSpecialCharacters() {
+        let weird = SymptomEntry(name: "Pain, sharp \"stabbing\"", severity: 5, emoji: "⚡️")
+        let logs = [makeSnapshot(daysAgo: 0, symptoms: [weird])]
+        let csv = CSVBuilder.csvString(from: logs)
+        // The symptom field must be wrapped in quotes with the inner quotes doubled.
+        #expect(csv.contains("\"Pain, sharp \"\"stabbing\"\"\""))
+    }
+
+    @Test("Joins multiple symptoms and factors with semicolons")
+    func csv_joinsMultipleValues() {
+        let logs = [makeSnapshot(daysAgo: 0, symptoms: [headacheEntry(), fatigueEntry()], factors: ["Alcohol", "Travel"])]
+        let csv = CSVBuilder.csvString(from: logs)
+        #expect(csv.contains("Headache; Fatigue"))
+        #expect(csv.contains("Alcohol; Travel"))
+    }
+}
+
+// MARK: - CustomTracker logic
+
+@Suite("CustomTracker – range and snapshot")
+struct CustomTrackerTests {
+
+    @Test("range and midpoint reflect the configured bounds")
+    func tracker_rangeAndMidpoint() {
+        let tracker = CustomTracker(name: "Joint pain", minValue: 0, maxValue: 10)
+        #expect(tracker.range == 0...10)
+        #expect(tracker.midpoint == 5)
+    }
+
+    @Test("range guards against an inverted/degenerate max")
+    func tracker_invertedBounds_areGuarded() {
+        let tracker = CustomTracker(name: "Bad", minValue: 5, maxValue: 5)
+        #expect(tracker.range.lowerBound == 5)
+        #expect(tracker.range.upperBound >= 6)
+    }
+
+    @Test("DailyLogSnapshot carries custom metric values")
+    func snapshot_carriesCustomMetrics() {
+        let id = UUID()
+        let snapshot = makeSnapshot(daysAgo: 0)
+        #expect(snapshot.customMetrics.isEmpty)
+
+        let withMetric = DailyLogSnapshot(date: .now, customMetrics: [MetricEntry(trackerID: id, value: 7)])
+        #expect(withMetric.customMetrics.first?.value == 7)
+        #expect(withMetric.customMetrics.first?.trackerID == id)
+    }
+}
+
+// MARK: - Flare model logic
+
+@Suite("Flare – duration and active state")
+struct FlareTests {
+
+    private func daysAgo(_ n: Int) -> Date {
+        Calendar.current.date(byAdding: .day, value: -n, to: .now)!
+    }
+
+    @Test("A flare with no end date is active")
+    func flare_noEndDate_isActive() {
+        let flare = Flare(startDate: daysAgo(2))
+        #expect(flare.isActive)
+    }
+
+    @Test("A flare with an end date is not active")
+    func flare_withEndDate_isNotActive() {
+        let flare = Flare(startDate: daysAgo(5), endDate: daysAgo(2))
+        #expect(flare.isActive == false)
+    }
+
+    @Test("Duration is inclusive of both start and end day")
+    func flare_durationDays_isInclusive() {
+        // Start 3 days ago, ended today → 4 calendar days inclusive.
+        let flare = Flare(startDate: daysAgo(3), endDate: daysAgo(0))
+        #expect(flare.durationDays == 4)
+    }
+
+    @Test("A same-day flare counts as one day")
+    func flare_sameDay_isOneDay() {
+        let flare = Flare(startDate: daysAgo(0), endDate: daysAgo(0))
+        #expect(flare.durationDays == 1)
+    }
+
+    @Test("An ongoing flare counts through today")
+    func flare_ongoing_countsThroughToday() {
+        let flare = Flare(startDate: daysAgo(2)) // ongoing
+        #expect(flare.durationDays == 3)
+    }
+}
+
+// MARK: - PatternEngine: wilsonLowerBound
+
+@Suite("PatternEngine – wilsonLowerBound")
+struct WilsonLowerBoundTests {
+
+    @Test("Zero or empty samples return 0")
+    func wilson_degenerateInputs_returnZero() {
+        #expect(PatternEngine.wilsonLowerBound(successes: 0, total: 0) == 0)
+        #expect(PatternEngine.wilsonLowerBound(successes: 0, total: 5) == 0)
+    }
+
+    @Test("A perfect rate over a small sample is well below 1.0")
+    func wilson_perfectSmallSample_shrinksBelowOne() {
+        let lb = PatternEngine.wilsonLowerBound(successes: 3, total: 3)
+        #expect(abs(lb - 0.75) < 0.01)   // ~0.75 at z = 1.0
+        #expect(lb < 1.0)
+    }
+
+    @Test("Lower bound rises toward the observed rate as the sample grows")
+    func wilson_largerSampleSameRate_increasesLowerBound() {
+        let small = PatternEngine.wilsonLowerBound(successes: 3, total: 3)
+        let large = PatternEngine.wilsonLowerBound(successes: 30, total: 30)
+        #expect(large > small)
+        #expect(large > 0.9)
+    }
+
+    @Test("A 50% rate over four trials lands below the 0.5 gate")
+    func wilson_halfRateSmallSample_belowGate() {
+        let lb = PatternEngine.wilsonLowerBound(successes: 2, total: 4)
+        #expect(lb < PatternThreshold.minimumConfidence)
     }
 }
 

@@ -13,6 +13,8 @@ final class DailyLog {
     var sleepQuality: Int  // 0–10
     var stressLevel: Int   // 0–10  (Anxiety in UI)
     var basicsCompleted: [String]
+    var factors: [String] = []   // contextual triggers logged that day (e.g. "Alcohol")
+    var customMetrics: [MetricEntry] = []   // values for user-defined CustomTrackers
     var freeNote: String
     var isComplete: Bool
     var didEditMood: Bool
@@ -64,6 +66,55 @@ struct SymptomEntry: Codable, Identifiable {
     var name: String
     var severity: Int  // 1–10
     var emoji: String
+}
+
+// Sendable projection of DailyLog so PatternEngine and PDF export can run off
+// any isolation context without touching the @Model (which isn't Sendable and
+// would race on its SwiftData-backed fields).
+struct DailyLogSnapshot: Sendable {
+    let date: Date
+    let mood: Int
+    let energy: Int
+    let sleepHours: Double
+    let stressLevel: Int
+    let symptoms: [SymptomEntry]
+    let factors: [String]
+    let customMetrics: [MetricEntry]
+    let didEditMetrics: Bool
+
+    init(_ log: DailyLog) {
+        date           = log.date
+        mood           = log.mood
+        energy         = log.energy
+        sleepHours     = log.sleepHours
+        stressLevel    = log.stressLevel
+        symptoms       = log.symptoms
+        factors        = log.factors
+        customMetrics  = log.customMetrics
+        didEditMetrics = log.didEditMetrics
+    }
+
+    init(
+        date: Date,
+        mood: Int = 3,
+        energy: Int = 5,
+        sleepHours: Double = 7.0,
+        stressLevel: Int = 5,
+        symptoms: [SymptomEntry] = [],
+        factors: [String] = [],
+        customMetrics: [MetricEntry] = [],
+        didEditMetrics: Bool = false
+    ) {
+        self.date = date
+        self.mood = mood
+        self.energy = energy
+        self.sleepHours = sleepHours
+        self.stressLevel = stressLevel
+        self.symptoms = symptoms
+        self.factors = factors
+        self.customMetrics = customMetrics
+        self.didEditMetrics = didEditMetrics
+    }
 }
 
 extension Int {

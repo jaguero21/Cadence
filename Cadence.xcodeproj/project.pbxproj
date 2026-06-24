@@ -12,7 +12,10 @@
 		AA11BB22CC33DD44EE55FF62 /* StoreServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF02 /* StoreServiceTests.swift */; };
 		AA11BB22CC33DD44EE55FF63 /* SchemaMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF03 /* SchemaMigrationTests.swift */; };
 		AA11BB22CC33DD44EE55FF64 /* HealthKitServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF04 /* HealthKitServiceTests.swift */; };
+		AA11BB22CC33DD44EE55FF66 /* ViewModelSaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */; };
+		AA11BB22CC33DD44EE55FF67 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */; };
 		0745304541CC789DE9CAECA8 /* PDFBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A51F97BA927E7299C9A1B07 /* PDFBuilder.swift */; };
+		AABBCCDD0000000000000207 /* CSVBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000107 /* CSVBuilder.swift */; };
 		1382864E5B8432AD840590BD /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF69CCB307CE7D5B6C39FDC1 /* HistoryView.swift */; };
 		1C70D1D1A3D941C21FB5FFAD /* WeeklyReviewViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E81365F433003269081917 /* WeeklyReviewViewModel.swift */; };
 		1D96522AE7200D9F795F68E8 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A292713D8D2930BB2E51C28C /* NotificationService.swift */; };
@@ -20,11 +23,18 @@
 		23239E42D1F3B3CA44C8ECEF /* Charts in Frameworks */ = {isa = PBXBuildFile; fileRef = D6A78715684ABBEB502D55E2 /* Charts */; };
 		233F59322A7A81F6487EF3DF /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 445D893A69E7D38B6B8C7E75 /* InsightsView.swift */; };
 		2549A45C2FC8EF0A006CD546 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2549A45B2FC8EF0A006CD546 /* Assets.xcassets */; };
+		CCAADDEE00000000000000B1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CCAADDEE00000000000000F1 /* Localizable.xcstrings */; };
 		2E030EDD7DE7E2C321D0B7DE /* DailyLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2C9315ED942B187FB6B889 /* DailyLogView.swift */; };
 		30D5FC0958DF5823D7D5A9D6 /* WeeklyReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F477B83B1C570CD91200BB18 /* WeeklyReview.swift */; };
 		3831F66F2CF40135C9718707 /* SymptomTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B648EA00AEBF0DFCC18871A /* SymptomTag.swift */; };
 		3A33703C608D9B41673CD755 /* MetricSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */; };
 		3D207A23376DB2750B758A61 /* DailyLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990D941EB5FC46F95C213CEE /* DailyLog.swift */; };
+		AABBCCDD0000000000000201 /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000101 /* Medication.swift */; };
+		AABBCCDD0000000000000202 /* MedicationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000102 /* MedicationsView.swift */; };
+		AABBCCDD0000000000000203 /* Flare.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000103 /* Flare.swift */; };
+		AABBCCDD0000000000000204 /* FlaresView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000104 /* FlaresView.swift */; };
+		AABBCCDD0000000000000205 /* CustomTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000105 /* CustomTracker.swift */; };
+		AABBCCDD0000000000000206 /* CustomTrackersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000106 /* CustomTrackersView.swift */; };
 		46261271D23E287938897B70 /* DailyLogViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1622C330943A74E15575A681 /* DailyLogViewModel.swift */; };
 		4F352F41B25B06C32AA0BC05 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55E0D4A1C0EC289C9F389C4 /* Constants.swift */; };
 		51FDD5A6B4B6AD32AA8C1FC3 /* PDFKit in Frameworks */ = {isa = PBXBuildFile; fileRef = E7E30F7C88B6A00D34FE6223 /* PDFKit */; };
@@ -61,6 +71,8 @@
 		AA11BB22CC33DD44EE55FF02 /* StoreServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StoreServiceTests.swift; path = /Volumes/APFS2/SwiftPorjects/Cadence/CadenceTests/StoreServiceTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF03 /* SchemaMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SchemaMigrationTests.swift; path = /Volumes/APFS2/SwiftPorjects/Cadence/CadenceTests/SchemaMigrationTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF04 /* HealthKitServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitServiceTests.swift; path = /Volumes/APFS2/SwiftPorjects/Cadence/CadenceTests/HealthKitServiceTests.swift; sourceTree = "<absolute>"; };
+		AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ViewModelSaveTests.swift; path = /Volumes/APFS2/SwiftPorjects/Cadence/CadenceTests/ViewModelSaveTests.swift; sourceTree = "<absolute>"; };
+		AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotificationServiceTests.swift; path = /Volumes/APFS2/SwiftPorjects/Cadence/CadenceTests/NotificationServiceTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF05 /* CadenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CadenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0D51242137B1F8597625745E /* View+Extensions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "View+Extensions.swift"; path = "./Cadence/Shared/Extensions/View+Extensions.swift"; sourceTree = "<absolute>"; };
 		11A96675ADF9BC9D5E22B8EC /* PromptCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PromptCardView.swift; path = ./Cadence/Features/WeeklyReview/PromptCardView.swift; sourceTree = "<absolute>"; };
@@ -70,10 +82,12 @@
 		20317D6C051870F466BF81F7 /* ExportView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExportView.swift; path = ./Cadence/Features/Export/ExportView.swift; sourceTree = "<absolute>"; };
 		2549A45A2FC8ED8D006CD546 /* Cadence.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Cadence.entitlements; sourceTree = "<group>"; };
 		2549A45B2FC8EF0A006CD546 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Cadence/Assets.xcassets; sourceTree = "<group>"; };
+		CCAADDEE00000000000000F1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = Cadence/Localizable.xcstrings; sourceTree = "<group>"; };
 		26D33A415B0A6E15E6DA6EA9 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = ./Cadence/App/Info.plist; sourceTree = "<absolute>"; };
 		3F0989CA66FE09F78B729A4E /* PatternEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PatternEngine.swift; path = ./Cadence/Services/PatternEngine.swift; sourceTree = "<absolute>"; };
 		445D893A69E7D38B6B8C7E75 /* InsightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightsView.swift; path = ./Cadence/Features/Insights/InsightsView.swift; sourceTree = "<absolute>"; };
 		4A51F97BA927E7299C9A1B07 /* PDFBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PDFBuilder.swift; path = ./Cadence/Features/Export/PDFBuilder.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000107 /* CSVBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CSVBuilder.swift; path = ./Cadence/Features/Export/CSVBuilder.swift; sourceTree = "<absolute>"; };
 		4E79E8D29A40DF8EC23AE638 /* DashboardViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DashboardViewModel.swift; path = ./Cadence/Features/Dashboard/DashboardViewModel.swift; sourceTree = "<absolute>"; };
 		54EC79110025DF66E8C1F0A7 /* UserNotifications */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications; path = System/Library/Frameworks/UserNotifications.framework; sourceTree = SDKROOT; };
 		493F590706A348D0857DA49A /* ServiceProtocols.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ServiceProtocols.swift; path = ./Cadence/Services/ServiceProtocols.swift; sourceTree = "<absolute>"; };
@@ -85,6 +99,12 @@
 		8F825BAF03150A00C8047D70 /* StoreKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		97F2F799247C6E3C22DFB11D /* TrendChartView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TrendChartView.swift; path = ./Cadence/Features/Insights/TrendChartView.swift; sourceTree = "<absolute>"; };
 		990D941EB5FC46F95C213CEE /* DailyLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DailyLog.swift; path = ./Cadence/Models/DailyLog.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000101 /* Medication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Medication.swift; path = ./Cadence/Models/Medication.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000102 /* MedicationsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MedicationsView.swift; path = ./Cadence/Features/Settings/MedicationsView.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000103 /* Flare.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Flare.swift; path = ./Cadence/Models/Flare.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000104 /* FlaresView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FlaresView.swift; path = ./Cadence/Features/Settings/FlaresView.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000105 /* CustomTracker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomTracker.swift; path = ./Cadence/Models/CustomTracker.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000106 /* CustomTrackersView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomTrackersView.swift; path = ./Cadence/Features/Settings/CustomTrackersView.swift; sourceTree = "<absolute>"; };
 		A0D01DD5A2B033204335261E /* SwiftUI */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		A292713D8D2930BB2E51C28C /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotificationService.swift; path = ./Cadence/Services/NotificationService.swift; sourceTree = "<absolute>"; };
 		A54B34C3966B1BD7CE976D7F /* Cadence.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cadence.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -157,6 +177,7 @@
 			children = (
 				20317D6C051870F466BF81F7 /* ExportView.swift */,
 				4A51F97BA927E7299C9A1B07 /* PDFBuilder.swift */,
+				AABBCCDD0000000000000107 /* CSVBuilder.swift */,
 			);
 			name = Export;
 			path = ./Cadence/Features/Export;
@@ -212,6 +233,8 @@
 				AA11BB22CC33DD44EE55FF02 /* StoreServiceTests.swift */,
 				AA11BB22CC33DD44EE55FF03 /* SchemaMigrationTests.swift */,
 				AA11BB22CC33DD44EE55FF04 /* HealthKitServiceTests.swift */,
+				AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */,
+				AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */,
 			);
 			name = CadenceTests;
 			path = ../CadenceTests;
@@ -222,6 +245,9 @@
 			children = (
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* ProPaywallView.swift */,
 				C644D07CF96C2AFA00637E3B /* SettingsView.swift */,
+				AABBCCDD0000000000000102 /* MedicationsView.swift */,
+				AABBCCDD0000000000000104 /* FlaresView.swift */,
+				AABBCCDD0000000000000106 /* CustomTrackersView.swift */,
 			);
 			name = Settings;
 			path = ./Cadence/Features/Settings;
@@ -243,6 +269,9 @@
 			isa = PBXGroup;
 			children = (
 				990D941EB5FC46F95C213CEE /* DailyLog.swift */,
+				AABBCCDD0000000000000101 /* Medication.swift */,
+				AABBCCDD0000000000000103 /* Flare.swift */,
+				AABBCCDD0000000000000105 /* CustomTracker.swift */,
 				0B648EA00AEBF0DFCC18871A /* SymptomTag.swift */,
 				F477B83B1C570CD91200BB18 /* WeeklyReview.swift */,
 			);
@@ -273,6 +302,7 @@
 			isa = PBXGroup;
 			children = (
 				2549A45B2FC8EF0A006CD546 /* Assets.xcassets */,
+				CCAADDEE00000000000000F1 /* Localizable.xcstrings */,
 				4E4C6FC200133FE2F1445DD3 /* Products */,
 				952AD024FE81537D998956A8 /* Frameworks */,
 				277D24392416FE5F01264815 /* Cadence */,
@@ -438,6 +468,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2549A45C2FC8EF0A006CD546 /* Assets.xcassets in Resources */,
+				CCAADDEE00000000000000B1 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -452,6 +483,8 @@
 				AA11BB22CC33DD44EE55FF62 /* StoreServiceTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF63 /* SchemaMigrationTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF64 /* HealthKitServiceTests.swift in Sources */,
+				AA11BB22CC33DD44EE55FF66 /* ViewModelSaveTests.swift in Sources */,
+				AA11BB22CC33DD44EE55FF67 /* NotificationServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -465,6 +498,12 @@
 				9007904B6F984195944DC622 /* EnvironmentValues+Services.swift in Sources */,
 				4B6391ABC53847B082A5D7CB /* OnboardingView.swift in Sources */,
 				3D207A23376DB2750B758A61 /* DailyLog.swift in Sources */,
+				AABBCCDD0000000000000201 /* Medication.swift in Sources */,
+				AABBCCDD0000000000000202 /* MedicationsView.swift in Sources */,
+				AABBCCDD0000000000000203 /* Flare.swift in Sources */,
+				AABBCCDD0000000000000204 /* FlaresView.swift in Sources */,
+				AABBCCDD0000000000000205 /* CustomTracker.swift in Sources */,
+				AABBCCDD0000000000000206 /* CustomTrackersView.swift in Sources */,
 				3831F66F2CF40135C9718707 /* SymptomTag.swift in Sources */,
 				30D5FC0958DF5823D7D5A9D6 /* WeeklyReview.swift in Sources */,
 				4F352F41B25B06C32AA0BC05 /* Constants.swift in Sources */,
@@ -486,6 +525,7 @@
 				1382864E5B8432AD840590BD /* HistoryView.swift in Sources */,
 				D7F560CFF67830EE4B7964D0 /* ExportView.swift in Sources */,
 				0745304541CC789DE9CAECA8 /* PDFBuilder.swift in Sources */,
+				AABBCCDD0000000000000207 /* CSVBuilder.swift in Sources */,
 				C7A67B11D453A48F3C8FD239 /* SettingsView.swift in Sources */,
 				E1B2C3D4F5A6B7C8D9E0F1A2 /* ProPaywallView.swift in Sources */,
 				D7C825C8710DDE261D377518 /* HealthKitService.swift in Sources */,

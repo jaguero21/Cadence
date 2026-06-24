@@ -37,6 +37,7 @@ enum UserDefaultsKey {
     static let dailyReminderHour    = "dailyReminderHour"
     static let dailyReminderMinute  = "dailyReminderMinute"
     static let weeklyReminderEnabled = "weeklyReminderEnabled"
+    static let lastVisitDate          = "lastVisitDate"   // timeIntervalSinceReferenceDate; 0 = unset
 }
 
 enum PatternThreshold {
@@ -54,6 +55,12 @@ enum PatternThreshold {
     // Confidence gates
     static let minimumConfidence: Double = 0.5
 
+    // Standard-normal quantile for the Wilson confidence lower bound. ~1.0 is a
+    // soft (≈68%) interval: enough to penalise thin samples (so a 2/2 streak no
+    // longer reports 100%) without suppressing genuine patterns at the small
+    // sample sizes daily logging produces. Raising it tightens evidence demands.
+    static let confidenceZ: Double = 1.0
+
     // Energy trend
     static let energyTrendWindow: Int = 14
     static let energyDropThreshold: Double = 1.5
@@ -61,4 +68,16 @@ enum PatternThreshold {
 
     // Mood/sleep correlation
     static let moodDiffThreshold: Double = 1.0
+
+    // Medication effect: minimum logged days on each side of a med's start date
+    // before/after which we'll compare, and the smallest change in average daily
+    // symptom count worth surfacing.
+    static let minimumMedEffectDays: Int = 5
+    static let medSymptomDeltaThreshold: Double = 0.5
+
+    // Factor (trigger) correlation: minimum days with and without a factor before
+    // comparing, and the smallest increase in average daily symptom count on
+    // factor days worth surfacing as a likely trigger.
+    static let minimumFactorDays: Int = 3
+    static let factorSymptomDeltaThreshold: Double = 0.5
 }

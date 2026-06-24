@@ -6,8 +6,11 @@ struct WeeklyReviewView: View {
     @Query private var logs: [DailyLog]
     @State private var activeSheet: ActiveSheet?
 
-    init() {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -14, to: .now) ?? .distantPast
+    // referenceDate anchors the 14-day window so it refreshes in place at a
+    // midnight rollover rather than via a full view rebuild.
+    init(referenceDate: Date = .now) {
+        let day = Calendar.current.startOfDay(for: referenceDate)
+        let cutoff = Calendar.current.date(byAdding: .day, value: -14, to: day) ?? .distantPast
         _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
     }
 

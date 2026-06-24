@@ -6,56 +6,8 @@ enum ReportType: String, CaseIterable {
     case personal = "Personal Summary"
 }
 
-struct DailyLogSnapshot: Sendable {
-    let date: Date
-    let mood: Int
-    let energy: Int
-    let sleepHours: Double
-    let stressLevel: Int
-    let symptoms: [SymptomEntry]
-    let didEditMetrics: Bool
-
-    init(_ log: DailyLog) {
-        date           = log.date
-        mood           = log.mood
-        energy         = log.energy
-        sleepHours     = log.sleepHours
-        stressLevel    = log.stressLevel
-        symptoms       = log.symptoms
-        didEditMetrics = log.didEditMetrics
-    }
-
-    init(
-        date: Date,
-        mood: Int = 3,
-        energy: Int = 5,
-        sleepHours: Double = 7.0,
-        stressLevel: Int = 5,
-        symptoms: [SymptomEntry] = [],
-        didEditMetrics: Bool = false
-    ) {
-        self.date = date
-        self.mood = mood
-        self.energy = energy
-        self.sleepHours = sleepHours
-        self.stressLevel = stressLevel
-        self.symptoms = symptoms
-        self.didEditMetrics = didEditMetrics
-    }
-}
-
-struct WeeklyReviewSnapshot: Sendable {
-    let weekLabel: String
-    let promptResponses: [PromptResponse]
-
-    init(_ review: WeeklyReview) {
-        weekLabel       = review.weekLabel
-        promptResponses = review.promptResponses
-    }
-}
-
 enum PDFBuilder {
-    static func build(type: ReportType, logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], headerTitle: String? = nil) async -> URL? {
+    static func build(type: ReportType, logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = [], headerTitle: String? = nil) async -> URL? {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
         let uid = UUID().uuidString
         let filename = type == .doctor ? "cadence-doctor-report-\(uid).pdf" : "cadence-personal-summary-\(uid).pdf"
@@ -63,12 +15,12 @@ enum PDFBuilder {
 
         // Insights run once here so the renderer doesn't need to know about
         // PatternEngine — and personal-summary builds don't pay the cost.
-        let insights = type == .doctor ? PatternEngine.allInsights(from: logs) : []
+        let insights = type == .doctor ? PatternEngine.allInsights(from: logs, medications: medications) : []
 
         do {
             try renderer.writePDF(to: url) { ctx in
                 switch type {
-                case .doctor:   renderDoctorReport(ctx: ctx, logs: logs, insights: insights, headerTitle: headerTitle)
+                case .doctor:   renderDoctorReport(ctx: ctx, logs: logs, insights: insights, medications: medications, flares: flares, customTrackers: customTrackers, headerTitle: headerTitle)
                 case .personal: renderPersonalSummary(ctx: ctx, reviews: reviews)
                 }
             }
@@ -101,7 +53,7 @@ enum PDFBuilder {
 
     // MARK: - Renderers
 
-    private static func renderDoctorReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], insights: [InsightCard], headerTitle: String?) {
+    private static func renderDoctorReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], insights: [InsightCard], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot], headerTitle: String?) {
         ctx.beginPage()
         let titleAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 22, weight: .bold)]
         let sectionAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 14, weight: .semibold)]
@@ -133,6 +85,21 @@ enum PDFBuilder {
             y += h + 2
         }
 
+        let factorCounts = logs.flatMap(\.factors).reduce(into: [:]) { $0[$1, default: 0] += 1 }
+        if !factorCounts.isEmpty {
+            y += 16
+            breakIfNeeded(y: &y, needing: 44, ctx: ctx)
+            "Common Factors".draw(in: CGRect(x: 40, y: y, width: 515, height: 20), withAttributes: sectionAttrs)
+            y += 24
+            for (factor, count) in factorCounts.sorted(by: { $0.value > $1.value }) {
+                let line = "\(factor): \(count) days"
+                let h = textHeight(line, attrs: bodyAttrs, width: 505)
+                breakIfNeeded(y: &y, needing: h, ctx: ctx)
+                line.draw(in: CGRect(x: 50, y: y, width: 505, height: h), withAttributes: bodyAttrs)
+                y += h + 2
+            }
+        }
+
         y += 16
         breakIfNeeded(y: &y, needing: 44, ctx: ctx)
         "Average Metrics".draw(in: CGRect(x: 40, y: y, width: 515, height: 20), withAttributes: sectionAttrs)
@@ -147,6 +114,49 @@ enum PDFBuilder {
                 "Avg sleep: \(String(format: "%.1f", avgSleep)) hrs",
             ]
             for line in metricLines {
+                let h = textHeight(line, attrs: bodyAttrs, width: 505)
+                breakIfNeeded(y: &y, needing: h, ctx: ctx)
+                line.draw(in: CGRect(x: 50, y: y, width: 505, height: h), withAttributes: bodyAttrs)
+                y += h + 2
+            }
+            for tracker in customTrackers {
+                let values = logs.compactMap { log in log.customMetrics.first { $0.trackerID == tracker.id }?.value }
+                guard !values.isEmpty else { continue }
+                let avg = Double(values.reduce(0, +)) / Double(values.count)
+                let line = "\(tracker.name): \(String(format: "%.1f", avg))\(tracker.unit.isEmpty ? "" : " \(tracker.unit)")"
+                let h = textHeight(line, attrs: bodyAttrs, width: 505)
+                breakIfNeeded(y: &y, needing: h, ctx: ctx)
+                line.draw(in: CGRect(x: 50, y: y, width: 505, height: h), withAttributes: bodyAttrs)
+                y += h + 2
+            }
+        }
+
+        if !medications.isEmpty {
+            y += 16
+            breakIfNeeded(y: &y, needing: 44, ctx: ctx)
+            "Medications".draw(in: CGRect(x: 40, y: y, width: 515, height: 20), withAttributes: sectionAttrs)
+            y += 24
+            let dateFmt = Date.FormatStyle().month(.abbreviated).day().year()
+            for med in medications.sorted(by: { $0.startDate > $1.startDate }) {
+                let range = "from \(med.startDate.formatted(dateFmt))" + (med.endDate.map { " to \($0.formatted(dateFmt))" } ?? " (ongoing)")
+                let line = "\(med.displayLabel) — \(range)"
+                let h = textHeight(line, attrs: bodyAttrs, width: 505)
+                breakIfNeeded(y: &y, needing: h, ctx: ctx)
+                line.draw(in: CGRect(x: 50, y: y, width: 505, height: h), withAttributes: bodyAttrs)
+                y += h + 2
+            }
+        }
+
+        if !flares.isEmpty {
+            y += 16
+            breakIfNeeded(y: &y, needing: 44, ctx: ctx)
+            "Symptom Flares".draw(in: CGRect(x: 40, y: y, width: 515, height: 20), withAttributes: sectionAttrs)
+            y += 24
+            let dateFmt = Date.FormatStyle().month(.abbreviated).day().year()
+            for flare in flares.sorted(by: { $0.startDate > $1.startDate }) {
+                let range = flare.endDate.map { "\(flare.startDate.formatted(dateFmt)) – \($0.formatted(dateFmt))" }
+                    ?? "since \(flare.startDate.formatted(dateFmt)) (ongoing)"
+                let line = "\(range): \(flare.durationDays) day\(flare.durationDays == 1 ? "" : "s"), peak \(flare.peakSeverity)/10"
                 let h = textHeight(line, attrs: bodyAttrs, width: 505)
                 breakIfNeeded(y: &y, needing: h, ctx: ctx)
                 line.draw(in: CGRect(x: 50, y: y, width: 505, height: h), withAttributes: bodyAttrs)

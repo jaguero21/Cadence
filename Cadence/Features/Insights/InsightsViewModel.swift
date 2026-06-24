@@ -39,9 +39,12 @@ final class InsightsViewModel {
         }
     }
 
-    func refresh(logs: [DailyLog]) {
+    func refresh(logs: [DailyLog], medications: [Medication] = []) {
         // Snapshot @Model values on the main actor before handing them to PatternEngine,
         // which is otherwise isolation-agnostic.
-        insights = PatternEngine.allInsights(from: logs.map(DailyLogSnapshot.init))
+        insights = PatternEngine.allInsights(
+            from: logs.map(DailyLogSnapshot.init),
+            medications: medications.map(MedicationSnapshot.init)
+        )
     }
 }

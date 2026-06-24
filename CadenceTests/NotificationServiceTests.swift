@@ -9,6 +9,7 @@ import Foundation
 // and scheduleWeeklyReviewReminder (hour/minute/weekday range guards).
 
 @Suite("NotificationService – scheduleDailyReminder validation")
+@MainActor
 struct NotificationServiceDailyReminderTests {
 
     @Test("Valid hour and minute do not crash")
@@ -36,6 +37,7 @@ struct NotificationServiceDailyReminderTests {
 }
 
 @Suite("NotificationService – scheduleWeeklyReviewReminder validation")
+@MainActor
 struct NotificationServiceWeeklyReminderTests {
 
     @Test("Valid weekday and hour do not crash")

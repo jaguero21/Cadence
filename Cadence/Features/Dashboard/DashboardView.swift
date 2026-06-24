@@ -10,8 +10,12 @@ struct DashboardView: View {
     @State private var showingDailyLog = false
     @State private var showingWeeklyReview = false
 
-    init() {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: .now) ?? .distantPast
+    // referenceDate anchors the query window. The parent passes the current day
+    // so that when it rolls over at midnight this view re-inits with a fresh
+    // cutoff — updating the @Query without destroying its view state.
+    init(referenceDate: Date = .now) {
+        let day = Calendar.current.startOfDay(for: referenceDate)
+        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: day) ?? .distantPast
         _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
     }
 

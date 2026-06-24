@@ -18,7 +18,7 @@ struct CadenceApp: App {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
-        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self])
         let persistentConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         if let container = try? ModelContainer(for: schema, configurations: [persistentConfig]) {
             return container
@@ -70,7 +70,11 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .dashboard
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
-    @State private var dayId = Calendar.current.startOfDay(for: .now)
+    // The current day, refreshed when the app returns to foreground. Passed into
+    // each date-windowed tab so a midnight rollover updates their @Query in place
+    // rather than rebuilding the subtree (which dropped open sheets / scroll
+    // state). HistoryView isn't date-windowed, so it doesn't take it.
+    @State private var today = Calendar.current.startOfDay(for: .now)
 
     private let symptomSeedKey = UserDefaultsKey.symptomTagsSeeded
     private static let log = Logger(subsystem: "com.carpecadence", category: "ContentView")
@@ -78,23 +82,19 @@ struct ContentView: View {
     var body: some View {
         @Bindable var appState = appState
         TabView(selection: $selectedTab) {
-            DashboardView()
-                .id(dayId)
+            DashboardView(referenceDate: today)
                 .tabItem { Label("Today", systemImage: "sun.max.fill") }
                 .tag(Tab.dashboard)
 
-            DailyLogView()
-                .id(dayId)
+            DailyLogView(referenceDate: today)
                 .tabItem { Label("Log", systemImage: "pencil.and.list.clipboard") }
                 .tag(Tab.dailyLog)
 
-            WeeklyReviewView()
-                .id(dayId)
+            WeeklyReviewView(referenceDate: today)
                 .tabItem { Label("Review", systemImage: "calendar.badge.checkmark") }
                 .tag(Tab.weeklyReview)
 
-            InsightsView()
-                .id(dayId)
+            InsightsView(referenceDate: today)
                 .tabItem { Label("Insights", systemImage: "chart.line.uptrend.xyaxis") }
                 .tag(Tab.insights)
 
@@ -105,8 +105,8 @@ struct ContentView: View {
         .tint(CadenceColor.accent)
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            let today = Calendar.current.startOfDay(for: .now)
-            if today != dayId { dayId = today }
+            let startOfToday = Calendar.current.startOfDay(for: .now)
+            if startOfToday != today { today = startOfToday }
         }
         .task { seedSymptomTagsIfNeeded() }
         .sheet(isPresented: $appState.showingProPaywall) {
