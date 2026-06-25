@@ -50,6 +50,7 @@
 		B6B76E4EF6D92F7B5179ADC8 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680C40C33549B696DF6BA3A5 /* WeeklyReviewView.swift */; };
 		B6EB3F0F0BE48CBDC5D5BA4A /* SwiftUI in Frameworks */ = {isa = PBXBuildFile; fileRef = A0D01DD5A2B033204335261E /* SwiftUI */; };
 		BB6405EE18F6B6D698226AB6 /* LogInputFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */; };
+		AABBCCDD000000000000020D /* VoiceNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010D /* VoiceNote.swift */; };
 		455141101502412D92E7CB50 /* ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493F590706A348D0857DA49A /* ServiceProtocols.swift */; };
 		9007904B6F984195944DC622 /* EnvironmentValues+Services.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D8C849E3B044CB78A9DB7B5 /* EnvironmentValues+Services.swift */; };
 		4B6391ABC53847B082A5D7CB /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AB8956A0FB74B69BE644D59 /* OnboardingView.swift */; };
@@ -58,6 +59,11 @@
 		E1B2C3D4F5A6B7C8D9E0F1A2 /* ProPaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* ProPaywallView.swift */; };
 		C7F20E34EA5B3C5F84042DA4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91AC27A765654C1A1DFFBD5 /* AppState.swift */; };
 		D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0989CA66FE09F78B729A4E /* PatternEngine.swift */; };
+		AABBCCDD0000000000000208 /* InsightRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000108 /* InsightRecord.swift */; };
+		AABBCCDD0000000000000209 /* InsightRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000109 /* InsightRecorder.swift */; };
+		AABBCCDD000000000000020A /* InsightHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010A /* InsightHistoryView.swift */; };
+		AABBCCDD000000000000020B /* Attachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010B /* Attachment.swift */; };
+		AABBCCDD000000000000020C /* AttachmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010C /* AttachmentStore.swift */; };
 		D45ECE5968E07CA77E8B26D5 /* StoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F51B62D7D39FC0309276D9D /* StoreService.swift */; };
 		D7C825C8710DDE261D377518 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7F46C62532314DD37DC860 /* HealthKitService.swift */; };
 		D7F560CFF67830EE4B7964D0 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20317D6C051870F466BF81F7 /* ExportView.swift */; };
@@ -85,6 +91,11 @@
 		CCAADDEE00000000000000F1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = Cadence/Localizable.xcstrings; sourceTree = "<group>"; };
 		26D33A415B0A6E15E6DA6EA9 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = ./Cadence/App/Info.plist; sourceTree = "<absolute>"; };
 		3F0989CA66FE09F78B729A4E /* PatternEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PatternEngine.swift; path = ./Cadence/Services/PatternEngine.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000108 /* InsightRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightRecord.swift; path = ./Cadence/Models/InsightRecord.swift; sourceTree = "<absolute>"; };
+		AABBCCDD000000000000010B /* Attachment.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Attachment.swift; path = ./Cadence/Models/Attachment.swift; sourceTree = "<absolute>"; };
+		AABBCCDD000000000000010C /* AttachmentStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AttachmentStore.swift; path = ./Cadence/Services/AttachmentStore.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000109 /* InsightRecorder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightRecorder.swift; path = ./Cadence/Services/InsightRecorder.swift; sourceTree = "<absolute>"; };
+		AABBCCDD000000000000010A /* InsightHistoryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightHistoryView.swift; path = ./Cadence/Features/Insights/InsightHistoryView.swift; sourceTree = "<absolute>"; };
 		445D893A69E7D38B6B8C7E75 /* InsightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightsView.swift; path = ./Cadence/Features/Insights/InsightsView.swift; sourceTree = "<absolute>"; };
 		4A51F97BA927E7299C9A1B07 /* PDFBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PDFBuilder.swift; path = ./Cadence/Features/Export/PDFBuilder.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000107 /* CSVBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CSVBuilder.swift; path = ./Cadence/Features/Export/CSVBuilder.swift; sourceTree = "<absolute>"; };
@@ -111,6 +122,7 @@
 		ABD3C5951CAE74F5C1693742 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ADCC6B77E8E1D5DB3D6A5BDA /* HealthKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogInputFlow.swift; path = ./Cadence/Features/DailyLog/LogInputFlow.swift; sourceTree = "<absolute>"; };
+		AABBCCDD000000000000010D /* VoiceNote.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VoiceNote.swift; path = ./Cadence/Features/DailyLog/VoiceNote.swift; sourceTree = "<absolute>"; };
 		B5792500A97EE8C382CEFDD9 /* SymptomPickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SymptomPickerView.swift; path = ./Cadence/Features/DailyLog/SymptomPickerView.swift; sourceTree = "<absolute>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* ProPaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProPaywallView.swift; path = ./Cadence/Features/Settings/ProPaywallView.swift; sourceTree = "<absolute>"; };
 		C644D07CF96C2AFA00637E3B /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = ./Cadence/Features/Settings/SettingsView.swift; sourceTree = "<absolute>"; };
@@ -210,6 +222,7 @@
 			isa = PBXGroup;
 			children = (
 				445D893A69E7D38B6B8C7E75 /* InsightsView.swift */,
+				AABBCCDD000000000000010A /* InsightHistoryView.swift */,
 				DCD1D6BAE9337E36C2D398B6 /* InsightsViewModel.swift */,
 				97F2F799247C6E3C22DFB11D /* TrendChartView.swift */,
 			);
@@ -259,6 +272,7 @@
 				EA2C9315ED942B187FB6B889 /* DailyLogView.swift */,
 				1622C330943A74E15575A681 /* DailyLogViewModel.swift */,
 				AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */,
+				AABBCCDD000000000000010D /* VoiceNote.swift */,
 				B5792500A97EE8C382CEFDD9 /* SymptomPickerView.swift */,
 			);
 			name = DailyLog;
@@ -272,6 +286,8 @@
 				AABBCCDD0000000000000101 /* Medication.swift */,
 				AABBCCDD0000000000000103 /* Flare.swift */,
 				AABBCCDD0000000000000105 /* CustomTracker.swift */,
+				AABBCCDD0000000000000108 /* InsightRecord.swift */,
+				AABBCCDD000000000000010B /* Attachment.swift */,
 				0B648EA00AEBF0DFCC18871A /* SymptomTag.swift */,
 				F477B83B1C570CD91200BB18 /* WeeklyReview.swift */,
 			);
@@ -365,6 +381,8 @@
 				1A7F46C62532314DD37DC860 /* HealthKitService.swift */,
 				A292713D8D2930BB2E51C28C /* NotificationService.swift */,
 				3F0989CA66FE09F78B729A4E /* PatternEngine.swift */,
+				AABBCCDD0000000000000109 /* InsightRecorder.swift */,
+				AABBCCDD000000000000010C /* AttachmentStore.swift */,
 				493F590706A348D0857DA49A /* ServiceProtocols.swift */,
 				7F51B62D7D39FC0309276D9D /* StoreService.swift */,
 			);
@@ -514,6 +532,7 @@
 				2E030EDD7DE7E2C321D0B7DE /* DailyLogView.swift in Sources */,
 				46261271D23E287938897B70 /* DailyLogViewModel.swift in Sources */,
 				BB6405EE18F6B6D698226AB6 /* LogInputFlow.swift in Sources */,
+				AABBCCDD000000000000020D /* VoiceNote.swift in Sources */,
 				B52AE232D80E6360C8C86490 /* SymptomPickerView.swift in Sources */,
 				593B150FEF1DA99C3B9F0E13 /* PromptCardView.swift in Sources */,
 				E66B7D4A5BF69E6B35416140 /* ReviewFlowView.swift in Sources */,
@@ -531,6 +550,11 @@
 				D7C825C8710DDE261D377518 /* HealthKitService.swift in Sources */,
 				1D96522AE7200D9F795F68E8 /* NotificationService.swift in Sources */,
 				D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */,
+				AABBCCDD0000000000000208 /* InsightRecord.swift in Sources */,
+				AABBCCDD0000000000000209 /* InsightRecorder.swift in Sources */,
+				AABBCCDD000000000000020A /* InsightHistoryView.swift in Sources */,
+				AABBCCDD000000000000020B /* Attachment.swift in Sources */,
+				AABBCCDD000000000000020C /* AttachmentStore.swift in Sources */,
 				D45ECE5968E07CA77E8B26D5 /* StoreService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

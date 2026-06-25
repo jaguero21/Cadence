@@ -15,6 +15,7 @@ struct InsightsView: View {
     }
     @Environment(StoreService.self) private var store
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         NavigationStack {
@@ -33,9 +34,28 @@ struct InsightsView: View {
             }
             .background(CadenceColor.background)
             .navigationTitle("Insights")
-            .onAppear { vm.refresh(logs: logs, medications: medications) }
-            .onChange(of: logs) { _, _ in vm.refresh(logs: logs, medications: medications) }
-            .onChange(of: medications) { _, _ in vm.refresh(logs: logs, medications: medications) }
+            .toolbar {
+                if store.isPro {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            InsightHistoryView()
+                        } label: {
+                            Image(systemName: "clock.arrow.circlepath")
+                        }
+                        .accessibilityLabel("Insight history")
+                    }
+                }
+            }
+            .onAppear { refreshAndRecord() }
+            .onChange(of: logs) { _, _ in refreshAndRecord() }
+            .onChange(of: medications) { _, _ in refreshAndRecord() }
+        }
+    }
+
+    private func refreshAndRecord() {
+        vm.refresh(logs: logs, medications: medications)
+        if store.isPro {
+            InsightRecorder.record(vm.insights, context: modelContext)
         }
     }
 
@@ -60,21 +80,33 @@ struct InsightsView: View {
 
     private var chartsSection: some View {
         let filtered = filteredLogs
+        let previous = previousLogs
         return VStack(spacing: 16) {
             ForEach(ChartMetric.allCases, id: \.self) { metric in
-                TrendChartView(logs: filtered, metric: metric, range: vm.chartRange)
+                TrendChartView(logs: filtered, metric: metric, range: vm.chartRange, previousLogs: previous)
             }
         }
     }
 
-    private var filteredLogs: [DailyLog] {
-        let cutoff: Date
+    private var windowDays: Int {
         switch vm.chartRange {
-        case .sevenDay:  cutoff = Calendar.current.date(byAdding: .day, value: -7,  to: .now) ?? .now
-        case .thirtyDay: cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
-        case .ninetyDay: cutoff = Calendar.current.date(byAdding: .day, value: -90, to: .now) ?? .now
+        case .sevenDay:  return 7
+        case .thirtyDay: return 30
+        case .ninetyDay: return 90
         }
+    }
+
+    private var filteredLogs: [DailyLog] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -windowDays, to: .now) ?? .now
         return logs.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
+    }
+
+    // The equal-length window immediately before the current one, for comparison.
+    private var previousLogs: [DailyLog] {
+        let cal = Calendar.current
+        let end = cal.date(byAdding: .day, value: -windowDays, to: .now) ?? .now
+        let start = cal.date(byAdding: .day, value: -2 * windowDays, to: .now) ?? .now
+        return logs.filter { $0.date >= start && $0.date < end }.sorted { $0.date < $1.date }
     }
 
     private var insightsSection: some View {
