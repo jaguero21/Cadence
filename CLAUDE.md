@@ -77,6 +77,19 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - **Haptics:** `UINotificationFeedbackGenerator().notificationOccurred(...)` on
   successful saves.
 
+## Widget
+
+- `CadenceWidgetExtension` (folder `CadenceWidget/`, a synchronized file-system
+  group — files there auto-build for the widget, unlike the app target's explicit
+  references). Shows logging streak + today's check-in status.
+- App↔widget share via the **App Group** `group.com.carpecadence.app`:
+  `WidgetData` (in `CadenceWidget/WidgetData.swift`, added to *both* targets —
+  explicit ref for the app, sync group for the widget) writes/reads a small
+  `Summary` in the shared `UserDefaults` suite. `DashboardViewModel.refresh`
+  writes it and calls `WidgetCenter.reloadAllTimelines()`.
+- App bundle id is **`com.carpecadence.app`** (unified with the code's
+  `com.carpecadence` convention); widget is `com.carpecadence.app.CadenceWidget`.
+
 ## Attachments
 
 - `DailyLog.attachments: [Attachment]` holds lightweight references; binaries live
