@@ -3,10 +3,10 @@ import SwiftData
 
 @Model
 final class SymptomTag {
-    var name: String
-    var emoji: String
-    var isDefault: Bool
-    var sortOrder: Int
+    var name: String = ""
+    var emoji: String = ""
+    var isDefault: Bool = false
+    var sortOrder: Int = 0
 
     init(name: String, emoji: String, isDefault: Bool = false, sortOrder: Int = 0) {
         self.name = name
