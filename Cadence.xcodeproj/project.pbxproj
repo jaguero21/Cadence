@@ -19,6 +19,7 @@
 		25762D172FEDD6A000A132C8 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25762D162FEDD6A000A132C8 /* WidgetKit.framework */; };
 		25762D192FEDD6A000A132C8 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25762D182FEDD6A000A132C8 /* SwiftUI.framework */; };
 		25762D262FEDD6A100A132C8 /* CadenceWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 25762D152FEDD6A000A132C8 /* CadenceWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		25762D6F2FEDDF5400A132C8 /* CadenceWidget Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 25762D652FEDDF5200A132C8 /* CadenceWidget Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		2E030EDD7DE7E2C321D0B7DE /* DailyLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2C9315ED942B187FB6B889 /* DailyLogView.swift */; };
 		30D5FC0958DF5823D7D5A9D6 /* WeeklyReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F477B83B1C570CD91200BB18 /* WeeklyReview.swift */; };
 		3831F66F2CF40135C9718707 /* SymptomTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B648EA00AEBF0DFCC18871A /* SymptomTag.swift */; };
@@ -58,6 +59,7 @@
 		AABBCCDD000000000000020C /* AttachmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010C /* AttachmentStore.swift */; };
 		AABBCCDD000000000000020D /* VoiceNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010D /* VoiceNote.swift */; };
 		AABBCCDD000000000000020E /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010E /* WidgetData.swift */; };
+		AABBCCDD000000000000020F /* PhoneConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */; };
 		B52AE232D80E6360C8C86490 /* SymptomPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5792500A97EE8C382CEFDD9 /* SymptomPickerView.swift */; };
 		B6B76E4EF6D92F7B5179ADC8 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680C40C33549B696DF6BA3A5 /* WeeklyReviewView.swift */; };
 		B6EB3F0F0BE48CBDC5D5BA4A /* SwiftUI in Frameworks */ = {isa = PBXBuildFile; fileRef = A0D01DD5A2B033204335261E /* SwiftUI */; };
@@ -83,6 +85,13 @@
 			remoteGlobalIDString = 25762D142FEDD6A000A132C8;
 			remoteInfo = CadenceWidgetExtension;
 		};
+		25762D6D2FEDDF5400A132C8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9E1F3F9027B3FBC8AA55CA8E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 25762D642FEDDF5200A132C8;
+			remoteInfo = "CadenceWidget Watch App";
+		};
 		AA11BB22CC33DD44EE55FF70 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9E1F3F9027B3FBC8AA55CA8E /* Project object */;
@@ -104,6 +113,17 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		25762D732FEDDF5400A132C8 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				25762D6F2FEDDF5400A132C8 /* CadenceWidget Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -120,6 +140,7 @@
 		25762D162FEDD6A000A132C8 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		25762D182FEDD6A000A132C8 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		25762D602FEDDCD400A132C8 /* CadenceWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CadenceWidgetExtension.entitlements; sourceTree = "<group>"; };
+		25762D652FEDDF5200A132C8 /* CadenceWidget Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CadenceWidget Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		26D33A415B0A6E15E6DA6EA9 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = ./Cadence/App/Info.plist; sourceTree = "<absolute>"; };
 		3F0989CA66FE09F78B729A4E /* PatternEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PatternEngine.swift; path = ./Cadence/Services/PatternEngine.swift; sourceTree = "<absolute>"; };
 		445D893A69E7D38B6B8C7E75 /* InsightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightsView.swift; path = ./Cadence/Features/Insights/InsightsView.swift; sourceTree = "<absolute>"; };
@@ -160,6 +181,7 @@
 		AABBCCDD000000000000010C /* AttachmentStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AttachmentStore.swift; path = ./Cadence/Services/AttachmentStore.swift; sourceTree = "<absolute>"; };
 		AABBCCDD000000000000010D /* VoiceNote.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VoiceNote.swift; path = ./Cadence/Features/DailyLog/VoiceNote.swift; sourceTree = "<absolute>"; };
 		AABBCCDD000000000000010E /* WidgetData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WidgetData.swift; path = ./CadenceWidget/WidgetData.swift; sourceTree = "<absolute>"; };
+		AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PhoneConnectivityManager.swift; path = ./Cadence/Services/PhoneConnectivityManager.swift; sourceTree = "<absolute>"; };
 		ABD3C5951CAE74F5C1693742 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ADCC6B77E8E1D5DB3D6A5BDA /* HealthKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogInputFlow.swift; path = ./Cadence/Features/DailyLog/LogInputFlow.swift; sourceTree = "<absolute>"; };
@@ -192,6 +214,7 @@
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		25762D1A2FEDD6A000A132C8 /* CadenceWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (25762D2A2FEDD6A100A132C8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = CadenceWidget; sourceTree = "<group>"; };
+		25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "CadenceWidget Watch App"; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -201,6 +224,13 @@
 			files = (
 				25762D192FEDD6A000A132C8 /* SwiftUI.framework in Frameworks */,
 				25762D172FEDD6A000A132C8 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		25762D622FEDDF5200A132C8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -281,6 +311,7 @@
 				A54B34C3966B1BD7CE976D7F /* Cadence.app */,
 				AA11BB22CC33DD44EE55FF05 /* CadenceTests.xctest */,
 				25762D152FEDD6A000A132C8 /* CadenceWidgetExtension.appex */,
+				25762D652FEDDF5200A132C8 /* CadenceWidget Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -362,6 +393,7 @@
 				2549A45B2FC8EF0A006CD546 /* Assets.xcassets */,
 				CCAADDEE00000000000000F1 /* Localizable.xcstrings */,
 				25762D1A2FEDD6A000A132C8 /* CadenceWidget */,
+				25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */,
 				4E4C6FC200133FE2F1445DD3 /* Products */,
 				952AD024FE81537D998956A8 /* Frameworks */,
 				277D24392416FE5F01264815 /* Cadence */,
@@ -441,6 +473,7 @@
 				1A7F46C62532314DD37DC860 /* HealthKitService.swift */,
 				A292713D8D2930BB2E51C28C /* NotificationService.swift */,
 				3F0989CA66FE09F78B729A4E /* PatternEngine.swift */,
+				AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */,
 				AABBCCDD0000000000000109 /* InsightRecorder.swift */,
 				AABBCCDD000000000000010C /* AttachmentStore.swift */,
 				493F590706A348D0857DA49A /* ServiceProtocols.swift */,
@@ -490,6 +523,28 @@
 			productReference = 25762D152FEDD6A000A132C8 /* CadenceWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		25762D642FEDDF5200A132C8 /* CadenceWidget Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 25762D702FEDDF5400A132C8 /* Build configuration list for PBXNativeTarget "CadenceWidget Watch App" */;
+			buildPhases = (
+				25762D612FEDDF5200A132C8 /* Sources */,
+				25762D622FEDDF5200A132C8 /* Frameworks */,
+				25762D632FEDDF5200A132C8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */,
+			);
+			name = "CadenceWidget Watch App";
+			packageProductDependencies = (
+			);
+			productName = "CadenceWidget Watch App";
+			productReference = 25762D652FEDDF5200A132C8 /* CadenceWidget Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
 		AA11BB22CC33DD44EE55FFA0 /* CadenceTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AA11BB22CC33DD44EE55FFB0 /* Build configuration list for PBXNativeTarget "CadenceTests" */;
@@ -515,11 +570,13 @@
 				4836B7A208C63E25610B6EAA /* Frameworks */,
 				6C0777D40FFBC1856C8B9BB0 /* Resources */,
 				25762D272FEDD6A100A132C8 /* Embed Foundation Extensions */,
+				25762D732FEDDF5400A132C8 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				25762D252FEDD6A100A132C8 /* PBXTargetDependency */,
+				25762D6E2FEDDF5400A132C8 /* PBXTargetDependency */,
 			);
 			name = Cadence;
 			productName = Cadence;
@@ -537,6 +594,9 @@
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					25762D142FEDD6A000A132C8 = {
+						CreatedOnToolsVersion = 26.4;
+					};
+					25762D642FEDDF5200A132C8 = {
 						CreatedOnToolsVersion = 26.4;
 					};
 				};
@@ -557,12 +617,20 @@
 				B4DC90E61DEB4E78C2EE8C78 /* Cadence */,
 				AA11BB22CC33DD44EE55FFA0 /* CadenceTests */,
 				25762D142FEDD6A000A132C8 /* CadenceWidgetExtension */,
+				25762D642FEDDF5200A132C8 /* CadenceWidget Watch App */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		25762D132FEDD6A000A132C8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		25762D632FEDDF5200A132C8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -582,6 +650,13 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		25762D112FEDD6A000A132C8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		25762D612FEDDF5200A132C8 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -633,6 +708,7 @@
 				D7C825C8710DDE261D377518 /* HealthKitService.swift in Sources */,
 				1D96522AE7200D9F795F68E8 /* NotificationService.swift in Sources */,
 				D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */,
+				AABBCCDD000000000000020F /* PhoneConnectivityManager.swift in Sources */,
 				AABBCCDD0000000000000208 /* InsightRecord.swift in Sources */,
 				AABBCCDD0000000000000209 /* InsightRecorder.swift in Sources */,
 				AABBCCDD000000000000020A /* InsightHistoryView.swift in Sources */,
@@ -662,6 +738,11 @@
 			isa = PBXTargetDependency;
 			target = 25762D142FEDD6A000A132C8 /* CadenceWidgetExtension */;
 			targetProxy = 25762D242FEDD6A100A132C8 /* PBXContainerItemProxy */;
+		};
+		25762D6E2FEDDF5400A132C8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 25762D642FEDDF5200A132C8 /* CadenceWidget Watch App */;
+			targetProxy = 25762D6D2FEDDF5400A132C8 /* PBXContainerItemProxy */;
 		};
 		AA11BB22CC33DD44EE55FF71 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -746,6 +827,84 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		25762D712FEDDF5400A132C8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4NWCR79S38;
+				ENABLE_PREVIEWS = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CadenceWidget;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.carpecadence.app;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.carpecadence.app.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		25762D722FEDDF5400A132C8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4NWCR79S38;
+				ENABLE_PREVIEWS = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CadenceWidget;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.carpecadence.app;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.carpecadence.app.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
 		};
@@ -995,6 +1154,15 @@
 			buildConfigurations = (
 				25762D282FEDD6A100A132C8 /* Debug */,
 				25762D292FEDD6A100A132C8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		25762D702FEDDF5400A132C8 /* Build configuration list for PBXNativeTarget "CadenceWidget Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25762D712FEDDF5400A132C8 /* Debug */,
+				25762D722FEDDF5400A132C8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

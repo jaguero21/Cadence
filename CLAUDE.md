@@ -90,6 +90,19 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - App bundle id is **`com.carpecadence.app`** (unified with the code's
   `com.carpecadence` convention); widget is `com.carpecadence.app.CadenceWidget`.
 
+## Watch app
+
+- `CadenceWidget Watch App` target (folder of the same name, a synchronized
+  group) provides a wrist **quick-log**: mood + energy → "Save to iPhone".
+- Bridge is **WatchConnectivity** (App Groups don't cross devices). The watch's
+  `WatchConnectivityManager` sends a plain `[String: Any]` payload
+  (`mood`/`energy`/`date`) via `sendMessage`, falling back to `transferUserInfo`.
+  The phone's `PhoneConnectivityManager` (started in `CadenceApp` with the
+  container) receives it and **upserts today's `DailyLog`**, then reloads the
+  widget. No model types are shared across the targets — only the dict keys.
+- Watch deployment target is 26.2; live phone↔watch transfer needs paired
+  sims/devices to verify (compiles + structurally complete here).
+
 ## Attachments
 
 - `DailyLog.attachments: [Attachment]` holds lightweight references; binaries live

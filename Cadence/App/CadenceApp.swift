@@ -57,6 +57,7 @@ struct CadenceApp: App {
                 .environment(appState)
                 .environment(store)
                 .modelContainer(container)
+                .task { PhoneConnectivityManager.shared.start(container: container) }
             } else {
                 StorageFatalErrorView()
             }
