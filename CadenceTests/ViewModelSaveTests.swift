@@ -129,6 +129,7 @@ struct DailyLogViewModelStepTests {
         vm.nextStep(); #expect(vm.currentStep == .bodyMetrics)
         vm.nextStep(); #expect(vm.currentStep == .basics)
         vm.nextStep(); #expect(vm.currentStep == .symptoms)
+        vm.nextStep(); #expect(vm.currentStep == .factors)
         vm.nextStep(); #expect(vm.currentStep == .note)
         vm.nextStep(); #expect(vm.currentStep == .done)
         #expect(vm.isDone == false)

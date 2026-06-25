@@ -18,7 +18,7 @@ struct CadenceApp: App {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
-        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self])
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self])
         let persistentConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         if let container = try? ModelContainer(for: schema, configurations: [persistentConfig]) {
             return container
@@ -66,7 +66,9 @@ struct CadenceApp: App {
 
 struct ContentView: View {
     @Environment(AppState.self) var appState
+    @Environment(StoreService.self) private var store
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.notificationService) private var notificationService
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .dashboard
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
@@ -107,6 +109,7 @@ struct ContentView: View {
             guard phase == .active else { return }
             let startOfToday = Calendar.current.startOfDay(for: .now)
             if startOfToday != today { today = startOfToday }
+            checkForNewInsights()
         }
         .task { seedSymptomTagsIfNeeded() }
         .sheet(isPresented: $appState.showingProPaywall) {
@@ -116,6 +119,25 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Cadence couldn't open its database (a migration may be needed). Your data is safe, but changes made this session won't be saved. Try deleting and reinstalling the app if this persists.")
+        }
+    }
+
+    // On foreground, recompute insights, persist any newly-emerged patterns, and
+    // notify the user about the most confident new one (Pro only — insights are a
+    // Pro feature). Recording is idempotent, so this notifies once per pattern.
+    private func checkForNewInsights() {
+        guard store.isPro else { return }
+        let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
+        guard logs.count >= PatternThreshold.minimumLogs else { return }
+        let medications = (try? modelContext.fetch(FetchDescriptor<Medication>())) ?? []
+        let insights = PatternEngine.allInsights(
+            from: logs.map(DailyLogSnapshot.init),
+            medications: medications.map(MedicationSnapshot.init)
+        )
+        let new = InsightRecorder.record(insights, context: modelContext)
+        if let top = new.filter({ $0.confidence >= PatternThreshold.minimumConfidence })
+            .max(by: { $0.confidence < $1.confidence }) {
+            notificationService.sendInsightNotification(title: top.title)
         }
     }
 

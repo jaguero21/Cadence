@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftData
 @testable import Cadence
 
 // MARK: - Helpers
@@ -224,6 +225,114 @@ struct FactorCorrelationsTests {
 
         let insights = PatternEngine.allInsights(from: logs)
         #expect(insights.first { $0.title.contains("Caffeine") } == nil)
+    }
+}
+
+// MARK: - AttachmentStore
+
+@Suite("AttachmentStore – file round-trip")
+struct AttachmentStoreTests {
+
+    private func tempStore() -> AttachmentStore {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("attach-test-\(UUID().uuidString)", isDirectory: true)
+        return AttachmentStore(baseURL: dir)
+    }
+
+    @Test("Saved data can be read back by filename")
+    func save_thenRead_roundTrips() throws {
+        let store = tempStore()
+        let payload = Data("hello".utf8)
+        let filename = try #require(store.save(payload, fileExtension: "jpg"))
+        #expect(filename.hasSuffix(".jpg"))
+        #expect(store.data(for: filename) == payload)
+    }
+
+    @Test("Deleted attachments are no longer readable")
+    func delete_removesFile() throws {
+        let store = tempStore()
+        let filename = try #require(store.save(Data([0x1, 0x2]), fileExtension: "m4a"))
+        store.delete(filename)
+        #expect(store.data(for: filename) == nil)
+    }
+
+    @Test("Each save gets a unique filename")
+    func save_generatesUniqueNames() throws {
+        let store = tempStore()
+        let a = try #require(store.save(Data([0x1]), fileExtension: "jpg"))
+        let b = try #require(store.save(Data([0x1]), fileExtension: "jpg"))
+        #expect(a != b)
+    }
+}
+
+// MARK: - Chart comparison helpers
+
+@Suite("TrendChart – comparison helpers")
+struct ChartComparisonTests {
+
+    @Test("mean returns nil for empty and the average otherwise")
+    func mean_emptyAndNonEmpty() {
+        #expect(TrendChartView.mean([]) == nil)
+        #expect(TrendChartView.mean([2, 4, 6]) == 4)
+    }
+
+    @Test("For higher-is-better metrics, a rise is an improvement")
+    func improvement_higherIsBetterMetrics() {
+        #expect(ChartMetric.mood.isImprovement(delta: 0.5))
+        #expect(!ChartMetric.mood.isImprovement(delta: -0.5))
+        #expect(ChartMetric.energy.isImprovement(delta: 1.0))
+    }
+
+    @Test("For stress, a drop is the improvement")
+    func improvement_stressIsInverted() {
+        #expect(ChartMetric.stress.isImprovement(delta: -1.0))
+        #expect(!ChartMetric.stress.isImprovement(delta: 1.0))
+    }
+}
+
+// MARK: - InsightRecorder
+
+@Suite("InsightRecorder – record")
+@MainActor
+struct InsightRecorderTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    private func card(_ title: String, confidence: Double = 0.8) -> InsightCard {
+        InsightCard(title: title, detail: "d", icon: "i", color: .red, confidence: confidence, category: .symptom)
+    }
+
+    @Test("First record of an insight is returned as newly created and persisted")
+    func record_firstTime_isNew() throws {
+        let context = try makeContext()
+        let new = InsightRecorder.record([card("Poor sleep is linked to next-day headaches")], context: context)
+        #expect(new.count == 1)
+        let stored = try context.fetch(FetchDescriptor<InsightRecord>())
+        #expect(stored.count == 1)
+    }
+
+    @Test("Recording the same insight again creates no new record")
+    func record_secondTime_isNotNew() throws {
+        let context = try makeContext()
+        _ = InsightRecorder.record([card("Same pattern")], context: context)
+        let secondPass = InsightRecorder.record([card("Same pattern", confidence: 0.9)], context: context)
+        #expect(secondPass.isEmpty)
+        let stored = try context.fetch(FetchDescriptor<InsightRecord>())
+        #expect(stored.count == 1)
+        #expect(stored.first?.confidence == 0.9) // confidence refreshed in place
+    }
+
+    @Test("Only genuinely new insights are returned on a mixed pass")
+    func record_mixed_returnsOnlyNew() throws {
+        let context = try makeContext()
+        _ = InsightRecorder.record([card("A")], context: context)
+        let new = InsightRecorder.record([card("A"), card("B")], context: context)
+        #expect(new.count == 1)
+        #expect(new.first?.title == "B")
     }
 }
 

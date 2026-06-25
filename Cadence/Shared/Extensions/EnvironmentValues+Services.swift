@@ -1,10 +1,11 @@
 import SwiftUI
 
 // The @Entry macro (iOS 17+) generates the EnvironmentKey conformance plus the
-// getter/setter, and emits a Sendable-correct key under Swift 6 strict
-// concurrency. The defaults reference @MainActor singletons, which are
-// implicitly Sendable.
+// getter/setter. The defaults are the @MainActor service singletons; the macro's
+// generated `defaultValue` is nonisolated, so we read the singleton through
+// MainActor.assumeIsolated — SwiftUI evaluates environment defaults on the main
+// actor, so the assertion always holds and the cross-isolation warning is avoided.
 extension EnvironmentValues {
-    @Entry var healthKitService: any HealthKitServiceProtocol = HealthKitService.shared
-    @Entry var notificationService: any NotificationServiceProtocol = NotificationService.shared
+    @Entry var healthKitService: any HealthKitServiceProtocol = MainActor.assumeIsolated { HealthKitService.shared }
+    @Entry var notificationService: any NotificationServiceProtocol = MainActor.assumeIsolated { NotificationService.shared }
 }

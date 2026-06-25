@@ -316,6 +316,7 @@ struct HistoryView: View {
 struct LogDetailView: View {
     let log: DailyLog
     @Environment(\.dismiss) private var dismiss
+    private let attachmentStore = AttachmentStore()
 
     var body: some View {
         NavigationStack {
@@ -353,6 +354,41 @@ struct LogDetailView: View {
                 if !log.freeNote.isEmpty {
                     Section("Notes") {
                         Text(log.freeNote)
+                    }
+                }
+
+                let photos = log.attachments.filter { $0.kind == .photo }
+                if !photos.isEmpty {
+                    Section("Photos") {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(photos) { photo in
+                                    if let data = attachmentStore.data(for: photo.filename),
+                                       let image = UIImage(data: data) {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 88, height: 88)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+
+                let voiceNotes = log.attachments.filter { $0.kind == .audio }
+                if !voiceNotes.isEmpty {
+                    Section("Voice Notes") {
+                        ForEach(voiceNotes) { note in
+                            HStack(spacing: 10) {
+                                AudioPlaybackButton(url: attachmentStore.url(for: note.filename))
+                                Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
 
