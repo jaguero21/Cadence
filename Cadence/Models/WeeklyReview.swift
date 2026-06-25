@@ -3,16 +3,18 @@ import SwiftData
 
 @Model
 final class WeeklyReview {
-    @Attribute(.unique) var weekStartDate: Date
-    var promptResponses: [PromptResponse]
-    var overallRating: Int      // 1–5
+    // Uniqueness per week is enforced in code (ReviewFlowView fetches the
+    // existing review before creating one); CloudKit forbids @Attribute(.unique).
+    var weekStartDate: Date = Date.now.startOfWeek
+    var promptResponses: [PromptResponse] = []
+    var overallRating: Int = 0      // 1–5
 
     // Auto-populated from daily logs
-    var avgMood: Double
-    var avgEnergy: Double
-    var avgSleep: Double
-    var topSymptoms: [String]
-    var isComplete: Bool
+    var avgMood: Double = 0
+    var avgEnergy: Double = 0
+    var avgSleep: Double = 0
+    var topSymptoms: [String] = []
+    var isComplete: Bool = false
 
     init(weekStartDate: Date) {
         self.weekStartDate = weekStartDate.startOfWeek

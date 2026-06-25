@@ -3,11 +3,11 @@ import SwiftData
 
 @Model
 final class Medication {
-    var name: String
-    var dosage: String        // free text, e.g. "50 mg"
-    var startDate: Date
-    var endDate: Date?        // nil = ongoing
-    var notes: String
+    var name: String = ""
+    var dosage: String = ""        // free text, e.g. "50 mg"
+    var startDate: Date = Calendar.current.startOfDay(for: .now)
+    var endDate: Date?             // nil = ongoing
+    var notes: String = ""
 
     init(name: String, dosage: String = "", startDate: Date = .now, endDate: Date? = nil, notes: String = "") {
         self.name = name
