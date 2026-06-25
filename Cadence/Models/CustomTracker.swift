@@ -7,12 +7,14 @@ import SwiftData
 // doesn't orphan its history.
 @Model
 final class CustomTracker {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var minValue: Int
-    var maxValue: Int
-    var unit: String
-    var sortOrder: Int
+    // id is a UUID (unique by construction); the DB-level unique constraint is
+    // dropped for CloudKit compatibility.
+    var id: UUID = UUID()
+    var name: String = ""
+    var minValue: Int = 0
+    var maxValue: Int = 10
+    var unit: String = ""
+    var sortOrder: Int = 0
 
     init(id: UUID = UUID(), name: String, minValue: Int = 0, maxValue: Int = 10, unit: String = "", sortOrder: Int = 0) {
         self.id = id

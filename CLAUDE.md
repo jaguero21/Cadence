@@ -63,10 +63,16 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   midnight rollover re-inits the child with a new window — updating the `@Query`
   in place. Do **not** reintroduce `.id(dayId)`: changing identity tears the
   subtree down and drops open sheets / scroll state.
-- **Persistence resilience.** `sharedModelContainer` falls back to in-memory
-  storage if the persistent store fails, then to `StorageFatalErrorView` if even
-  that fails. `save()` methods return `Bool`, revert mutated state on failure,
-  and surface a `saveError`; orphan/rollback cleanup happens at `.onDisappear`.
+- **Persistence resilience.** `sharedModelContainer` tries a **CloudKit-mirrored**
+  store first (`cloudKitDatabase: .automatic`), then a local-only persistent
+  store (used when the iCloud entitlement is absent), then in-memory, then
+  `StorageFatalErrorView`. `save()` methods return `Bool`, revert mutated state
+  on failure, and surface a `saveError`; orphan/rollback cleanup at `.onDisappear`.
+- **CloudKit constraints.** Because of CloudKit mirroring, models carry **no
+  `@Attribute(.unique)`** and every non-optional attribute has an **inline default
+  value** (both are hard CloudKit requirements). Uniqueness/dedup is enforced in
+  code instead (fetch-before-insert for the day/week log, `InsightRecorder` by
+  key, UUID ids). Don't reintroduce `.unique` or drop the inline defaults.
 
 ## Conventions
 
