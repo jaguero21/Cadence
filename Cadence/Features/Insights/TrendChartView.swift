@@ -5,6 +5,7 @@ struct TrendChartView: View {
     let logs: [DailyLog]   // pre-filtered and sorted ascending by caller
     let metric: ChartMetric
     let range: InsightsViewModel.ChartRange
+    var previousLogs: [DailyLog] = []   // same-length window immediately before, for comparison
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -13,6 +14,7 @@ struct TrendChartView: View {
                     .font(.headline)
                     .foregroundStyle(metric.color)
                 Spacer()
+                comparisonBadge
                 if let avg = average {
                     Text("Avg: \(String(format: "%.1f", avg))")
                         .font(.caption.weight(.semibold))
@@ -20,26 +22,39 @@ struct TrendChartView: View {
                 }
             }
 
-            Chart(logs) { log in
-                AreaMark(
-                    x: .value("Date", log.date),
-                    y: .value(metric.label, metric.value(for: log))
-                )
-                .foregroundStyle(metric.color.opacity(0.15))
+            Chart {
+                ForEach(logs) { log in
+                    AreaMark(
+                        x: .value("Date", log.date),
+                        y: .value(metric.label, metric.value(for: log))
+                    )
+                    .foregroundStyle(metric.color.opacity(0.15))
 
-                LineMark(
-                    x: .value("Date", log.date),
-                    y: .value(metric.label, metric.value(for: log))
-                )
-                .foregroundStyle(metric.color)
-                .interpolationMethod(.catmullRom)
+                    LineMark(
+                        x: .value("Date", log.date),
+                        y: .value(metric.label, metric.value(for: log))
+                    )
+                    .foregroundStyle(metric.color)
+                    .interpolationMethod(.catmullRom)
 
-                PointMark(
-                    x: .value("Date", log.date),
-                    y: .value(metric.label, metric.value(for: log))
-                )
-                .foregroundStyle(metric.color)
-                .symbolSize(25)
+                    PointMark(
+                        x: .value("Date", log.date),
+                        y: .value(metric.label, metric.value(for: log))
+                    )
+                    .foregroundStyle(metric.color)
+                    .symbolSize(25)
+                }
+
+                if let avg = average {
+                    RuleMark(y: .value("Average", avg))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        .foregroundStyle(metric.color.opacity(0.5))
+                        .annotation(position: .topLeading, alignment: .leading) {
+                            Text("avg \(String(format: "%.1f", avg))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                }
             }
             .chartYScale(domain: metric.yDomain)
             .chartXAxis {
@@ -53,8 +68,27 @@ struct TrendChartView: View {
         .cadenceCard()
     }
 
-    private var average: Double? {
-        let values = logs.map { metric.value(for: $0) }
+    @ViewBuilder
+    private var comparisonBadge: some View {
+        if let avg = average, let prev = previousAverage {
+            let delta = avg - prev
+            if abs(delta) >= 0.05 {
+                let improved = metric.isImprovement(delta: delta)
+                HStack(spacing: 2) {
+                    Image(systemName: delta > 0 ? "arrow.up.right" : "arrow.down.right")
+                    Text(String(format: "%+.1f", delta))
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(improved ? CadenceColor.successGreen : CadenceColor.stressRed)
+                .accessibilityLabel("\(improved ? "Improved" : "Worsened") by \(String(format: "%.1f", abs(delta))) versus the previous \(range.voiceLabel)")
+            }
+        }
+    }
+
+    private var average: Double? { Self.mean(logs.map { metric.value(for: $0) }) }
+    private var previousAverage: Double? { Self.mean(previousLogs.map { metric.value(for: $0) }) }
+
+    static func mean(_ values: [Double]) -> Double? {
         guard !values.isEmpty else { return nil }
         return values.reduce(0, +) / Double(values.count)
     }
@@ -95,6 +129,19 @@ enum ChartMetric: CaseIterable {
         case .mood:   return 1...5
         case .energy, .sleep, .stress: return 0...10
         }
+    }
+
+    // For stress, a lower value is the desirable direction; for the rest, higher.
+    var higherIsBetter: Bool {
+        switch self {
+        case .mood, .energy, .sleep: return true
+        case .stress: return false
+        }
+    }
+
+    // Whether a change of `delta` (current minus previous average) is an improvement.
+    func isImprovement(delta: Double) -> Bool {
+        (delta > 0) == higherIsBetter
     }
 
     func value(for log: DailyLog) -> Double {

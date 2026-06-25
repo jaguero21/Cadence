@@ -26,6 +26,8 @@
 	<string>Cadence reads your sleep, heart rate, and activity data to automatically fill in your daily log and surface health patterns.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Cadence can optionally write your mood log as a HealthKit entry so it appears alongside your other health data.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Cadence uses the microphone so you can attach short voice notes to a daily log.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
