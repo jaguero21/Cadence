@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 import OSLog
 
 struct LogInputFlow: View {
@@ -29,6 +30,10 @@ struct LogInputFlow: View {
     @State private var basicsCompleted: [String] = []
     @State private var selectedFactors: [String] = []
     @State private var customValues: [UUID: Int] = [:]
+    @State private var attachments: [Attachment] = []
+    @State private var photoItem: PhotosPickerItem?
+    @State private var audioRecorder = AudioRecorder()
+    private let attachmentStore = AttachmentStore()
     @State private var freeNote: String = ""
     @State private var hkSnapshot: HealthKitSnapshot?
     @State private var isHydrated = false
@@ -88,6 +93,7 @@ struct LogInputFlow: View {
                     selectedSymptoms = log.symptoms
                     selectedFactors  = log.factors
                     customValues     = Dictionary(log.customMetrics.map { ($0.trackerID, $0.value) }, uniquingKeysWith: { a, _ in a })
+                    attachments      = log.attachments
                     freeNote         = log.freeNote
                 } else {
                     hkTask = Task { await applyHealthKitData() }
@@ -381,8 +387,103 @@ struct LogInputFlow: View {
             .lineLimit(4...8)
             .padding(12)
             .background(Color(.systemFill), in: RoundedRectangle(cornerRadius: 10))
+
+            photosSection
         }
         .cadenceCard()
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            Task { await addPhoto(item) }
+        }
+    }
+
+    private var photosSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 20) {
+                PhotosPicker(selection: $photoItem, matching: .images, photoLibrary: .shared()) {
+                    Label("Add photo", systemImage: "photo.badge.plus")
+                        .font(.subheadline)
+                        .foregroundStyle(CadenceColor.accent)
+                }
+                Button {
+                    toggleRecording()
+                } label: {
+                    Label(audioRecorder.isRecording ? "Stop recording" : "Voice note",
+                          systemImage: audioRecorder.isRecording ? "stop.circle.fill" : "mic.badge.plus")
+                        .font(.subheadline)
+                        .foregroundStyle(audioRecorder.isRecording ? CadenceColor.stressRed : CadenceColor.accent)
+                }
+            }
+
+            ForEach(attachments.filter { $0.kind == .audio }) { note in
+                HStack(spacing: 10) {
+                    AudioPlaybackButton(url: attachmentStore.url(for: note.filename))
+                    Text("Voice note").font(.subheadline)
+                    Spacer()
+                    Button {
+                        removeAttachment(note)
+                    } label: {
+                        Image(systemName: "trash").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            let photos = attachments.filter { $0.kind == .photo }
+            if !photos.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(photos) { photo in
+                            if let data = attachmentStore.data(for: photo.filename),
+                               let image = UIImage(data: data) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 64, height: 64)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .overlay(alignment: .topTrailing) {
+                                        Button {
+                                            removeAttachment(photo)
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .foregroundStyle(.white, .black.opacity(0.5))
+                                        }
+                                        .padding(2)
+                                    }
+                                    .accessibilityLabel("Attached photo")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func addPhoto(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let filename = attachmentStore.save(data, fileExtension: "jpg") else { return }
+        attachments.append(Attachment(kind: .photo, filename: filename))
+        photoItem = nil
+    }
+
+    private func toggleRecording() {
+        if audioRecorder.isRecording {
+            guard let url = audioRecorder.stop(),
+                  let data = try? Data(contentsOf: url),
+                  let filename = attachmentStore.save(data, fileExtension: "m4a") else { return }
+            attachments.append(Attachment(kind: .audio, filename: filename))
+            try? FileManager.default.removeItem(at: url)
+        } else {
+            Task {
+                guard await audioRecorder.requestPermission() else { return }
+                audioRecorder.start()
+            }
+        }
+    }
+
+    private func removeAttachment(_ attachment: Attachment) {
+        attachmentStore.delete(attachment.filename)
+        attachments.removeAll { $0.id == attachment.id }
     }
 
     // MARK: - Done Step
@@ -503,6 +604,7 @@ struct LogInputFlow: View {
         log.symptoms        = selectedSymptoms
         log.factors         = selectedFactors
         log.customMetrics   = customValues.map { MetricEntry(trackerID: $0.key, value: $0.value) }
+        log.attachments     = attachments
         log.freeNote        = freeNote
         log.didEditMetrics  = didEditMetrics
         if let snapshot = hkSnapshot {
