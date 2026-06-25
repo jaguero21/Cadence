@@ -9,7 +9,8 @@ final class DashboardViewModel {
     var streak: Int = 0
     var latestInsight: InsightCard?
 
-    func refresh(logs: [DailyLog], reviews: [WeeklyReview], notifications: any NotificationServiceProtocol = NotificationService.shared) {
+    func refresh(logs: [DailyLog], reviews: [WeeklyReview], notifications: (any NotificationServiceProtocol)? = nil) {
+        let notifications = notifications ?? NotificationService.shared
         todayLog = logs.first { Calendar.current.isDateInToday($0.date) }
         thisWeekReview = reviews.first { $0.weekStartDate.isThisWeek }
         streak = computeStreak(from: logs)

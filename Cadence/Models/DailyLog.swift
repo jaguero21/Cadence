@@ -15,6 +15,7 @@ final class DailyLog {
     var basicsCompleted: [String]
     var factors: [String] = []   // contextual triggers logged that day (e.g. "Alcohol")
     var customMetrics: [MetricEntry] = []   // values for user-defined CustomTrackers
+    var attachments: [Attachment] = []      // photo/voice references; binaries live on disk
     var freeNote: String
     var isComplete: Bool
     var didEditMood: Bool

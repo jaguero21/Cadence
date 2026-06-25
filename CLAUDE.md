@@ -22,6 +22,13 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   Metrics step in `LogInputFlow`, managed in `CustomTrackersView`, averaged in
   the doctor PDF. Not yet wired into trend charts or `PatternEngine` (those are
   hardcoded to the built-in fields) — a known follow-up.
+- **Insight history & notifications:** detected `InsightCard`s are persisted as
+  `InsightRecord` (deduped by title) via `InsightRecorder.record(_:context:)`,
+  which returns only the newly-emerged ones. `InsightsView` records on appear and
+  links to `InsightHistoryView`; `ContentView.checkForNewInsights()` runs on
+  foreground (Pro only) and fires `sendInsightNotification` for the top new
+  high-confidence pattern. Recording is idempotent, so users are notified once
+  per pattern.
 - **Flares:** `Flare` (`startDate`/optional `endDate`/`peakSeverity`/`note`) tracks
   multi-day symptom episodes; `durationDays` is inclusive and counts ongoing
   flares through today. Managed in `FlaresView` (Settings → Flares) and listed in
@@ -69,6 +76,27 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   (`PatternThreshold`, etc.). Don't hardcode these inline.
 - **Haptics:** `UINotificationFeedbackGenerator().notificationOccurred(...)` on
   successful saves.
+
+## Attachments
+
+- `DailyLog.attachments: [Attachment]` holds lightweight references; binaries live
+  on disk via `AttachmentStore` (Documents/Attachments, base dir injectable for
+  tests). Photos are added in the log's note step via `PhotosPicker` (no
+  permission prompt) and shown in `LogDetailView`.
+- Voice notes (`AttachmentKind.audio`) record via `AudioRecorder` and play via
+  `AudioPlaybackButton`/`AudioPlayback` (all in `Features/DailyLog/VoiceNote.swift`,
+  built on `AVAudioRecorder`/`AVAudioPlayer`). Needs `NSMicrophoneUsageDescription`
+  (in Info.plist). Compiles and drives the permission flow; **actual capture
+  should be verified on a device.**
+
+## Charts
+
+- `TrendChartView` draws each metric with an `average` `RuleMark` annotation and a
+  period-comparison badge: it takes the current window's `logs` plus the
+  equal-length `previousLogs` window (computed in `InsightsView`) and shows the
+  delta, colored by `ChartMetric.isImprovement(delta:)` (stress is inverted —
+  lower is better). `TrendChartView.mean` and `ChartMetric.isImprovement` are the
+  pure, unit-tested helpers.
 
 ## History
 
