@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import WidgetKit
 
 @MainActor
 @Observable
@@ -23,6 +24,14 @@ final class DashboardViewModel {
         } else {
             notifications.removeNotification(id: NotificationID.streakRisk)
         }
+
+        // Publish a summary for the home-screen widget and refresh its timeline.
+        WidgetData.write(WidgetData.Summary(
+            date: Calendar.current.startOfDay(for: .now),
+            loggedToday: todayLog?.isComplete == true,
+            streak: streak
+        ))
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     private func computeStreak(from logs: [DailyLog]) -> Int {
