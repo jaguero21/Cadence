@@ -63,10 +63,16 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   midnight rollover re-inits the child with a new window — updating the `@Query`
   in place. Do **not** reintroduce `.id(dayId)`: changing identity tears the
   subtree down and drops open sheets / scroll state.
-- **Persistence resilience.** `sharedModelContainer` falls back to in-memory
-  storage if the persistent store fails, then to `StorageFatalErrorView` if even
-  that fails. `save()` methods return `Bool`, revert mutated state on failure,
-  and surface a `saveError`; orphan/rollback cleanup happens at `.onDisappear`.
+- **Persistence resilience.** `sharedModelContainer` tries a **CloudKit-mirrored**
+  store first (`cloudKitDatabase: .automatic`), then a local-only persistent
+  store (used when the iCloud entitlement is absent), then in-memory, then
+  `StorageFatalErrorView`. `save()` methods return `Bool`, revert mutated state
+  on failure, and surface a `saveError`; orphan/rollback cleanup at `.onDisappear`.
+- **CloudKit constraints.** Because of CloudKit mirroring, models carry **no
+  `@Attribute(.unique)`** and every non-optional attribute has an **inline default
+  value** (both are hard CloudKit requirements). Uniqueness/dedup is enforced in
+  code instead (fetch-before-insert for the day/week log, `InsightRecorder` by
+  key, UUID ids). Don't reintroduce `.unique` or drop the inline defaults.
 
 ## Conventions
 
@@ -76,6 +82,32 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   (`PatternThreshold`, etc.). Don't hardcode these inline.
 - **Haptics:** `UINotificationFeedbackGenerator().notificationOccurred(...)` on
   successful saves.
+
+## Widget
+
+- `CadenceWidgetExtension` (folder `CadenceWidget/`, a synchronized file-system
+  group — files there auto-build for the widget, unlike the app target's explicit
+  references). Shows logging streak + today's check-in status.
+- App↔widget share via the **App Group** `group.com.carpecadence.app`:
+  `WidgetData` (in `CadenceWidget/WidgetData.swift`, added to *both* targets —
+  explicit ref for the app, sync group for the widget) writes/reads a small
+  `Summary` in the shared `UserDefaults` suite. `DashboardViewModel.refresh`
+  writes it and calls `WidgetCenter.reloadAllTimelines()`.
+- App bundle id is **`com.carpecadence.app`** (unified with the code's
+  `com.carpecadence` convention); widget is `com.carpecadence.app.CadenceWidget`.
+
+## Watch app
+
+- `CadenceWidget Watch App` target (folder of the same name, a synchronized
+  group) provides a wrist **quick-log**: mood + energy → "Save to iPhone".
+- Bridge is **WatchConnectivity** (App Groups don't cross devices). The watch's
+  `WatchConnectivityManager` sends a plain `[String: Any]` payload
+  (`mood`/`energy`/`date`) via `sendMessage`, falling back to `transferUserInfo`.
+  The phone's `PhoneConnectivityManager` (started in `CadenceApp` with the
+  container) receives it and **upserts today's `DailyLog`**, then reloads the
+  widget. No model types are shared across the targets — only the dict keys.
+- Watch deployment target is 26.2; live phone↔watch transfer needs paired
+  sims/devices to verify (compiles + structurally complete here).
 
 ## Attachments
 

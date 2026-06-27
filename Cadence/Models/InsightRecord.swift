@@ -6,13 +6,15 @@ import SwiftData
 // pattern. Deduped by `key` (the insight title, which is stable per pattern).
 @Model
 final class InsightRecord {
-    @Attribute(.unique) var key: String
-    var title: String
-    var detail: String
-    var category: String
-    var confidence: Double
-    var firstSeen: Date
-    var lastSeen: Date
+    // Dedupe by key happens in code (InsightRecorder.record); CloudKit forbids
+    // @Attribute(.unique).
+    var key: String = ""
+    var title: String = ""
+    var detail: String = ""
+    var category: String = ""
+    var confidence: Double = 0
+    var firstSeen: Date = Date.now
+    var lastSeen: Date = Date.now
 
     init(key: String, title: String, detail: String, category: String, confidence: Double, firstSeen: Date = .now, lastSeen: Date = .now) {
         self.key = key
