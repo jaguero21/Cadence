@@ -5,10 +5,10 @@ import SwiftData
 // chronic condition, distinct from a single day's log.
 @Model
 final class Flare {
-    var startDate: Date
+    var startDate: Date = Calendar.current.startOfDay(for: .now)
     var endDate: Date?       // nil = still ongoing
-    var peakSeverity: Int    // 1–10
-    var note: String
+    var peakSeverity: Int = 5    // 1–10
+    var note: String = ""
 
     init(startDate: Date = .now, endDate: Date? = nil, peakSeverity: Int = 5, note: String = "") {
         self.startDate = Calendar.current.startOfDay(for: startDate)

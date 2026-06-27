@@ -3,23 +3,26 @@ import SwiftData
 
 @Model
 final class DailyLog {
-    @Attribute(.unique) var date: Date
-    var symptoms: [SymptomEntry]
-    var mood: Int          // 1–5 (emoji scale)
-    var energy: Int        // 0–10
-    var painLevel: Int     // 0–10
-    var brainFogLevel: Int // 0–10
-    var sleepHours: Double
-    var sleepQuality: Int  // 0–10
-    var stressLevel: Int   // 0–10  (Anxiety in UI)
-    var basicsCompleted: [String]
+    // Inline defaults on every non-optional attribute are required for CloudKit
+    // mirroring. Per-day uniqueness is enforced in code (callers fetch today's
+    // log before creating one), not via @Attribute(.unique) — CloudKit forbids it.
+    var date: Date = Calendar.current.startOfDay(for: .now)
+    var symptoms: [SymptomEntry] = []
+    var mood: Int = 3          // 1–5 (emoji scale)
+    var energy: Int = 5        // 0–10
+    var painLevel: Int = 0     // 0–10
+    var brainFogLevel: Int = 0 // 0–10
+    var sleepHours: Double = 7.0
+    var sleepQuality: Int = 5  // 0–10
+    var stressLevel: Int = 5   // 0–10  (Anxiety in UI)
+    var basicsCompleted: [String] = []
     var factors: [String] = []   // contextual triggers logged that day (e.g. "Alcohol")
     var customMetrics: [MetricEntry] = []   // values for user-defined CustomTrackers
     var attachments: [Attachment] = []      // photo/voice references; binaries live on disk
-    var freeNote: String
-    var isComplete: Bool
-    var didEditMood: Bool
-    var didEditMetrics: Bool
+    var freeNote: String = ""
+    var isComplete: Bool = false
+    var didEditMood: Bool = false
+    var didEditMetrics: Bool = false
 
     // HealthKit-pulled data
     var hkSteps: Int?

@@ -19,8 +19,18 @@ struct CadenceApp: App {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self])
-        let persistentConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        if let container = try? ModelContainer(for: schema, configurations: [persistentConfig]) {
+        // CloudKit mirroring: syncs across the user's devices once the iCloud +
+        // CloudKit capability is enabled on the target. If the entitlement is
+        // absent (e.g. a build without iCloud), this init fails and we fall back
+        // to a local-only store below, so the app still works offline.
+        let cloudConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
+        if let container = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
+            return container
+        }
+        // Local-only persistent store (no CloudKit) — used when the iCloud
+        // entitlement isn't present or CloudKit setup fails.
+        let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        if let container = try? ModelContainer(for: schema, configurations: [localConfig]) {
             return container
         }
         CadenceApp.usingFallbackStorage = true
@@ -57,6 +67,7 @@ struct CadenceApp: App {
                 .environment(appState)
                 .environment(store)
                 .modelContainer(container)
+                .task { PhoneConnectivityManager.shared.start(container: container) }
             } else {
                 StorageFatalErrorView()
             }
