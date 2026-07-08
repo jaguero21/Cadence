@@ -19,6 +19,11 @@ struct CadenceApp: App {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self])
+        // UI tests get an isolated in-memory store so runs are deterministic.
+        if AppLaunch.isUITesting {
+            let testConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try? ModelContainer(for: schema, configurations: [testConfig])
+        }
         // CloudKit mirroring: syncs across the user's devices once the iCloud +
         // CloudKit capability is enabled on the target. If the entitlement is
         // absent (e.g. a build without iCloud), this init fails and we fall back
@@ -49,6 +54,8 @@ struct CadenceApp: App {
                     if appState.hasCompletedOnboarding {
                         ContentView()
                             .task {
+                                // No system permission prompts during UI tests.
+                                guard !AppLaunch.isUITesting else { return }
                                 appState.notificationsAuthorized = await NotificationService.shared.requestAuthorization()
                                 appState.healthKitAuthorized = (try? await HealthKitService.shared.requestAuthorization()) ?? HealthKitService.shared.isAuthorized
                                 if appState.notificationsAuthorized {
