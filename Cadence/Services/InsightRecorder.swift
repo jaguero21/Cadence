@@ -18,9 +18,13 @@ enum InsightRecorder {
             FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date >= cutoff })
         )) ?? []
         let medications = (try? context.fetch(FetchDescriptor<Medication>())) ?? []
+        let flares = (try? context.fetch(FetchDescriptor<Flare>())) ?? []
+        let trackers = (try? context.fetch(FetchDescriptor<CustomTracker>())) ?? []
         return PatternEngine.allInsights(
             from: logs.map(DailyLogSnapshot.init),
-            medications: medications.map(MedicationSnapshot.init)
+            medications: medications.map(MedicationSnapshot.init),
+            flares: flares.map(FlareSnapshot.init),
+            trackers: trackers.map(CustomTrackerSnapshot.init)
         )
     }
 
