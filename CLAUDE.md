@@ -20,8 +20,11 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `DailyLog.customMetrics: [MetricEntry]` keyed by the tracker's stable `id` (so
   renames don't orphan history). Logged via slider rows appended to the Body
   Metrics step in `LogInputFlow`, managed in `CustomTrackersView`, averaged in
-  the doctor PDF. Not yet wired into trend charts or `PatternEngine` (those are
-  hardcoded to the built-in fields) — a known follow-up.
+  the doctor PDF. Wired into `PatternEngine.trackerCorrelations` (mean-split
+  high/low days vs symptom count; key is `tracker:<uuid>` so renames update the
+  same insight) and into trend charts via `ChartSeries.custom` (days without an
+  entry are skipped, never drawn as zero; the comparison badge is neutral
+  because a custom tracker's desirable direction is unknowable).
 - **Insight history & notifications:** every `InsightCard` carries a **stable
   semantic `key`** (e.g. `med-effect:Sertraline`) set at the PatternEngine
   creation site — never derive identity from the display title, which changes
@@ -37,7 +40,11 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - **Flares:** `Flare` (`startDate`/optional `endDate`/`peakSeverity`/`note`) tracks
   multi-day symptom episodes; `durationDays` is inclusive and counts ongoing
   flares through today. Managed in `FlaresView` (Settings → Flares) and listed in
-  the doctor PDF.
+  the doctor PDF. `PatternEngine.flarePrecursors` compares the
+  `flarePrecursorWindowDays` run-up before each flare against baseline days
+  (in-flare days excluded from both sides) and surfaces stress-rise
+  (`flare-stress`) and sleep-dip (`flare-sleep`) early-warning cards; needs
+  `minimumFlaresForPattern` flares with run-up data.
 - **Factor (trigger) logging:** `DailyLog.factors: [String]` holds contextual
   triggers chosen from a fixed list (`LogInputFlow.factorItems`) in the `.factors`
   log step — same hardcoded-list pattern as `basicsCompleted` (no model).
@@ -145,12 +152,15 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 
 ## Charts
 
-- `TrendChartView` draws each metric with an `average` `RuleMark` annotation and a
-  period-comparison badge: it takes the current window's `logs` plus the
-  equal-length `previousLogs` window (computed in `InsightsView`) and shows the
-  delta, colored by `ChartMetric.isImprovement(delta:)` (stress is inverted —
-  lower is better; badge threshold in `ChartThreshold`). `TrendChartView.mean`
-  and `ChartMetric.isImprovement` are the pure, unit-tested helpers.
+- `TrendChartView` draws a `ChartSeries` (label/color/domain + a per-log value
+  extractor returning `nil` for no-data days) with an `average` `RuleMark`
+  annotation and a period-comparison badge: it takes the current window's `logs`
+  plus the equal-length `previousLogs` window (computed in `InsightsView`) and
+  shows the delta. Built-ins map via `ChartMetric.series` (stress is inverted —
+  lower is better); custom trackers via `ChartSeries.custom`, whose
+  `higherIsBetter` is `nil` → neutral badge. Badge threshold in
+  `ChartThreshold`. `TrendChartView.mean`, `ChartMetric.isImprovement`, and
+  `ChartSeries.isImprovement` are the pure, unit-tested helpers.
 - `InsightsView`'s `@Query` spans **2× the largest chart window** (180 days) so
   `previousLogs` has data for the 90D comparison; keep it at 2× if ranges
   change (`ChartRange.days` is the per-range source of truth). Insight

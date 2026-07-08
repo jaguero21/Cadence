@@ -49,4 +49,10 @@ struct CustomTrackerSnapshot: Sendable {
         name = tracker.name
         unit = tracker.unit
     }
+
+    init(id: UUID, name: String, unit: String = "") {
+        self.id = id
+        self.name = name
+        self.unit = unit
+    }
 }

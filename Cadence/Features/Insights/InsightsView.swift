@@ -4,6 +4,8 @@ import SwiftData
 struct InsightsView: View {
     @Query private var logs: [DailyLog]
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
+    @Query(sort: \Flare.startDate, order: .reverse) private var flares: [Flare]
+    @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
     @State private var vm = InsightsViewModel()
 
     // referenceDate anchors the query window so it refreshes in place at a
@@ -52,6 +54,8 @@ struct InsightsView: View {
             .onAppear { refreshAndRecord() }
             .onChange(of: logs) { _, _ in refreshAndRecord() }
             .onChange(of: medications) { _, _ in refreshAndRecord() }
+            .onChange(of: flares) { _, _ in refreshAndRecord() }
+            .onChange(of: customTrackers) { _, _ in refreshAndRecord() }
         }
     }
 
@@ -64,7 +68,7 @@ struct InsightsView: View {
     }
 
     private func refreshAndRecord() {
-        vm.refresh(logs: insightLogs, medications: medications)
+        vm.refresh(logs: insightLogs, medications: medications, flares: flares, trackers: customTrackers)
         if store.isPro {
             InsightRecorder.record(vm.insights, context: modelContext)
         }
@@ -94,7 +98,12 @@ struct InsightsView: View {
         let previous = previousLogs
         return VStack(spacing: 16) {
             ForEach(ChartMetric.allCases, id: \.self) { metric in
-                TrendChartView(logs: filtered, metric: metric, range: vm.chartRange, previousLogs: previous)
+                TrendChartView(logs: filtered, series: metric.series, range: vm.chartRange, previousLogs: previous)
+            }
+            // Custom trackers chart with the same average/comparison treatment;
+            // days without an entry are skipped, not drawn as zero.
+            ForEach(customTrackers) { tracker in
+                TrendChartView(logs: filtered, series: .custom(tracker), range: vm.chartRange, previousLogs: previous)
             }
         }
     }
