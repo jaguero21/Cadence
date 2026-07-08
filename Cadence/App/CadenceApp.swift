@@ -13,6 +13,9 @@ struct CadenceApp: App {
     static private(set) var usingFallbackStorage = false
     // Set when even the in-memory fallback failed; app runs without SwiftData.
     static private(set) var containerFailed = false
+    // Set when the CloudKit-mirrored store initialised (vs the local-only
+    // fallback). CloudSyncMonitor uses this to show a truthful sync status.
+    static private(set) var usingCloudKitStore = false
 
     var sharedModelContainer: ModelContainer? = {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
@@ -30,6 +33,7 @@ struct CadenceApp: App {
         // to a local-only store below, so the app still works offline.
         let cloudConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
         if let container = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
+            CadenceApp.usingCloudKitStore = true
             return container
         }
         // Local-only persistent store (no CloudKit) — used when the iCloud
