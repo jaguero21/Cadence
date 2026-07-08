@@ -14,12 +14,9 @@ struct TrendChartView: View {
                     .font(.headline)
                     .foregroundStyle(metric.color)
                 Spacer()
+                // The period average itself is annotated on the chart's RuleMark,
+                // so the header only carries the period-over-period badge.
                 comparisonBadge
-                if let avg = average {
-                    Text("Avg: \(String(format: "%.1f", avg))")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
             }
 
             Chart {
@@ -72,15 +69,20 @@ struct TrendChartView: View {
     private var comparisonBadge: some View {
         if let avg = average, let prev = previousAverage {
             let delta = avg - prev
-            if abs(delta) >= 0.05 {
+            if abs(delta) >= ChartThreshold.comparisonBadgeMinimumDelta {
                 let improved = metric.isImprovement(delta: delta)
+                // Built with String(localized:) so the direction words extract
+                // into the catalog; a bare ternary String would not localize.
+                let direction = improved
+                    ? String(localized: "Improved")
+                    : String(localized: "Worsened")
                 HStack(spacing: 2) {
                     Image(systemName: delta > 0 ? "arrow.up.right" : "arrow.down.right")
                     Text(String(format: "%+.1f", delta))
                 }
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(improved ? CadenceColor.successGreen : CadenceColor.stressRed)
-                .accessibilityLabel("\(improved ? "Improved" : "Worsened") by \(String(format: "%.1f", abs(delta))) versus the previous \(range.voiceLabel)")
+                .accessibilityLabel("\(direction) by \(String(format: "%.1f", abs(delta))) versus the previous \(range.voiceLabel)")
             }
         }
     }

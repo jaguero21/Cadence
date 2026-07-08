@@ -22,13 +22,18 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   Metrics step in `LogInputFlow`, managed in `CustomTrackersView`, averaged in
   the doctor PDF. Not yet wired into trend charts or `PatternEngine` (those are
   hardcoded to the built-in fields) — a known follow-up.
-- **Insight history & notifications:** detected `InsightCard`s are persisted as
-  `InsightRecord` (deduped by title) via `InsightRecorder.record(_:context:)`,
-  which returns only the newly-emerged ones. `InsightsView` records on appear and
-  links to `InsightHistoryView`; `ContentView.checkForNewInsights()` runs on
-  foreground (Pro only) and fires `sendInsightNotification` for the top new
-  high-confidence pattern. Recording is idempotent, so users are notified once
-  per pattern.
+- **Insight history & notifications:** every `InsightCard` carries a **stable
+  semantic `key`** (e.g. `med-effect:Sertraline`) set at the PatternEngine
+  creation site — never derive identity from the display title, which changes
+  (direction flips, copyedits, localization). `InsightRecord`s dedupe by that
+  key via `InsightRecorder.record(_:context:)`, which updates copy/confidence
+  in place, skips no-op saves, reports save failures via OSLog (returning `[]`
+  so nothing unpersisted is announced as new), and returns only newly-emerged
+  records. `InsightRecorder.currentInsights/detectAndRecord` is the **canonical
+  pipeline** (90-day window, `PatternThreshold.insightWindowDays`) used by both
+  the Insights tab and `ContentView.checkForNewInsights()` (Pro only, throttled
+  to once per calendar day via `UserDefaultsKey.lastInsightCheckDay`) so the
+  surfaces can never disagree about which patterns exist.
 - **Flares:** `Flare` (`startDate`/optional `endDate`/`peakSeverity`/`note`) tracks
   multi-day symptom episodes; `durationDays` is inclusive and counts ongoing
   flares through today. Managed in `FlaresView` (Settings → Flares) and listed in
@@ -71,8 +76,13 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - **CloudKit constraints.** Because of CloudKit mirroring, models carry **no
   `@Attribute(.unique)`** and every non-optional attribute has an **inline default
   value** (both are hard CloudKit requirements). Uniqueness/dedup is enforced in
-  code instead (fetch-before-insert for the day/week log, `InsightRecorder` by
-  key, UUID ids). Don't reintroduce `.unique` or drop the inline defaults.
+  code **at save time, not just at presentation time** — a sheet's captured
+  `existingLog`/`existingReview` can go stale while it's open (watch quick-log,
+  CloudKit import): `LogInputFlow.ensureLog()` re-fetches today's log before
+  creating one, `WeeklyReviewViewModel.save` merges into a persisted same-week
+  review, `seedSymptomTagsIfNeeded` dedupes by name against the store, and
+  `InsightRecorder` dedupes by key. Don't reintroduce `.unique`, drop the inline
+  defaults, or add an insert path without a save-time dedup check.
 
 ## Conventions
 
@@ -91,8 +101,15 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - App↔widget share via the **App Group** `group.com.carpecadence.app`:
   `WidgetData` (in `CadenceWidget/WidgetData.swift`, added to *both* targets —
   explicit ref for the app, sync group for the widget) writes/reads a small
-  `Summary` in the shared `UserDefaults` suite. `DashboardViewModel.refresh`
-  writes it and calls `WidgetCenter.reloadAllTimelines()`.
+  `Summary` in the shared `UserDefaults` suite.
+  `DashboardViewModel.publishWidgetSummary(logs:)` is the **single publish
+  point** — call it from any path that saves a `DailyLog` (dashboard refresh,
+  `LogInputFlow.partialSave`, watch quick-log). It skips the write *and* the
+  timeline reload when the summary is unchanged (reloads are system-budgeted);
+  never call `WidgetCenter.reloadAllTimelines()` without republishing first.
+  The widget's `Provider` validates `summary.date` before trusting it:
+  `loggedToday` only holds for a summary from today, and a streak survives
+  exactly one day past its summary.
 - App bundle id is **`com.carpecadence.app`** (unified with the code's
   `com.carpecadence` convention); widget is `com.carpecadence.app.CadenceWidget`.
 
@@ -102,10 +119,15 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   group) provides a wrist **quick-log**: mood + energy → "Save to iPhone".
 - Bridge is **WatchConnectivity** (App Groups don't cross devices). The watch's
   `WatchConnectivityManager` sends a plain `[String: Any]` payload
-  (`mood`/`energy`/`date`) via `sendMessage`, falling back to `transferUserInfo`.
-  The phone's `PhoneConnectivityManager` (started in `CadenceApp` with the
-  container) receives it and **upserts today's `DailyLog`**, then reloads the
-  widget. No model types are shared across the targets — only the dict keys.
+  (`mood`/`energy`/`date`) via `sendMessage` with a reply ack, falling back to
+  `transferUserInfo`; the UI reports **Sent** (acked) vs **Queued** truthfully,
+  and the session is activated at watch-app launch to avoid racing the first
+  tap. The phone's `PhoneConnectivityManager` (started in `CadenceApp` with the
+  container) **upserts the log for the payload's `date`** — a queued overnight
+  entry lands on the day it was recorded, never clobbering the new day — then
+  republishes the widget summary. No model types are shared across the targets;
+  `MoodScale` (in the watch folder, member of both targets) keeps the emoji
+  scale identical on both sides.
 - Watch deployment target is 26.2; live phone↔watch transfer needs paired
   sims/devices to verify (compiles + structurally complete here).
 
@@ -127,8 +149,12 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   period-comparison badge: it takes the current window's `logs` plus the
   equal-length `previousLogs` window (computed in `InsightsView`) and shows the
   delta, colored by `ChartMetric.isImprovement(delta:)` (stress is inverted —
-  lower is better). `TrendChartView.mean` and `ChartMetric.isImprovement` are the
-  pure, unit-tested helpers.
+  lower is better; badge threshold in `ChartThreshold`). `TrendChartView.mean`
+  and `ChartMetric.isImprovement` are the pure, unit-tested helpers.
+- `InsightsView`'s `@Query` spans **2× the largest chart window** (180 days) so
+  `previousLogs` has data for the 90D comparison; keep it at 2× if ranges
+  change (`ChartRange.days` is the per-range source of truth). Insight
+  computation still uses the canonical 90-day slice (`insightLogs`).
 
 ## History
 

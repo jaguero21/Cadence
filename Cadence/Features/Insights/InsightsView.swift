@@ -6,11 +6,14 @@ struct InsightsView: View {
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
     @State private var vm = InsightsViewModel()
 
-    // referenceDate anchors the 90-day window so it refreshes in place at a
-    // midnight rollover rather than via a full view rebuild.
+    // referenceDate anchors the query window so it refreshes in place at a
+    // midnight rollover rather than via a full view rebuild. The cutoff is 2×
+    // the largest chart window (180 days) — the previous-period comparison for
+    // the 90D range needs logs 90–180 days back; insight computation still uses
+    // the canonical 90-day slice (see insightLogs).
     init(referenceDate: Date = .now) {
         let day = Calendar.current.startOfDay(for: referenceDate)
-        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: day) ?? .distantPast
+        let cutoff = Calendar.current.date(byAdding: .day, value: -2 * PatternThreshold.insightWindowDays, to: day) ?? .distantPast
         _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
     }
     @Environment(StoreService.self) private var store
@@ -52,8 +55,16 @@ struct InsightsView: View {
         }
     }
 
+    // Insights compute over the canonical window (the @Query is wider — 180
+    // days — for chart comparisons), keeping this surface consistent with the
+    // foreground notification check in ContentView.
+    private var insightLogs: [DailyLog] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -PatternThreshold.insightWindowDays, to: .now) ?? .distantPast
+        return logs.filter { $0.date >= cutoff }
+    }
+
     private func refreshAndRecord() {
-        vm.refresh(logs: logs, medications: medications)
+        vm.refresh(logs: insightLogs, medications: medications)
         if store.isPro {
             InsightRecorder.record(vm.insights, context: modelContext)
         }
@@ -88,24 +99,16 @@ struct InsightsView: View {
         }
     }
 
-    private var windowDays: Int {
-        switch vm.chartRange {
-        case .sevenDay:  return 7
-        case .thirtyDay: return 30
-        case .ninetyDay: return 90
-        }
-    }
-
     private var filteredLogs: [DailyLog] {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -windowDays, to: .now) ?? .now
+        let cutoff = Calendar.current.date(byAdding: .day, value: -vm.chartRange.days, to: .now) ?? .now
         return logs.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
     }
 
     // The equal-length window immediately before the current one, for comparison.
     private var previousLogs: [DailyLog] {
         let cal = Calendar.current
-        let end = cal.date(byAdding: .day, value: -windowDays, to: .now) ?? .now
-        let start = cal.date(byAdding: .day, value: -2 * windowDays, to: .now) ?? .now
+        let end = cal.date(byAdding: .day, value: -vm.chartRange.days, to: .now) ?? .now
+        let start = cal.date(byAdding: .day, value: -2 * vm.chartRange.days, to: .now) ?? .now
         return logs.filter { $0.date >= start && $0.date < end }.sorted { $0.date < $1.date }
     }
 

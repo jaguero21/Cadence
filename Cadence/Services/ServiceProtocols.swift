@@ -13,6 +13,7 @@ import SwiftData
 protocol ModelPersisting {
     func insert<T: PersistentModel>(_ model: T)
     func delete<T: PersistentModel>(_ model: T)
+    func fetch<T: PersistentModel>(_ descriptor: FetchDescriptor<T>) throws -> [T]
     func save() throws
 }
 

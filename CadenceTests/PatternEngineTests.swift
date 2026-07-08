@@ -302,8 +302,8 @@ struct InsightRecorderTests {
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
-    private func card(_ title: String, confidence: Double = 0.8) -> InsightCard {
-        InsightCard(title: title, detail: "d", icon: "i", color: .red, confidence: confidence, category: .symptom)
+    private func card(_ title: String, key: String? = nil, confidence: Double = 0.8) -> InsightCard {
+        InsightCard(key: key ?? title, title: title, detail: "d", icon: "i", color: .red, confidence: confidence, category: .symptom)
     }
 
     @Test("First record of an insight is returned as newly created and persisted")
@@ -333,6 +333,20 @@ struct InsightRecorderTests {
         let new = InsightRecorder.record([card("A"), card("B")], context: context)
         #expect(new.count == 1)
         #expect(new.first?.title == "B")
+    }
+
+    // Regression: a medication insight flipping direction changes its TITLE but
+    // keeps its semantic key — it must update the same record in place, not
+    // mint a "new" pattern (which would re-fire the notification).
+    @Test("A title change under the same key updates in place, not as new")
+    func record_titleFlipSameKey_isNotNew() throws {
+        let context = try makeContext()
+        _ = InsightRecorder.record([card("Fewer symptoms since starting X", key: "med-effect:X")], context: context)
+        let flipped = InsightRecorder.record([card("More symptoms since starting X", key: "med-effect:X")], context: context)
+        #expect(flipped.isEmpty)
+        let stored = try context.fetch(FetchDescriptor<InsightRecord>())
+        #expect(stored.count == 1)
+        #expect(stored.first?.title == "More symptoms since starting X") // copy refreshed in place
     }
 }
 

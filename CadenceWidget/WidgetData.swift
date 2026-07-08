@@ -7,7 +7,7 @@ enum WidgetData {
     static let appGroup = "group.com.carpecadence.app"
     private static let key = "todaySummary"
 
-    struct Summary: Codable {
+    struct Summary: Codable, Equatable {
         var date: Date          // start of day the summary describes
         var loggedToday: Bool
         var streak: Int

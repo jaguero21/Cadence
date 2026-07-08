@@ -133,19 +133,20 @@ struct ContentView: View {
         }
     }
 
-    // On foreground, recompute insights, persist any newly-emerged patterns, and
-    // notify the user about the most confident new one (Pro only — insights are a
-    // Pro feature). Recording is idempotent, so this notifies once per pattern.
+    // On foreground, recompute insights via the shared pipeline (same 90-day
+    // window and inputs as the Insights tab, so a notification can never
+    // advertise a pattern the tab doesn't show), persist newly-emerged ones,
+    // and notify about the most confident new pattern (Pro only). Throttled to
+    // once per calendar day — patterns move on daily granularity, and running
+    // the engine on every unlock/app-switch is wasted main-thread work.
     private func checkForNewInsights() {
         guard store.isPro else { return }
-        let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
-        guard logs.count >= PatternThreshold.minimumLogs else { return }
-        let medications = (try? modelContext.fetch(FetchDescriptor<Medication>())) ?? []
-        let insights = PatternEngine.allInsights(
-            from: logs.map(DailyLogSnapshot.init),
-            medications: medications.map(MedicationSnapshot.init)
-        )
-        let new = InsightRecorder.record(insights, context: modelContext)
+        let startOfToday = Calendar.current.startOfDay(for: .now)
+        let lastCheck = UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay)
+        guard lastCheck != startOfToday.timeIntervalSinceReferenceDate else { return }
+        UserDefaults.standard.set(startOfToday.timeIntervalSinceReferenceDate, forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        let new = InsightRecorder.detectAndRecord(context: modelContext)
         if let top = new.filter({ $0.confidence >= PatternThreshold.minimumConfidence })
             .max(by: { $0.confidence < $1.confidence }) {
             notificationService.sendInsightNotification(title: top.title)
@@ -154,7 +155,14 @@ struct ContentView: View {
 
     private func seedSymptomTagsIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: symptomSeedKey) else { return }
-        for tag in SymptomTag.defaults { modelContext.insert(tag) }
+        // Dedup against tags already in the store (reinstall over an existing
+        // CloudKit database, or a sync that landed before first launch). A
+        // second device seeding before its first sync completes can still race;
+        // name-based dedup here covers every case where the data is visible.
+        let existingNames = Set(((try? modelContext.fetch(FetchDescriptor<SymptomTag>())) ?? []).map(\.name))
+        for tag in SymptomTag.defaults where !existingNames.contains(tag.name) {
+            modelContext.insert(tag)
+        }
         do {
             try modelContext.save()
             UserDefaults.standard.set(true, forKey: symptomSeedKey)
