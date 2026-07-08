@@ -24,8 +24,6 @@
 		30D5FC0958DF5823D7D5A9D6 /* WeeklyReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F477B83B1C570CD91200BB18 /* WeeklyReview.swift */; };
 		3831F66F2CF40135C9718707 /* SymptomTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B648EA00AEBF0DFCC18871A /* SymptomTag.swift */; };
 		3A33703C608D9B41673CD755 /* MetricSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */; };
-		AABBCCDD0000000000000210 /* AttachmentPhotoStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */; };
-		AABBCCDD0000000000000211 /* MoodScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000111 /* MoodScale.swift */; };
 		3D207A23376DB2750B758A61 /* DailyLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990D941EB5FC46F95C213CEE /* DailyLog.swift */; };
 		455141101502412D92E7CB50 /* ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493F590706A348D0857DA49A /* ServiceProtocols.swift */; };
 		46261271D23E287938897B70 /* DailyLogViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1622C330943A74E15575A681 /* DailyLogViewModel.swift */; };
@@ -46,8 +44,8 @@
 		AA11BB22CC33DD44EE55FF63 /* SchemaMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF03 /* SchemaMigrationTests.swift */; };
 		AA11BB22CC33DD44EE55FF64 /* HealthKitServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF04 /* HealthKitServiceTests.swift */; };
 		AA11BB22CC33DD44EE55FF66 /* ViewModelSaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */; };
-		AA11BB22CC33DD44EE55FF68 /* SeamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */; };
 		AA11BB22CC33DD44EE55FF67 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */; };
+		AA11BB22CC33DD44EE55FF68 /* SeamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */; };
 		AABBCCDD0000000000000201 /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000101 /* Medication.swift */; };
 		AABBCCDD0000000000000202 /* MedicationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000102 /* MedicationsView.swift */; };
 		AABBCCDD0000000000000203 /* Flare.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000103 /* Flare.swift */; };
@@ -63,6 +61,8 @@
 		AABBCCDD000000000000020D /* VoiceNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010D /* VoiceNote.swift */; };
 		AABBCCDD000000000000020E /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010E /* WidgetData.swift */; };
 		AABBCCDD000000000000020F /* PhoneConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */; };
+		AABBCCDD0000000000000210 /* AttachmentPhotoStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */; };
+		AABBCCDD0000000000000211 /* MoodScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000111 /* MoodScale.swift */; };
 		B52AE232D80E6360C8C86490 /* SymptomPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5792500A97EE8C382CEFDD9 /* SymptomPickerView.swift */; };
 		B6B76E4EF6D92F7B5179ADC8 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680C40C33549B696DF6BA3A5 /* WeeklyReviewView.swift */; };
 		B6EB3F0F0BE48CBDC5D5BA4A /* SwiftUI in Frameworks */ = {isa = PBXBuildFile; fileRef = A0D01DD5A2B033204335261E /* SwiftUI */; };
@@ -81,6 +81,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		2523F5F72FFEEB0F00F3F0A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9E1F3F9027B3FBC8AA55CA8E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4DC90E61DEB4E78C2EE8C78;
+			remoteInfo = Cadence;
+		};
 		25762D242FEDD6A100A132C8 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9E1F3F9027B3FBC8AA55CA8E /* Project object */;
@@ -137,6 +144,7 @@
 		1A7F46C62532314DD37DC860 /* HealthKitService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitService.swift; path = ./Cadence/Services/HealthKitService.swift; sourceTree = "<absolute>"; };
 		1C82A14983F2F53FA4220A9E /* ReviewFlowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ReviewFlowView.swift; path = ./Cadence/Features/WeeklyReview/ReviewFlowView.swift; sourceTree = "<absolute>"; };
 		20317D6C051870F466BF81F7 /* ExportView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExportView.swift; path = ./Cadence/Features/Export/ExportView.swift; sourceTree = "<absolute>"; };
+		2523F5F12FFEEB0F00F3F0A5 /* CadenceUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CadenceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2549A45A2FC8ED8D006CD546 /* Cadence.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Cadence.entitlements; sourceTree = "<group>"; };
 		2549A45B2FC8EF0A006CD546 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Cadence/Assets.xcassets; sourceTree = "<group>"; };
 		25762D152FEDD6A000A132C8 /* CadenceWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CadenceWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -169,8 +177,8 @@
 		AA11BB22CC33DD44EE55FF04 /* HealthKitServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitServiceTests.swift; path = ./CadenceTests/HealthKitServiceTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF05 /* CadenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CadenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ViewModelSaveTests.swift; path = ./CadenceTests/ViewModelSaveTests.swift; sourceTree = "<absolute>"; };
-		AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SeamTests.swift; path = ./CadenceTests/SeamTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotificationServiceTests.swift; path = ./CadenceTests/NotificationServiceTests.swift; sourceTree = "<absolute>"; };
+		AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SeamTests.swift; path = ./CadenceTests/SeamTests.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000101 /* Medication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Medication.swift; path = ./Cadence/Models/Medication.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000102 /* MedicationsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MedicationsView.swift; path = ./Cadence/Features/Settings/MedicationsView.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000103 /* Flare.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Flare.swift; path = ./Cadence/Models/Flare.swift; sourceTree = "<absolute>"; };
@@ -186,6 +194,8 @@
 		AABBCCDD000000000000010D /* VoiceNote.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VoiceNote.swift; path = ./Cadence/Features/DailyLog/VoiceNote.swift; sourceTree = "<absolute>"; };
 		AABBCCDD000000000000010E /* WidgetData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WidgetData.swift; path = ./CadenceWidget/WidgetData.swift; sourceTree = "<absolute>"; };
 		AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PhoneConnectivityManager.swift; path = ./Cadence/Services/PhoneConnectivityManager.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AttachmentPhotoStrip.swift; path = ./Cadence/Shared/Components/AttachmentPhotoStrip.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000111 /* MoodScale.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MoodScale.swift; path = "./CadenceWidget Watch App/MoodScale.swift"; sourceTree = "<absolute>"; };
 		ABD3C5951CAE74F5C1693742 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ADCC6B77E8E1D5DB3D6A5BDA /* HealthKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogInputFlow.swift; path = ./Cadence/Features/DailyLog/LogInputFlow.swift; sourceTree = "<absolute>"; };
@@ -198,8 +208,6 @@
 		D6A78715684ABBEB502D55E2 /* Charts */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
 		DCD1D6BAE9337E36C2D398B6 /* InsightsViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightsViewModel.swift; path = ./Cadence/Features/Insights/InsightsViewModel.swift; sourceTree = "<absolute>"; };
 		E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricSlider.swift; path = ./Cadence/Shared/Components/MetricSlider.swift; sourceTree = "<absolute>"; };
-		AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AttachmentPhotoStrip.swift; path = ./Cadence/Shared/Components/AttachmentPhotoStrip.swift; sourceTree = "<absolute>"; };
-		AABBCCDD0000000000000111 /* MoodScale.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MoodScale.swift; path = "./CadenceWidget Watch App/MoodScale.swift"; sourceTree = "<absolute>"; };
 		E7E30F7C88B6A00D34FE6223 /* PDFKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = PDFKit; path = System/Library/Frameworks/PDFKit.framework; sourceTree = SDKROOT; };
 		EA2C9315ED942B187FB6B889 /* DailyLogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DailyLogView.swift; path = ./Cadence/Features/DailyLog/DailyLogView.swift; sourceTree = "<absolute>"; };
 		EB8A65FA882473E559C0012B /* SwiftData */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftData; path = System/Library/Frameworks/SwiftData.framework; sourceTree = SDKROOT; };
@@ -219,11 +227,19 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		2523F5F22FFEEB0F00F3F0A5 /* CadenceUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CadenceUITests; sourceTree = "<group>"; };
 		25762D1A2FEDD6A000A132C8 /* CadenceWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (25762D2A2FEDD6A100A132C8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = CadenceWidget; sourceTree = "<group>"; };
 		25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "CadenceWidget Watch App"; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		2523F5EE2FFEEB0F00F3F0A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		25762D122FEDD6A000A132C8 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -318,6 +334,7 @@
 				AA11BB22CC33DD44EE55FF05 /* CadenceTests.xctest */,
 				25762D152FEDD6A000A132C8 /* CadenceWidgetExtension.appex */,
 				25762D652FEDDF5200A132C8 /* CadenceWidget Watch App.app */,
+				2523F5F12FFEEB0F00F3F0A5 /* CadenceUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -400,6 +417,7 @@
 				CCAADDEE00000000000000F1 /* Localizable.xcstrings */,
 				25762D1A2FEDD6A000A132C8 /* CadenceWidget */,
 				25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */,
+				2523F5F22FFEEB0F00F3F0A5 /* CadenceUITests */,
 				4E4C6FC200133FE2F1445DD3 /* Products */,
 				952AD024FE81537D998956A8 /* Frameworks */,
 				277D24392416FE5F01264815 /* Cadence */,
@@ -510,6 +528,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		2523F5F02FFEEB0F00F3F0A5 /* CadenceUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2523F5FB2FFEEB0F00F3F0A5 /* Build configuration list for PBXNativeTarget "CadenceUITests" */;
+			buildPhases = (
+				2523F5ED2FFEEB0F00F3F0A5 /* Sources */,
+				2523F5EE2FFEEB0F00F3F0A5 /* Frameworks */,
+				2523F5EF2FFEEB0F00F3F0A5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2523F5F82FFEEB0F00F3F0A5 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				2523F5F22FFEEB0F00F3F0A5 /* CadenceUITests */,
+			);
+			name = CadenceUITests;
+			packageProductDependencies = (
+			);
+			productName = CadenceUITests;
+			productReference = 2523F5F12FFEEB0F00F3F0A5 /* CadenceUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		25762D142FEDD6A000A132C8 /* CadenceWidgetExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 25762D2B2FEDD6A100A132C8 /* Build configuration list for PBXNativeTarget "CadenceWidgetExtension" */;
@@ -602,6 +643,10 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					2523F5F02FFEEB0F00F3F0A5 = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = B4DC90E61DEB4E78C2EE8C78;
+					};
 					25762D142FEDD6A000A132C8 = {
 						CreatedOnToolsVersion = 26.4;
 					};
@@ -627,11 +672,19 @@
 				AA11BB22CC33DD44EE55FFA0 /* CadenceTests */,
 				25762D142FEDD6A000A132C8 /* CadenceWidgetExtension */,
 				25762D642FEDDF5200A132C8 /* CadenceWidget Watch App */,
+				2523F5F02FFEEB0F00F3F0A5 /* CadenceUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		2523F5EF2FFEEB0F00F3F0A5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		25762D132FEDD6A000A132C8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -658,6 +711,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		2523F5ED2FFEEB0F00F3F0A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		25762D112FEDD6A000A132C8 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -746,6 +806,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		2523F5F82FFEEB0F00F3F0A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4DC90E61DEB4E78C2EE8C78 /* Cadence */;
+			targetProxy = 2523F5F72FFEEB0F00F3F0A5 /* PBXContainerItemProxy */;
+		};
 		25762D252FEDD6A100A132C8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 25762D142FEDD6A000A132C8 /* CadenceWidgetExtension */;
@@ -764,6 +829,60 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		2523F5F92FFEEB0F00F3F0A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4NWCR79S38;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jamesaguero.CadenceUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Cadence;
+			};
+			name = Debug;
+		};
+		2523F5FA2FFEEB0F00F3F0A5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4NWCR79S38;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jamesaguero.CadenceUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Cadence;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		25762D282FEDD6A100A132C8 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1161,6 +1280,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		2523F5FB2FFEEB0F00F3F0A5 /* Build configuration list for PBXNativeTarget "CadenceUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2523F5F92FFEEB0F00F3F0A5 /* Debug */,
+				2523F5FA2FFEEB0F00F3F0A5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		25762D2B2FEDD6A100A132C8 /* Build configuration list for PBXNativeTarget "CadenceWidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

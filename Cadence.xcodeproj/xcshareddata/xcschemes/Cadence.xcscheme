@@ -48,6 +48,19 @@
             default = "YES">
          </TestPlanReference>
       </TestPlans>
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2523F5F02FFEEB0F00F3F0A5"
+               BuildableName = "CadenceUITests.xctest"
+               BlueprintName = "CadenceUITests"
+               ReferencedContainer = "container:Cadence.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
