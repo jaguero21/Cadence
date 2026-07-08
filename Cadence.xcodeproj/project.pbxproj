@@ -46,6 +46,7 @@
 		AA11BB22CC33DD44EE55FF66 /* ViewModelSaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */; };
 		AA11BB22CC33DD44EE55FF67 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */; };
 		AA11BB22CC33DD44EE55FF68 /* SeamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */; };
+		AA11BB22CC33DD44EE55FF69 /* BackupServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF09 /* BackupServiceTests.swift */; };
 		AABBCCDD0000000000000201 /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000101 /* Medication.swift */; };
 		AABBCCDD0000000000000202 /* MedicationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000102 /* MedicationsView.swift */; };
 		AABBCCDD0000000000000203 /* Flare.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000103 /* Flare.swift */; };
@@ -63,6 +64,9 @@
 		AABBCCDD000000000000020F /* PhoneConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */; };
 		AABBCCDD0000000000000210 /* AttachmentPhotoStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */; };
 		AABBCCDD0000000000000211 /* MoodScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000111 /* MoodScale.swift */; };
+		AABBCCDD0000000000000212 /* CloudSyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000112 /* CloudSyncMonitor.swift */; };
+		AABBCCDD0000000000000213 /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000113 /* BackupService.swift */; };
+		AABBCCDD0000000000000214 /* SyncBackupSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000114 /* SyncBackupSection.swift */; };
 		B52AE232D80E6360C8C86490 /* SymptomPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5792500A97EE8C382CEFDD9 /* SymptomPickerView.swift */; };
 		B6B76E4EF6D92F7B5179ADC8 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680C40C33549B696DF6BA3A5 /* WeeklyReviewView.swift */; };
 		B6EB3F0F0BE48CBDC5D5BA4A /* SwiftUI in Frameworks */ = {isa = PBXBuildFile; fileRef = A0D01DD5A2B033204335261E /* SwiftUI */; };
@@ -179,6 +183,7 @@
 		AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ViewModelSaveTests.swift; path = ./CadenceTests/ViewModelSaveTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotificationServiceTests.swift; path = ./CadenceTests/NotificationServiceTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SeamTests.swift; path = ./CadenceTests/SeamTests.swift; sourceTree = "<absolute>"; };
+		AA11BB22CC33DD44EE55FF09 /* BackupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BackupServiceTests.swift; path = ./CadenceTests/BackupServiceTests.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000101 /* Medication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Medication.swift; path = ./Cadence/Models/Medication.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000102 /* MedicationsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MedicationsView.swift; path = ./Cadence/Features/Settings/MedicationsView.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000103 /* Flare.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Flare.swift; path = ./Cadence/Models/Flare.swift; sourceTree = "<absolute>"; };
@@ -196,6 +201,9 @@
 		AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PhoneConnectivityManager.swift; path = ./Cadence/Services/PhoneConnectivityManager.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AttachmentPhotoStrip.swift; path = ./Cadence/Shared/Components/AttachmentPhotoStrip.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000111 /* MoodScale.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MoodScale.swift; path = "./CadenceWidget Watch App/MoodScale.swift"; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000112 /* CloudSyncMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudSyncMonitor.swift; path = ./Cadence/Services/CloudSyncMonitor.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000113 /* BackupService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BackupService.swift; path = ./Cadence/Services/BackupService.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000114 /* SyncBackupSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyncBackupSection.swift; path = ./Cadence/Features/Settings/SyncBackupSection.swift; sourceTree = "<absolute>"; };
 		ABD3C5951CAE74F5C1693742 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ADCC6B77E8E1D5DB3D6A5BDA /* HealthKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogInputFlow.swift; path = ./Cadence/Features/DailyLog/LogInputFlow.swift; sourceTree = "<absolute>"; };
@@ -356,6 +364,7 @@
 				AABBCCDD0000000000000102 /* MedicationsView.swift */,
 				AABBCCDD0000000000000104 /* FlaresView.swift */,
 				AABBCCDD0000000000000106 /* CustomTrackersView.swift */,
+				AABBCCDD0000000000000114 /* SyncBackupSection.swift */,
 			);
 			name = Settings;
 			path = ./Cadence/Features/Settings;
@@ -476,6 +485,7 @@
 				AA11BB22CC33DD44EE55FF04 /* HealthKitServiceTests.swift */,
 				AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */,
 				AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */,
+				AA11BB22CC33DD44EE55FF09 /* BackupServiceTests.swift */,
 				AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */,
 			);
 			name = CadenceTests;
@@ -502,6 +512,8 @@
 				3F0989CA66FE09F78B729A4E /* PatternEngine.swift */,
 				AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */,
 				AABBCCDD0000000000000109 /* InsightRecorder.swift */,
+				AABBCCDD0000000000000112 /* CloudSyncMonitor.swift */,
+				AABBCCDD0000000000000113 /* BackupService.swift */,
 				AABBCCDD000000000000010C /* AttachmentStore.swift */,
 				493F590706A348D0857DA49A /* ServiceProtocols.swift */,
 				7F51B62D7D39FC0309276D9D /* StoreService.swift */,
@@ -782,6 +794,9 @@
 				AABBCCDD000000000000020F /* PhoneConnectivityManager.swift in Sources */,
 				AABBCCDD0000000000000208 /* InsightRecord.swift in Sources */,
 				AABBCCDD0000000000000209 /* InsightRecorder.swift in Sources */,
+				AABBCCDD0000000000000212 /* CloudSyncMonitor.swift in Sources */,
+				AABBCCDD0000000000000213 /* BackupService.swift in Sources */,
+				AABBCCDD0000000000000214 /* SyncBackupSection.swift in Sources */,
 				AABBCCDD000000000000020A /* InsightHistoryView.swift in Sources */,
 				AABBCCDD000000000000020B /* Attachment.swift in Sources */,
 				AABBCCDD000000000000020C /* AttachmentStore.swift in Sources */,
@@ -799,6 +814,7 @@
 				AA11BB22CC33DD44EE55FF64 /* HealthKitServiceTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF66 /* ViewModelSaveTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF68 /* SeamTests.swift in Sources */,
+				AA11BB22CC33DD44EE55FF69 /* BackupServiceTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF67 /* NotificationServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
