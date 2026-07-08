@@ -2,19 +2,11 @@ import WidgetKit
 import SwiftUI
 
 struct Provider: TimelineProvider {
-    // The stored summary describes the day it was written (summary.date). The
-    // post-midnight refresh re-reads the same stored value, so staleness must
-    // be resolved here: "logged today" only holds if the summary IS from today,
-    // and a streak survives exactly one day past its summary (yesterday's
-    // streak is still alive until tonight); anything older is broken → 0.
+    // Staleness resolution lives in WidgetData.resolved (shared with the app
+    // target and unit-tested there): the stored summary describes the day it
+    // was written and must be reinterpreted after midnight.
     private func currentSummary() -> WidgetData.Summary {
-        let cal = Calendar.current
-        guard let stored = WidgetData.read() else {
-            return WidgetData.Summary(date: .now, loggedToday: false, streak: 0)
-        }
-        if cal.isDateInToday(stored.date) { return stored }
-        let streak = cal.isDateInYesterday(stored.date) ? stored.streak : 0
-        return WidgetData.Summary(date: .now, loggedToday: false, streak: streak)
+        WidgetData.resolved(WidgetData.read())
     }
 
     func placeholder(in context: Context) -> CadenceEntry {
