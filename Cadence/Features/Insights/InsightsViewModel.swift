@@ -47,12 +47,14 @@ final class InsightsViewModel {
         var voiceLabel: String { "\(days) days" }
     }
 
-    func refresh(logs: [DailyLog], medications: [Medication] = []) {
+    func refresh(logs: [DailyLog], medications: [Medication] = [], flares: [Flare] = [], trackers: [CustomTracker] = []) {
         // Snapshot @Model values on the main actor before handing them to PatternEngine,
         // which is otherwise isolation-agnostic.
         insights = PatternEngine.allInsights(
             from: logs.map(DailyLogSnapshot.init),
-            medications: medications.map(MedicationSnapshot.init)
+            medications: medications.map(MedicationSnapshot.init),
+            flares: flares.map(FlareSnapshot.init),
+            trackers: trackers.map(CustomTrackerSnapshot.init)
         )
     }
 }

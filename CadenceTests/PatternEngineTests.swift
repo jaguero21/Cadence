@@ -15,6 +15,7 @@ private func makeSnapshot(
     stressLevel: Int = 5,
     symptoms: [SymptomEntry] = [],
     factors: [String] = [],
+    customMetrics: [MetricEntry] = [],
     didEditMetrics: Bool = false
 ) -> DailyLogSnapshot {
     let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)!
@@ -26,6 +27,7 @@ private func makeSnapshot(
         stressLevel: stressLevel,
         symptoms: symptoms,
         factors: factors,
+        customMetrics: customMetrics,
         didEditMetrics: didEditMetrics
     )
 }
@@ -852,5 +854,175 @@ struct DailyLogCompletionScoreTests {
         log.didEditMetrics = true
         log.freeNote = "A full log day"
         #expect(log.completionScore == 1.0)
+    }
+}
+
+// MARK: - PatternEngine: trackerCorrelations
+
+@Suite("PatternEngine – trackerCorrelations")
+struct TrackerCorrelationsTests {
+
+    private let trackerID = UUID()
+    private var tracker: CustomTrackerSnapshot {
+        CustomTrackerSnapshot(id: trackerID, name: "Screen time", unit: "hrs")
+    }
+
+    private func logs(highSymptoms: Int, lowSymptoms: Int) -> [DailyLogSnapshot] {
+        // 6 high-value days + 6 low-value days (mean = 5, so > / <= splits 6/6).
+        let high = (0..<6).map { makeSnapshot(
+            daysAgo: $0,
+            symptoms: (0..<highSymptoms).map { _ in headacheEntry() },
+            customMetrics: [MetricEntry(trackerID: trackerID, value: 8)]
+        ) }
+        let low = (6..<12).map { makeSnapshot(
+            daysAgo: $0,
+            symptoms: (0..<lowSymptoms).map { _ in headacheEntry() },
+            customMetrics: [MetricEntry(trackerID: trackerID, value: 2)]
+        ) }
+        return high + low
+    }
+
+    private func trackerCards(_ logs: [DailyLogSnapshot]) -> [InsightCard] {
+        PatternEngine.allInsights(from: logs, trackers: [tracker])
+            .filter { $0.key.hasPrefix("tracker:") }
+    }
+
+    @Test("More symptoms on high-value days surfaces a 'Higher' insight keyed by tracker id")
+    func highDirection() {
+        let cards = trackerCards(logs(highSymptoms: 2, lowSymptoms: 0))
+        #expect(cards.count == 1)
+        #expect(cards.first?.key == "tracker:\(trackerID.uuidString)")
+        #expect(cards.first?.title.contains("Higher") == true)
+    }
+
+    @Test("More symptoms on low-value days surfaces a 'Lower' insight")
+    func lowDirection() {
+        let cards = trackerCards(logs(highSymptoms: 0, lowSymptoms: 2))
+        #expect(cards.count == 1)
+        #expect(cards.first?.title.contains("Lower") == true)
+    }
+
+    @Test("No insight when the symptom delta is under the threshold")
+    func noDelta() {
+        let cards = trackerCards(logs(highSymptoms: 1, lowSymptoms: 1))
+        #expect(cards.isEmpty)
+    }
+
+    @Test("No insight with fewer than the minimum days per side")
+    func tooFewDays() {
+        // Only 4 entries per side (< minimumTrackerDays on each).
+        let all = logs(highSymptoms: 2, lowSymptoms: 0)
+        let thin = Array(all.prefix(4)) + Array(all.suffix(4))
+        #expect(trackerCards(thin).isEmpty)
+    }
+
+    @Test("Days without an entry for the tracker are ignored, not treated as zero")
+    func missingDaysIgnored() {
+        // 12 tracked days + 10 untracked symptom-free days; the untracked days
+        // must not dilute the low side into hiding the correlation.
+        let untracked = (12..<22).map { makeSnapshot(daysAgo: $0) }
+        let cards = trackerCards(logs(highSymptoms: 2, lowSymptoms: 0) + untracked)
+        #expect(cards.count == 1)
+    }
+}
+
+// MARK: - PatternEngine: flarePrecursors
+
+@Suite("PatternEngine – flarePrecursors")
+struct FlarePrecursorsTests {
+
+    private func day(_ daysAgo: Int) -> Date {
+        Calendar.current.startOfDay(for: Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)!)
+    }
+
+    // Two flares: days 20–18 ago and days 8–6 ago. Run-up windows are the 3
+    // days before each start (23–21 and 11–9 days ago).
+    private var flares: [FlareSnapshot] {
+        [
+            FlareSnapshot(startDate: day(20), endDate: day(18)),
+            FlareSnapshot(startDate: day(8), endDate: day(6)),
+        ]
+    }
+
+    private func logs(preStress: Int, baseStress: Int, preSleep: Double, baseSleep: Double) -> [DailyLogSnapshot] {
+        (0..<30).map { daysAgo in
+            let isPre = (21...23).contains(daysAgo) || (9...11).contains(daysAgo)
+            return makeSnapshot(
+                daysAgo: daysAgo,
+                sleepHours: isPre ? preSleep : baseSleep,
+                stressLevel: isPre ? preStress : baseStress
+            )
+        }
+    }
+
+    private func flareCards(_ logs: [DailyLogSnapshot], flares: [FlareSnapshot]) -> [InsightCard] {
+        PatternEngine.allInsights(from: logs, flares: flares)
+            .filter { $0.key.hasPrefix("flare-") }
+    }
+
+    @Test("Stress rising before flares surfaces flare-stress")
+    func stressPrecursor() {
+        let cards = flareCards(logs(preStress: 9, baseStress: 4, preSleep: 7.5, baseSleep: 7.5), flares: flares)
+        #expect(cards.map(\.key) == ["flare-stress"])
+    }
+
+    @Test("Sleep dipping before flares surfaces flare-sleep")
+    func sleepPrecursor() {
+        let cards = flareCards(logs(preStress: 5, baseStress: 5, preSleep: 5.0, baseSleep: 8.0), flares: flares)
+        #expect(cards.map(\.key) == ["flare-sleep"])
+    }
+
+    @Test("Both precursors can fire together")
+    func bothPrecursors() {
+        let cards = flareCards(logs(preStress: 9, baseStress: 4, preSleep: 5.0, baseSleep: 8.0), flares: flares)
+        #expect(Set(cards.map(\.key)) == ["flare-stress", "flare-sleep"])
+    }
+
+    @Test("A single flare is not enough")
+    func singleFlare() {
+        let cards = flareCards(
+            logs(preStress: 9, baseStress: 4, preSleep: 5.0, baseSleep: 8.0),
+            flares: [FlareSnapshot(startDate: day(8), endDate: day(6))]
+        )
+        #expect(cards.isEmpty)
+    }
+
+    @Test("No precursor when the run-up looks like baseline")
+    func noSignal() {
+        let cards = flareCards(logs(preStress: 5, baseStress: 5, preSleep: 7.5, baseSleep: 7.5), flares: flares)
+        #expect(cards.isEmpty)
+    }
+}
+
+// MARK: - ChartSeries
+
+@Suite("ChartSeries – custom trackers")
+@MainActor
+struct ChartSeriesTests {
+
+    @Test("isImprovement is nil when the desirable direction is unknown")
+    func neutralDirection() {
+        let series = ChartSeries.custom(CustomTracker(name: "Hydration", minValue: 0, maxValue: 8))
+        #expect(series.isImprovement(delta: 1.0) == nil)
+        #expect(series.isImprovement(delta: -1.0) == nil)
+    }
+
+    @Test("Built-in metrics keep a definite improvement direction")
+    func builtInDirection() {
+        #expect(ChartMetric.mood.series.isImprovement(delta: 1.0) == true)
+        #expect(ChartMetric.stress.series.isImprovement(delta: 1.0) == false)
+    }
+
+    @Test("value extracts the tracker's entry and is nil on unlogged days")
+    func valueExtraction() {
+        let tracker = CustomTracker(name: "Hydration", minValue: 0, maxValue: 8)
+        let series = ChartSeries.custom(tracker)
+        let logged = DailyLog(date: .now)
+        logged.customMetrics = [MetricEntry(trackerID: tracker.id, value: 6)]
+        let unlogged = DailyLog(date: .now)
+        #expect(series.value(logged) == 6)
+        #expect(series.value(unlogged) == nil)
+        // The tracker's declared range drives the chart's y-axis.
+        #expect(series.yDomain == 0...8)
     }
 }

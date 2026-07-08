@@ -82,6 +82,20 @@ enum PatternThreshold {
     static let minimumFactorDays: Int = 3
     static let factorSymptomDeltaThreshold: Double = 0.5
 
+    // Custom tracker correlation: minimum logged days on each side of the
+    // tracker's mean value before comparing, and the smallest difference in
+    // average daily symptom count worth surfacing.
+    static let minimumTrackerDays: Int = 5
+    static let trackerSymptomDeltaThreshold: Double = 0.5
+
+    // Flare precursors: minimum flares with pre-flare logs before comparing the
+    // run-up window against baseline days, and the smallest average stress rise
+    // / sleep drop in that window worth surfacing.
+    static let minimumFlaresForPattern: Int = 2
+    static let flarePrecursorWindowDays: Int = 3
+    static let flareStressDeltaThreshold: Double = 1.0
+    static let flareSleepDeltaThreshold: Double = 0.75
+
     // Canonical window for pattern detection. Every surface (Insights tab,
     // foreground notification check, insight history) computes over this window
     // so they can never disagree about which patterns exist.
