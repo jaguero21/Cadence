@@ -175,6 +175,26 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   (`timeIntervalSinceReferenceDate`, 0 = unset) so a report can be scoped to
   everything since the last visit.
 
+## Backup & iCloud status
+
+- **JSON backup/restore** (`BackupService`, driven from `SyncBackupSection` in
+  Settings; intentionally **not Pro-gated** — users own their data). The
+  versioned `Document` mirrors the user-entered models; insight history is
+  recomputable and attachment binaries live outside SwiftData, so neither is
+  included. `encode`/`decode` are pure and unit-tested (ISO8601 dates; decode
+  rejects documents from a newer format version). **Restore merges** — inserts
+  what the store lacks, never overwrites (logs by day, reviews by week start,
+  tags by name, meds by name+start, flares by start, trackers by `id`).
+  `CustomTracker.id` must round-trip: `DailyLog.customMetrics` is keyed by it.
+  Restore republishes the widget summary (it can change today's streak).
+- **Sync status**: `CloudSyncMonitor` (@MainActor singleton) folds
+  `NSPersistentCloudKitContainer.eventChangedNotification` events (SwiftData's
+  mirroring is built on that container) plus the CloudKit account status into
+  one `SyncState`. `CadenceApp.usingCloudKitStore` records whether the
+  CloudKit-backed store actually initialised (vs the local fallback) so the row
+  reads "Off — local storage" truthfully. The state fold (`stateAfterEvent`) is
+  pure and unit-tested; sync events outrank the account probe.
+
 ## Localization
 
 - Strings live in `Cadence/Localizable.xcstrings`. `SWIFT_EMIT_LOC_STRINGS` is

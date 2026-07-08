@@ -37,6 +37,7 @@ struct SettingsView: View {
                 symptomsSection
                 customTrackersSection
                 healthKitSection
+                SyncBackupSection()
                 aboutSection
                 #if DEBUG
                 debugSection
