@@ -22,10 +22,12 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
         WCSession.default.activate()
     }
 
-    @MainActor
-    private func applyQuickLog(_ payload: [String: Any]) {
-        guard let container, let mood = payload["mood"] as? Int else { return }
-        let context = container.mainContext
+    // Core upsert, static and context-injected so tests can exercise it against
+    // an in-memory container (the seam the watch↔phone bridge hinges on).
+    // Returns whether anything was persisted.
+    @discardableResult
+    static func applyQuickLog(_ payload: [String: Any], context: ModelContext) -> Bool {
+        guard let mood = payload["mood"] as? Int else { return false }
 
         // Attribute the entry to the day it was recorded on the wrist.
         let recordedAt = (payload["date"] as? TimeInterval).map(Date.init(timeIntervalSinceReferenceDate:)) ?? .now
@@ -50,12 +52,22 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
 
         do {
             try context.save()
+            return true
+        } catch {
+            Self.log.error("Failed to save watch quick-log: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    @MainActor
+    private func applyQuickLog(_ payload: [String: Any]) {
+        guard let container else { return }
+        let context = container.mainContext
+        if Self.applyQuickLog(payload, context: context) {
             // Publish a fresh widget summary — a bare timeline reload would
             // just republish the stale App Group data.
             let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
             DashboardViewModel.publishWidgetSummary(logs: logs)
-        } catch {
-            Self.log.error("Failed to save watch quick-log: \(error.localizedDescription)")
         }
     }
 
