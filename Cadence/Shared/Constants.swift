@@ -92,3 +92,10 @@ enum ChartThreshold {
     // Minimum period-over-period delta before the trend comparison badge shows.
     static let comparisonBadgeMinimumDelta: Double = 0.05
 }
+
+enum AppLaunch {
+    // Set by the UI test runner (see CadenceUITests). Switches the app to an
+    // in-memory store, fresh onboarding, and no permission prompts so UI tests
+    // are deterministic and never blocked by system dialogs.
+    static let isUITesting = ProcessInfo.processInfo.arguments.contains("--uitest")
+}

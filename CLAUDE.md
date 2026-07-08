@@ -193,7 +193,11 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 ## Testing
 
 - **Swift Testing**, not XCTest: `import Testing`, `@Suite`, `@Test`, `#expect`,
-  `#require`. (XCTest is not used.)
+  `#require`. Exception: **`CadenceUITests` is XCTest** (XCUIApplication has no
+  Swift Testing equivalent). The smoke test launches with `--uitest`, which
+  gives the app an in-memory store, fresh onboarding, and no permission
+  prompts (`AppLaunch.isUITesting`) — keep new UI-affecting launch behavior
+  behind that flag so UI runs stay deterministic.
 - SwiftData tests use an **in-memory `ModelContainer`** built from the same
   `Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self])`.
 - Any suite that calls a `@MainActor` singleton (e.g. `NotificationService.shared`)
