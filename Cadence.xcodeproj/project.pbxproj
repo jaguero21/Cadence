@@ -24,6 +24,8 @@
 		30D5FC0958DF5823D7D5A9D6 /* WeeklyReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F477B83B1C570CD91200BB18 /* WeeklyReview.swift */; };
 		3831F66F2CF40135C9718707 /* SymptomTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B648EA00AEBF0DFCC18871A /* SymptomTag.swift */; };
 		3A33703C608D9B41673CD755 /* MetricSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */; };
+		AABBCCDD0000000000000210 /* AttachmentPhotoStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */; };
+		AABBCCDD0000000000000211 /* MoodScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000111 /* MoodScale.swift */; };
 		3D207A23376DB2750B758A61 /* DailyLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990D941EB5FC46F95C213CEE /* DailyLog.swift */; };
 		455141101502412D92E7CB50 /* ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493F590706A348D0857DA49A /* ServiceProtocols.swift */; };
 		46261271D23E287938897B70 /* DailyLogViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1622C330943A74E15575A681 /* DailyLogViewModel.swift */; };
@@ -194,6 +196,8 @@
 		D6A78715684ABBEB502D55E2 /* Charts */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
 		DCD1D6BAE9337E36C2D398B6 /* InsightsViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightsViewModel.swift; path = ./Cadence/Features/Insights/InsightsViewModel.swift; sourceTree = "<absolute>"; };
 		E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricSlider.swift; path = ./Cadence/Shared/Components/MetricSlider.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AttachmentPhotoStrip.swift; path = ./Cadence/Shared/Components/AttachmentPhotoStrip.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000111 /* MoodScale.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MoodScale.swift; path = "./CadenceWidget Watch App/MoodScale.swift"; sourceTree = "<absolute>"; };
 		E7E30F7C88B6A00D34FE6223 /* PDFKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = PDFKit; path = System/Library/Frameworks/PDFKit.framework; sourceTree = SDKROOT; };
 		EA2C9315ED942B187FB6B889 /* DailyLogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DailyLogView.swift; path = ./Cadence/Features/DailyLog/DailyLogView.swift; sourceTree = "<absolute>"; };
 		EB8A65FA882473E559C0012B /* SwiftData */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftData; path = System/Library/Frameworks/SwiftData.framework; sourceTree = SDKROOT; };
@@ -425,6 +429,8 @@
 				AABBCCDD000000000000010E /* WidgetData.swift */,
 				5D8C849E3B044CB78A9DB7B5 /* EnvironmentValues+Services.swift */,
 				E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */,
+				AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */,
+				AABBCCDD0000000000000111 /* MoodScale.swift */,
 				0D51242137B1F8597625745E /* View+Extensions.swift */,
 			);
 			name = Shared;
@@ -684,6 +690,8 @@
 				4F352F41B25B06C32AA0BC05 /* Constants.swift in Sources */,
 				AABBCCDD000000000000020E /* WidgetData.swift in Sources */,
 				3A33703C608D9B41673CD755 /* MetricSlider.swift in Sources */,
+				AABBCCDD0000000000000210 /* AttachmentPhotoStrip.swift in Sources */,
+				AABBCCDD0000000000000211 /* MoodScale.swift in Sources */,
 				20230AD97F5885D21E64CA05 /* View+Extensions.swift in Sources */,
 				F5A197BE0882ED0B9566160F /* DashboardView.swift in Sources */,
 				8002299E6F1762F96BCC2BCD /* DashboardViewModel.swift in Sources */,

@@ -2,8 +2,19 @@ import WidgetKit
 import SwiftUI
 
 struct Provider: TimelineProvider {
-    private var fallback: WidgetData.Summary {
-        WidgetData.Summary(date: .now, loggedToday: false, streak: 0)
+    // The stored summary describes the day it was written (summary.date). The
+    // post-midnight refresh re-reads the same stored value, so staleness must
+    // be resolved here: "logged today" only holds if the summary IS from today,
+    // and a streak survives exactly one day past its summary (yesterday's
+    // streak is still alive until tonight); anything older is broken → 0.
+    private func currentSummary() -> WidgetData.Summary {
+        let cal = Calendar.current
+        guard let stored = WidgetData.read() else {
+            return WidgetData.Summary(date: .now, loggedToday: false, streak: 0)
+        }
+        if cal.isDateInToday(stored.date) { return stored }
+        let streak = cal.isDateInYesterday(stored.date) ? stored.streak : 0
+        return WidgetData.Summary(date: .now, loggedToday: false, streak: streak)
     }
 
     func placeholder(in context: Context) -> CadenceEntry {
@@ -11,12 +22,13 @@ struct Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CadenceEntry) -> Void) {
-        completion(CadenceEntry(date: .now, summary: WidgetData.read() ?? fallback))
+        completion(CadenceEntry(date: .now, summary: currentSummary()))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CadenceEntry>) -> Void) {
-        let entry = CadenceEntry(date: .now, summary: WidgetData.read() ?? fallback)
-        // Refresh after midnight so "today" status resets even if the app isn't opened.
+        let entry = CadenceEntry(date: .now, summary: currentSummary())
+        // Refresh after midnight so currentSummary() re-evaluates staleness for
+        // the new day even if the app isn't opened.
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
         let nextMidnight = Calendar.current.startOfDay(for: tomorrow)
         completion(Timeline(entries: [entry], policy: .after(nextMidnight)))
