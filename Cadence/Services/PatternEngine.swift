@@ -75,6 +75,7 @@ enum PatternEngine {
         guard confidence >= PatternThreshold.minimumConfidence else { return nil }
 
         return InsightCard(
+            key: "sleep-headache",
             title: "Poor sleep is linked to next-day headaches",
             detail: "On \(Int(observedRate * 100))% of days after sleeping under \(Int(PatternThreshold.poorSleepHours)) hours, you logged a headache the next day.",
             icon: "moon.zzz.fill",
@@ -156,6 +157,7 @@ enum PatternEngine {
         let confidence = wilsonLowerBound(successes: fatigueFollowed, total: streaksChecked)
         guard confidence >= PatternThreshold.minimumConfidence else { return nil }
         return InsightCard(
+            key: "stress-fatigue",
             title: "Extended stress streaks are followed by fatigue",
             detail: "When you log high stress 3+ consecutive days, a fatigue spike tends to follow.",
             icon: "brain.head.profile",
@@ -178,6 +180,7 @@ enum PatternEngine {
         guard drop > PatternThreshold.energyDropThreshold else { return nil }
         let confidence = min(drop / PatternThreshold.confidenceScale, 1.0)
         return InsightCard(
+            key: "energy-decline",
             title: "Energy declining week-over-week",
             detail: "Your average energy dropped from \(String(format: "%.1f", firstAvg)) to \(String(format: "%.1f", secondAvg)) over the past two weeks.",
             icon: "arrow.down.circle.fill",
@@ -217,6 +220,9 @@ enum PatternEngine {
 
             let improved = delta > 0
             cards.append(InsightCard(
+                // Direction-independent key: when the delta flips sign the SAME
+                // record updates in place instead of minting a "new" pattern.
+                key: "med-effect:\(med.name)",
                 title: improved
                     ? "Fewer symptoms since starting \(med.name)"
                     : "More symptoms since starting \(med.name)",
@@ -251,6 +257,7 @@ enum PatternEngine {
             guard delta >= PatternThreshold.factorSymptomDeltaThreshold else { continue }
 
             cards.append(InsightCard(
+                key: "factor:\(factor)",
                 title: "\(factor) days tend to have more symptoms",
                 detail: "On days you logged \(factor), you averaged \(String(format: "%.1f", withAvg)) symptoms versus \(String(format: "%.1f", withoutAvg)) on other days.",
                 icon: "exclamationmark.triangle.fill",
@@ -273,6 +280,7 @@ enum PatternEngine {
         guard diff > PatternThreshold.moodDiffThreshold else { return nil }
         let confidence = min(diff / PatternThreshold.confidenceScale, 1.0)
         return InsightCard(
+            key: "mood-sleep",
             title: "More sleep correlates with better mood",
             detail: "On days with above-average sleep your mood is \(String(format: "%.1f", diff)) points higher on average.",
             icon: "sparkles",
