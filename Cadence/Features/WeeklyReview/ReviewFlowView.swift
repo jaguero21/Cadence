@@ -6,8 +6,6 @@ struct ReviewFlowView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var vm = WeeklyReviewViewModel()
     @State private var review: WeeklyReview
-    @State private var peaksAndValleysRecorder = AudioRecorder()
-    private let attachmentStore = AttachmentStore()
     let existingReview: WeeklyReview?
     let logs: [DailyLog]
 
@@ -91,8 +89,6 @@ struct ReviewFlowView: View {
         switch vm.currentStep {
         case .prompt(let i):
             promptCard(for: vm.prompts[i])
-        case .peaksAndValleys:
-            peaksAndValleysCard
         case .intentions:
             intentionsCard
             StarRatingView(rating: $review.overallRating)
@@ -111,39 +107,6 @@ struct ReviewFlowView: View {
             }
         )
         return PromptCardView(prompt: prompt, response: binding, index: vm.currentFlatIndex, total: vm.totalSteps)
-    }
-
-    private var peaksAndValleysCard: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Text("\(vm.currentFlatIndex + 1) of \(vm.totalSteps)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("Peaks & Valleys")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(CadenceColor.sleepPurple)
-            }
-
-            Text("What were the peaks and valleys of your week?")
-                .font(.title3.bold())
-                .fixedSize(horizontal: false, vertical: true)
-
-            TextField("The best and hardest parts of this week…", text: $review.peaksAndValleysNote, axis: .vertical)
-                .font(.body)
-                .lineLimit(5...12)
-                .padding(14)
-                .background(Color(.systemFill), in: RoundedRectangle(cornerRadius: 12))
-
-            VoiceMemoRow(
-                attachment: $review.peaksAndValleysVoiceMemo,
-                recorder: peaksAndValleysRecorder,
-                store: attachmentStore,
-                onReplace: { old, _ in if let old { attachmentStore.delete(old.filename) } },
-                onDelete: { attachmentStore.delete($0.filename) }
-            )
-        }
-        .cadenceCard()
     }
 
     private var intentionsCard: some View {

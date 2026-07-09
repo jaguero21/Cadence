@@ -250,21 +250,6 @@ enum PDFBuilder {
                 y += bodyH + 16
             }
 
-            if !review.peaksAndValleysNote.isEmpty || review.hasPeaksAndValleysVoiceMemo {
-                let title = "Peaks & Valleys"
-                var text = review.peaksAndValleysNote.isEmpty ? "(voice memo only)" : review.peaksAndValleysNote
-                if review.hasPeaksAndValleysVoiceMemo && !review.peaksAndValleysNote.isEmpty {
-                    text += " (+ voice memo)"
-                }
-                let sectionH = textHeight(title, attrs: sectionAttrs, width: 515)
-                let bodyH = textHeight(text, attrs: bodyAttrs, width: 505)
-                breakIfNeeded(y: &y, needing: sectionH + 4 + bodyH + 16, ctx: ctx)
-                title.draw(in: CGRect(x: 40, y: y, width: 515, height: sectionH), withAttributes: sectionAttrs)
-                y += sectionH + 4
-                text.draw(in: CGRect(x: 50, y: y, width: 505, height: bodyH), withAttributes: bodyAttrs)
-                y += bodyH + 16
-            }
-
             if !review.intentionsForTomorrow.isEmpty {
                 let title = "Intentions for Tomorrow"
                 let text = review.intentionsForTomorrow

@@ -36,7 +36,6 @@ import SwiftData
         review.overallRating = 4
         review.promptResponses = [PromptResponse(section: "Wins This Week", prompt: "What went well?", response: "Slept more")]
         review.isComplete = true
-        review.peaksAndValleysNote = "Best: the whole week went smoothly."
         review.intentionsForTomorrow = "Start the week with a plan"
 
         return BackupService.Document(
@@ -67,7 +66,6 @@ import SwiftData
         #expect(log.intentionsForTomorrow == "Sleep earlier")
         let review = try #require(decoded.weeklyReviews.first)
         #expect(review.promptResponses.first?.response == "Slept more")
-        #expect(review.peaksAndValleysNote == "Best: the whole week went smoothly.")
         #expect(review.intentionsForTomorrow == "Start the week with a plan")
         #expect(decoded.symptomTags.first?.name == "Tinnitus")
         #expect(decoded.medications.first?.dosage == "50 mg")
@@ -95,7 +93,6 @@ import SwiftData
         let trackers = try context.fetch(FetchDescriptor<CustomTracker>())
         #expect(trackers.first?.id == trackerID)
         let reviews = try context.fetch(FetchDescriptor<WeeklyReview>())
-        #expect(reviews.first?.peaksAndValleysNote == "Best: the whole week went smoothly.")
         #expect(reviews.first?.intentionsForTomorrow == "Start the week with a plan")
     }
 
