@@ -620,6 +620,7 @@ struct LogInputFlow: View {
                             return
                         }
                         logPersisted = true
+                        publishToHealth(log)
                     }
                     vm.nextStep()
                 } label: {
@@ -732,6 +733,25 @@ struct LogInputFlow: View {
         if snapshot.menstrualFlow == true, !selectedFactors.contains(Self.menstrualCycleFactorName) {
             selectedFactors.append(Self.menstrualCycleFactorName)
         }
+        // Symptoms another app already logged in Health today prefill the
+        // picker — only while the user hasn't chosen any themselves.
+        if selectedSymptoms.isEmpty, !snapshot.symptoms.isEmpty {
+            selectedSymptoms = snapshot.symptoms
+        }
+        // A daily mood logged elsewhere (State of Mind) prefills the mood step;
+        // the user's own tap always wins.
+        if !didEditMood, let externalMood = snapshot.mood {
+            mood = externalMood
+        }
+    }
+
+    // Fire-and-forget mirror of the saved day into Health (mapped symptoms +
+    // State of Mind mood). Snapshot on the main actor; the write is
+    // best-effort and can never block or fail the save it follows.
+    private func publishToHealth(_ log: DailyLog) {
+        let snapshot = DailyLogSnapshot(log)
+        let service = healthKitService
+        Task { await service.publish(log: snapshot) }
     }
 
     private func partialSave() {
@@ -749,6 +769,7 @@ struct LogInputFlow: View {
             // the Dashboard tab.
             let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
             DashboardViewModel.publishWidgetSummary(logs: logs)
+            publishToHealth(log)
         } catch {
             Self.log.error("Partial save failed: \(error, privacy: .public)")
             if existingLog == nil, !logPersisted {

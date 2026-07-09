@@ -181,3 +181,66 @@ struct SleepQualityScoreTests {
         #expect((0...10).contains(unwrapped))
     }
 }
+
+// MARK: - Symptom & mood mapping
+
+// The pure maps behind two-way Health symptom sync and State of Mind mood.
+@Suite("HealthKitService – symptom and mood mapping")
+struct HealthMappingTests {
+
+    @Test("Cadence names map to HK symptom types case-insensitively")
+    func nameToType() {
+        #expect(HealthKitService.symptomTypeIdentifier(for: "Headache") == .headache)
+        #expect(HealthKitService.symptomTypeIdentifier(for: "FATIGUE") == .fatigue)
+        #expect(HealthKitService.symptomTypeIdentifier(for: "Pain") == .generalizedBodyAche)
+        // No honest HK counterpart → no sync, not a stretched mapping.
+        #expect(HealthKitService.symptomTypeIdentifier(for: "Brain Fog") == nil)
+    }
+
+    @Test("Type→name round trip picks the canonical Cadence display name")
+    func typeToName() {
+        #expect(HealthKitService.symptomName(for: .headache) == "Headache")
+        #expect(HealthKitService.symptomName(for: .coughing) == "Coughing")
+        #expect(HealthKitService.symptomName(for: .generalizedBodyAche) == "Pain")
+    }
+
+    @Test("Every mapped name survives a name→type→name round trip")
+    func roundTripAllMappings() {
+        for identifier in Set(HealthKitService.symptomTypeByName.values) {
+            let name = HealthKitService.symptomName(for: identifier)
+            #expect(name != nil)
+            #expect(HealthKitService.symptomTypeIdentifier(for: name ?? "") == identifier)
+        }
+    }
+
+    @Test("Severity buckets: 1–3 mild, 4–7 moderate, 8–10 severe")
+    func severityToHK() {
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 1) == HKCategoryValueSeverity.mild.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 3) == HKCategoryValueSeverity.mild.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 4) == HKCategoryValueSeverity.moderate.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 7) == HKCategoryValueSeverity.moderate.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 8) == HKCategoryValueSeverity.severe.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 10) == HKCategoryValueSeverity.severe.rawValue)
+    }
+
+    @Test("HK severity maps back to a representative Cadence severity")
+    func severityFromHK() {
+        #expect(HealthKitService.cadenceSeverity(fromHKSeverity: HKCategoryValueSeverity.mild.rawValue) == 2)
+        #expect(HealthKitService.cadenceSeverity(fromHKSeverity: HKCategoryValueSeverity.moderate.rawValue) == 5)
+        #expect(HealthKitService.cadenceSeverity(fromHKSeverity: HKCategoryValueSeverity.severe.rawValue) == 9)
+        #expect(HealthKitService.cadenceSeverity(fromHKSeverity: HKCategoryValueSeverity.unspecified.rawValue) == 5)
+    }
+
+    @Test("Mood ↔ valence round trips across the whole 1–5 scale")
+    func moodValenceRoundTrip() {
+        for mood in 1...5 {
+            let valence = HealthKitService.valence(forMood: mood)
+            #expect((-1.0...1.0).contains(valence))
+            #expect(HealthKitService.mood(forValence: valence) == mood)
+        }
+        // Out-of-range inputs clamp instead of wrapping.
+        #expect(HealthKitService.valence(forMood: 99) == 1.0)
+        #expect(HealthKitService.mood(forValence: 3.0) == 5)
+        #expect(HealthKitService.mood(forValence: -3.0) == 1)
+    }
+}
