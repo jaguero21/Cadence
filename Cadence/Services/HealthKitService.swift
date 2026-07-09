@@ -86,16 +86,39 @@ final class HealthKitService: HealthKitServiceProtocol {
         async let mindful = fetchDurationMinutes(.mindfulSession, predicate: todayPredicate)
         async let hr    = fetchLatest(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: yesterdayPredicate)
         async let hrv   = fetchLatest(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), predicate: yesterdayPredicate)
-        async let sleep = fetchSleepHours(start: yesterdayStart, end: todayStart)
+        async let sleep = fetchSleepDetail(start: yesterdayStart, end: todayStart)
 
+        let sleepDetail = await sleep
         return await HealthKitSnapshot(
             steps: steps.map(Int.init),
             restingHR: hr,
             hrv: hrv,
-            sleepHours: sleep,
+            sleepHours: sleepDetail.hours,
             activeEnergy: energy,
-            mindfulMinutes: mindful
+            mindfulMinutes: mindful,
+            sleepQuality: sleepDetail.quality
         )
+    }
+
+    // Derives a 0–10 sleep-quality score from stage totals. Returns nil unless
+    // the night has real stage data (core/REM/deep) — duration-only sources
+    // (manual entry, basic trackers) can't support a quality claim, and the
+    // slider should stay at its default rather than show a made-up number.
+    // Score = 60% sleep efficiency (asleep vs awake within the night) + 40%
+    // restorative share (deep+REM as a fraction of sleep, normalised against
+    // a typical ~45%).
+    nonisolated static func sleepQualityScore(
+        asleepSeconds: Double,
+        awakeSeconds: Double,
+        deepSeconds: Double,
+        remSeconds: Double,
+        stagedSeconds: Double
+    ) -> Int? {
+        guard asleepSeconds > 0, stagedSeconds > 0 else { return nil }
+        let efficiency = asleepSeconds / (asleepSeconds + awakeSeconds)
+        let restorative = min(((deepSeconds + remSeconds) / asleepSeconds) / 0.45, 1.0)
+        let score = (10 * (0.6 * efficiency + 0.4 * restorative)).rounded()
+        return Int(score).clamped(to: 0...10)
     }
 
     // MARK: - Private helpers
@@ -145,26 +168,40 @@ final class HealthKitService: HealthKitServiceProtocol {
         }
     }
 
-    nonisolated private func fetchSleepHours(start: Date, end: Date) async -> Double? {
-        guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return nil }
+    // One query for the night's sleep: total asleep hours plus a derived 0–10
+    // quality score (nil for either when the data can't support it — see
+    // sleepQualityScore).
+    nonisolated private func fetchSleepDetail(start: Date, end: Date) async -> (hours: Double?, quality: Int?) {
+        guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return (nil, nil) }
         let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         return await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
-                if let error { Self.log.error("fetchSleepHours failed: \(error, privacy: .public)") }
+                if let error { Self.log.error("fetchSleepDetail failed: \(error, privacy: .public)") }
                 guard error == nil, let samples = samples as? [HKCategorySample] else {
-                    cont.resume(returning: nil); return
+                    cont.resume(returning: (nil, nil)); return
                 }
-                let asleepValues: Set<Int> = [
-                    HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,  // covers legacy .asleep (same raw value, renamed iOS 16)
-                    HKCategoryValueSleepAnalysis.asleepCore.rawValue,
-                    HKCategoryValueSleepAnalysis.asleepREM.rawValue,
-                    HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
-                ]
-                let seconds = samples.filter { asleepValues.contains($0.value) }
-                    .reduce(0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+                func seconds(of value: HKCategoryValueSleepAnalysis) -> Double {
+                    samples.filter { $0.value == value.rawValue }
+                        .reduce(0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+                }
+                // .asleepUnspecified covers legacy .asleep (same raw value, renamed iOS 16).
+                let unspecified = seconds(of: .asleepUnspecified)
+                let core  = seconds(of: .asleepCore)
+                let rem   = seconds(of: .asleepREM)
+                let deep  = seconds(of: .asleepDeep)
+                let awake = seconds(of: .awake)
+                let asleep = unspecified + core + rem + deep
                 // Return nil rather than 0 when no qualifying sleep stages were recorded,
                 // so callers can distinguish "no data" from a genuine zero.
-                cont.resume(returning: seconds > 0 ? seconds / 3600 : nil)
+                let hours: Double? = asleep > 0 ? asleep / 3600 : nil
+                let quality = HealthKitService.sleepQualityScore(
+                    asleepSeconds: asleep,
+                    awakeSeconds: awake,
+                    deepSeconds: deep,
+                    remSeconds: rem,
+                    stagedSeconds: core + rem + deep
+                )
+                cont.resume(returning: (hours, quality))
             }
             store.execute(query)
         }
@@ -178,4 +215,5 @@ struct HealthKitSnapshot {
     var sleepHours: Double?
     var activeEnergy: Double?     // kcal, today's sum
     var mindfulMinutes: Double?   // minutes, today's sessions
+    var sleepQuality: Int?        // 0–10, derived from sleep stages; nil without stage data
 }

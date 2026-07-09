@@ -120,3 +120,64 @@ struct HealthKitSnapshotValueTests {
         #expect(original.sleepHours == 6.5)
     }
 }
+
+// MARK: - Sleep quality score
+
+// The 0–10 score that pre-fills the Body Metrics "Sleep quality" slider.
+// Derived only from real stage data: 60% efficiency (asleep vs awake) +
+// 40% restorative share (deep+REM / asleep, normalised against ~45%).
+@Suite("HealthKitService – sleepQualityScore")
+struct SleepQualityScoreTests {
+
+    @Test("No stage data (duration-only source) yields nil, not a fake score")
+    func durationOnly_returnsNil() {
+        // 7h logged as unspecified sleep — no core/REM/deep stages.
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: 7 * 3600, awakeSeconds: 0,
+            deepSeconds: 0, remSeconds: 0, stagedSeconds: 0
+        )
+        #expect(score == nil)
+    }
+
+    @Test("No sleep at all yields nil")
+    func noSleep_returnsNil() {
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: 0, awakeSeconds: 3600,
+            deepSeconds: 0, remSeconds: 0, stagedSeconds: 0
+        )
+        #expect(score == nil)
+    }
+
+    @Test("An efficient, restorative night scores at the top of the scale")
+    func greatNight_scoresHigh() {
+        // 8h asleep, 10 min awake, 45% deep+REM — efficiency ≈ 0.98, restorative = 1.
+        let asleep = 8.0 * 3600
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: asleep, awakeSeconds: 600,
+            deepSeconds: asleep * 0.25, remSeconds: asleep * 0.20, stagedSeconds: asleep
+        )
+        #expect(score == 10)
+    }
+
+    @Test("A fragmented night with little deep/REM scores low")
+    func fragmentedNight_scoresLow() throws {
+        // 4h asleep vs 2h awake (efficiency 0.67), only 10% deep+REM.
+        let asleep = 4.0 * 3600
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: asleep, awakeSeconds: 2 * 3600,
+            deepSeconds: asleep * 0.05, remSeconds: asleep * 0.05, stagedSeconds: asleep
+        )
+        let unwrapped = try #require(score)
+        #expect(unwrapped <= 5)
+    }
+
+    @Test("Score is clamped to the 0...10 slider range")
+    func score_staysInSliderRange() throws {
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: 10 * 3600, awakeSeconds: 0,
+            deepSeconds: 5 * 3600, remSeconds: 5 * 3600, stagedSeconds: 10 * 3600
+        )
+        let unwrapped = try #require(score)
+        #expect((0...10).contains(unwrapped))
+    }
+}

@@ -708,8 +708,17 @@ struct LogInputFlow: View {
         }
         guard let snapshot, !Task.isCancelled else { return }
         hkSnapshot = snapshot
-        if !didEditMetrics, let sleep = snapshot.sleepHours {
-            sleepHours = sleep
+        // Pre-fill the Body Metrics sleep sliders from last night's measured
+        // sleep — but never over a value the user already set. Hours snap to
+        // the slider's half-hour steps; quality only arrives when the night
+        // has real stage data (see HealthKitService.sleepQualityScore).
+        if !didEditMetrics {
+            if let sleep = snapshot.sleepHours {
+                sleepHours = min(max((sleep * 2).rounded() / 2, 0), 12)
+            }
+            if let quality = snapshot.sleepQuality {
+                sleepQuality = quality
+            }
         }
     }
 
