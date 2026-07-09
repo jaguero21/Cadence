@@ -244,3 +244,26 @@ struct HealthMappingTests {
         #expect(HealthKitService.mood(forValence: -3.0) == 1)
     }
 }
+
+// MARK: - Intense exercise gate
+
+// Pure gate behind the "Intense exercise" auto-factor: enough time OR enough
+// energy — a long easy hike and a short hard run both count.
+@Suite("HealthKitService – isIntenseExercise")
+struct IntenseExerciseGateTests {
+
+    @Test("Below both thresholds is not intense")
+    func belowBoth() {
+        #expect(HealthKitService.isIntenseExercise(totalMinutes: 30, totalKilocalories: 250) == false)
+    }
+
+    @Test("Enough time alone qualifies (long easy hike)")
+    func timeAlone() {
+        #expect(HealthKitService.isIntenseExercise(totalMinutes: HealthThreshold.intenseWorkoutMinutes, totalKilocalories: 0))
+    }
+
+    @Test("Enough energy alone qualifies (short hard run)")
+    func energyAlone() {
+        #expect(HealthKitService.isIntenseExercise(totalMinutes: 20, totalKilocalories: HealthThreshold.intenseWorkoutKilocalories))
+    }
+}

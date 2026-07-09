@@ -110,6 +110,13 @@ enum ChartThreshold {
     static let comparisonBadgeMinimumDelta: Double = 0.05
 }
 
+enum HealthThreshold {
+    // A day's HealthKit workouts count as "Intense exercise" (auto-selecting
+    // that factor chip) when they total at least this much time or energy.
+    static let intenseWorkoutMinutes: Double = 45
+    static let intenseWorkoutKilocalories: Double = 400
+}
+
 enum AppLaunch {
     // Set by the UI test runner (see CadenceUITests). Switches the app to an
     // in-memory store, fresh onboarding, and no permission prompts so UI tests
