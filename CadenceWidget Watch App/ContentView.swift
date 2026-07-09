@@ -1,11 +1,13 @@
 import SwiftUI
 
 struct ContentView: View {
+    private enum SendState {
+        case idle, sent, queued
+    }
+
     @State private var mood = 3
     @State private var energy = 5
-    @State private var sent = false
-
-    private let moods = ["😢", "😕", "😐", "🙂", "😊"]
+    @State private var sendState: SendState = .idle
 
     var body: some View {
         ScrollView {
@@ -16,9 +18,9 @@ struct ContentView: View {
                     ForEach(1...5, id: \.self) { value in
                         Button {
                             mood = value
-                            sent = false
+                            sendState = .idle
                         } label: {
-                            Text(moods[value - 1])
+                            Text(MoodScale.emoji(for: value))
                                 .font(.title3)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 6)
@@ -33,19 +35,37 @@ struct ContentView: View {
                     Text("Energy: \(energy)").font(.caption)
                     Stepper("Energy", value: $energy, in: 0...10)
                         .labelsHidden()
-                        .onChange(of: energy) { _, _ in sent = false }
+                        .onChange(of: energy) { _, _ in sendState = .idle }
                 }
 
                 Button {
-                    WatchConnectivityManager.shared.sendQuickLog(mood: mood, energy: energy)
-                    sent = true
+                    WatchConnectivityManager.shared.sendQuickLog(mood: mood, energy: energy) { state in
+                        Task { @MainActor in
+                            sendState = state == .sent ? .sent : .queued
+                        }
+                    }
                 } label: {
-                    Text(sent ? "Sent ✓" : "Save to iPhone")
+                    Text(buttonLabel)
                         .frame(maxWidth: .infinity)
                 }
-                .tint(sent ? .green : .accentColor)
+                .tint(sendState == .idle ? Color.accentColor : .green)
+
+                if sendState == .queued {
+                    Text("Will sync when your iPhone is nearby.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
             .padding()
+        }
+    }
+
+    private var buttonLabel: String {
+        switch sendState {
+        case .idle:   return String(localized: "Save to iPhone")
+        case .sent:   return String(localized: "Sent ✓")
+        case .queued: return String(localized: "Queued ✓")
         }
     }
 }

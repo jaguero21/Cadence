@@ -20,19 +20,31 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `DailyLog.customMetrics: [MetricEntry]` keyed by the tracker's stable `id` (so
   renames don't orphan history). Logged via slider rows appended to the Body
   Metrics step in `LogInputFlow`, managed in `CustomTrackersView`, averaged in
-  the doctor PDF. Not yet wired into trend charts or `PatternEngine` (those are
-  hardcoded to the built-in fields) — a known follow-up.
-- **Insight history & notifications:** detected `InsightCard`s are persisted as
-  `InsightRecord` (deduped by title) via `InsightRecorder.record(_:context:)`,
-  which returns only the newly-emerged ones. `InsightsView` records on appear and
-  links to `InsightHistoryView`; `ContentView.checkForNewInsights()` runs on
-  foreground (Pro only) and fires `sendInsightNotification` for the top new
-  high-confidence pattern. Recording is idempotent, so users are notified once
-  per pattern.
+  the doctor PDF. Wired into `PatternEngine.trackerCorrelations` (mean-split
+  high/low days vs symptom count; key is `tracker:<uuid>` so renames update the
+  same insight) and into trend charts via `ChartSeries.custom` (days without an
+  entry are skipped, never drawn as zero; the comparison badge is neutral
+  because a custom tracker's desirable direction is unknowable).
+- **Insight history & notifications:** every `InsightCard` carries a **stable
+  semantic `key`** (e.g. `med-effect:Sertraline`) set at the PatternEngine
+  creation site — never derive identity from the display title, which changes
+  (direction flips, copyedits, localization). `InsightRecord`s dedupe by that
+  key via `InsightRecorder.record(_:context:)`, which updates copy/confidence
+  in place, skips no-op saves, reports save failures via OSLog (returning `[]`
+  so nothing unpersisted is announced as new), and returns only newly-emerged
+  records. `InsightRecorder.currentInsights/detectAndRecord` is the **canonical
+  pipeline** (90-day window, `PatternThreshold.insightWindowDays`) used by both
+  the Insights tab and `ContentView.checkForNewInsights()` (Pro only, throttled
+  to once per calendar day via `UserDefaultsKey.lastInsightCheckDay`) so the
+  surfaces can never disagree about which patterns exist.
 - **Flares:** `Flare` (`startDate`/optional `endDate`/`peakSeverity`/`note`) tracks
   multi-day symptom episodes; `durationDays` is inclusive and counts ongoing
   flares through today. Managed in `FlaresView` (Settings → Flares) and listed in
-  the doctor PDF.
+  the doctor PDF. `PatternEngine.flarePrecursors` compares the
+  `flarePrecursorWindowDays` run-up before each flare against baseline days
+  (in-flare days excluded from both sides) and surfaces stress-rise
+  (`flare-stress`) and sleep-dip (`flare-sleep`) early-warning cards; needs
+  `minimumFlaresForPattern` flares with run-up data.
 - **Factor (trigger) logging:** `DailyLog.factors: [String]` holds contextual
   triggers chosen from a fixed list (`LogInputFlow.factorItems`) in the `.factors`
   log step — same hardcoded-list pattern as `basicsCompleted` (no model).
@@ -71,8 +83,13 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - **CloudKit constraints.** Because of CloudKit mirroring, models carry **no
   `@Attribute(.unique)`** and every non-optional attribute has an **inline default
   value** (both are hard CloudKit requirements). Uniqueness/dedup is enforced in
-  code instead (fetch-before-insert for the day/week log, `InsightRecorder` by
-  key, UUID ids). Don't reintroduce `.unique` or drop the inline defaults.
+  code **at save time, not just at presentation time** — a sheet's captured
+  `existingLog`/`existingReview` can go stale while it's open (watch quick-log,
+  CloudKit import): `LogInputFlow.ensureLog()` re-fetches today's log before
+  creating one, `WeeklyReviewViewModel.save` merges into a persisted same-week
+  review, `seedSymptomTagsIfNeeded` dedupes by name against the store, and
+  `InsightRecorder` dedupes by key. Don't reintroduce `.unique`, drop the inline
+  defaults, or add an insert path without a save-time dedup check.
 
 ## Conventions
 
@@ -91,10 +108,39 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - App↔widget share via the **App Group** `group.com.carpecadence.app`:
   `WidgetData` (in `CadenceWidget/WidgetData.swift`, added to *both* targets —
   explicit ref for the app, sync group for the widget) writes/reads a small
-  `Summary` in the shared `UserDefaults` suite. `DashboardViewModel.refresh`
-  writes it and calls `WidgetCenter.reloadAllTimelines()`.
+  `Summary` in the shared `UserDefaults` suite.
+  `DashboardViewModel.publishWidgetSummary(logs:)` is the **single publish
+  point** — call it from any path that saves a `DailyLog` (dashboard refresh,
+  `LogInputFlow.partialSave`, watch quick-log). It skips the write *and* the
+  timeline reload when the summary is unchanged (reloads are system-budgeted);
+  never call `WidgetCenter.reloadAllTimelines()` without republishing first.
+  The widget's `Provider` validates `summary.date` before trusting it:
+  `loggedToday` only holds for a summary from today, and a streak survives
+  exactly one day past its summary.
 - App bundle id is **`com.carpecadence.app`** (unified with the code's
   `com.carpecadence` convention); widget is `com.carpecadence.app.CadenceWidget`.
+- **Interactive mood buttons** (`WidgetQuickLogIntent` in
+  `CadenceWidget/QuickLogIntent.swift`, member of both app and widget targets):
+  the widget can't open the app's SwiftData store, so a tap is **stashed** in
+  the App Group (`WidgetData.stashPendingQuickLog`, date-stamped, queue capped)
+  and the widget shows an interim "Mood saved" state. The app consumes the
+  queue on foreground (`ContentView.applyPendingQuickLogs`) through the same
+  `applyQuickLog` upsert seam the watch uses — so an overnight tap lands on
+  the day it was made — then republishes the summary AND explicitly reloads
+  the timeline (the summary is usually unchanged, since a quick log doesn't
+  complete the day, and the skip-if-unchanged guard would strand the interim
+  state). Widget kind string lives in `WidgetData.widgetKind`.
+
+## App Intents (Siri / Shortcuts)
+
+- `LogCheckInIntent` (`Cadence/App/CheckInIntents.swift`, app target only) is
+  the Siri/Shortcuts check-in: mood (`MoodOption` AppEnum, emoji order matches
+  `MoodScale`) + optional energy. It runs in the app's process and writes via
+  `PhoneConnectivityManager.applyQuickLog` + `publishWidgetSummary` — every
+  quick-log surface (watch, widget, Siri) funnels through that one tested
+  upsert. Phrases live in `CadenceShortcuts: AppShortcutsProvider`.
+- `CadenceApp.sharedModelContainer` is **static** so intents (which run outside
+  the SwiftUI scene) reach the same container the UI uses.
 
 ## Watch app
 
@@ -102,10 +148,15 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   group) provides a wrist **quick-log**: mood + energy → "Save to iPhone".
 - Bridge is **WatchConnectivity** (App Groups don't cross devices). The watch's
   `WatchConnectivityManager` sends a plain `[String: Any]` payload
-  (`mood`/`energy`/`date`) via `sendMessage`, falling back to `transferUserInfo`.
-  The phone's `PhoneConnectivityManager` (started in `CadenceApp` with the
-  container) receives it and **upserts today's `DailyLog`**, then reloads the
-  widget. No model types are shared across the targets — only the dict keys.
+  (`mood`/`energy`/`date`) via `sendMessage` with a reply ack, falling back to
+  `transferUserInfo`; the UI reports **Sent** (acked) vs **Queued** truthfully,
+  and the session is activated at watch-app launch to avoid racing the first
+  tap. The phone's `PhoneConnectivityManager` (started in `CadenceApp` with the
+  container) **upserts the log for the payload's `date`** — a queued overnight
+  entry lands on the day it was recorded, never clobbering the new day — then
+  republishes the widget summary. No model types are shared across the targets;
+  `MoodScale` (in the watch folder, member of both targets) keeps the emoji
+  scale identical on both sides.
 - Watch deployment target is 26.2; live phone↔watch transfer needs paired
   sims/devices to verify (compiles + structurally complete here).
 
@@ -123,12 +174,19 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 
 ## Charts
 
-- `TrendChartView` draws each metric with an `average` `RuleMark` annotation and a
-  period-comparison badge: it takes the current window's `logs` plus the
-  equal-length `previousLogs` window (computed in `InsightsView`) and shows the
-  delta, colored by `ChartMetric.isImprovement(delta:)` (stress is inverted —
-  lower is better). `TrendChartView.mean` and `ChartMetric.isImprovement` are the
-  pure, unit-tested helpers.
+- `TrendChartView` draws a `ChartSeries` (label/color/domain + a per-log value
+  extractor returning `nil` for no-data days) with an `average` `RuleMark`
+  annotation and a period-comparison badge: it takes the current window's `logs`
+  plus the equal-length `previousLogs` window (computed in `InsightsView`) and
+  shows the delta. Built-ins map via `ChartMetric.series` (stress is inverted —
+  lower is better); custom trackers via `ChartSeries.custom`, whose
+  `higherIsBetter` is `nil` → neutral badge. Badge threshold in
+  `ChartThreshold`. `TrendChartView.mean`, `ChartMetric.isImprovement`, and
+  `ChartSeries.isImprovement` are the pure, unit-tested helpers.
+- `InsightsView`'s `@Query` spans **2× the largest chart window** (180 days) so
+  `previousLogs` has data for the 90D comparison; keep it at 2× if ranges
+  change (`ChartRange.days` is the per-range source of truth). Insight
+  computation still uses the canonical 90-day slice (`insightLogs`).
 
 ## History
 
@@ -149,6 +207,26 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   (`timeIntervalSinceReferenceDate`, 0 = unset) so a report can be scoped to
   everything since the last visit.
 
+## Backup & iCloud status
+
+- **JSON backup/restore** (`BackupService`, driven from `SyncBackupSection` in
+  Settings; intentionally **not Pro-gated** — users own their data). The
+  versioned `Document` mirrors the user-entered models; insight history is
+  recomputable and attachment binaries live outside SwiftData, so neither is
+  included. `encode`/`decode` are pure and unit-tested (ISO8601 dates; decode
+  rejects documents from a newer format version). **Restore merges** — inserts
+  what the store lacks, never overwrites (logs by day, reviews by week start,
+  tags by name, meds by name+start, flares by start, trackers by `id`).
+  `CustomTracker.id` must round-trip: `DailyLog.customMetrics` is keyed by it.
+  Restore republishes the widget summary (it can change today's streak).
+- **Sync status**: `CloudSyncMonitor` (@MainActor singleton) folds
+  `NSPersistentCloudKitContainer.eventChangedNotification` events (SwiftData's
+  mirroring is built on that container) plus the CloudKit account status into
+  one `SyncState`. `CadenceApp.usingCloudKitStore` records whether the
+  CloudKit-backed store actually initialised (vs the local fallback) so the row
+  reads "Off — local storage" truthfully. The state fold (`stateAfterEvent`) is
+  pure and unit-tested; sync events outrank the account probe.
+
 ## Localization
 
 - Strings live in `Cadence/Localizable.xcstrings`. `SWIFT_EMIT_LOC_STRINGS` is
@@ -167,7 +245,11 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 ## Testing
 
 - **Swift Testing**, not XCTest: `import Testing`, `@Suite`, `@Test`, `#expect`,
-  `#require`. (XCTest is not used.)
+  `#require`. Exception: **`CadenceUITests` is XCTest** (XCUIApplication has no
+  Swift Testing equivalent). The smoke test launches with `--uitest`, which
+  gives the app an in-memory store, fresh onboarding, and no permission
+  prompts (`AppLaunch.isUITesting`) — keep new UI-affecting launch behavior
+  behind that flag so UI runs stay deterministic.
 - SwiftData tests use an **in-memory `ModelContainer`** built from the same
   `Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self])`.
 - Any suite that calls a `@MainActor` singleton (e.g. `NotificationService.shared`)

@@ -22,6 +22,13 @@
         "identifier" : "AA11BB22CC33DD44EE55FFA0",
         "name" : "CadenceTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Cadence.xcodeproj",
+        "identifier" : "2523F5F02FFEEB0F00F3F0A5",
+        "name" : "CadenceUITests"
+      }
     }
   ],
   "version" : 1

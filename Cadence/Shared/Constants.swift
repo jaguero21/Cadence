@@ -38,6 +38,7 @@ enum UserDefaultsKey {
     static let dailyReminderMinute  = "dailyReminderMinute"
     static let weeklyReminderEnabled = "weeklyReminderEnabled"
     static let lastVisitDate          = "lastVisitDate"   // timeIntervalSinceReferenceDate; 0 = unset
+    static let lastInsightCheckDay    = "lastInsightCheckDay"   // startOfDay interval; foreground insight check runs once per day
 }
 
 enum PatternThreshold {
@@ -80,4 +81,35 @@ enum PatternThreshold {
     // factor days worth surfacing as a likely trigger.
     static let minimumFactorDays: Int = 3
     static let factorSymptomDeltaThreshold: Double = 0.5
+
+    // Custom tracker correlation: minimum logged days on each side of the
+    // tracker's mean value before comparing, and the smallest difference in
+    // average daily symptom count worth surfacing.
+    static let minimumTrackerDays: Int = 5
+    static let trackerSymptomDeltaThreshold: Double = 0.5
+
+    // Flare precursors: minimum flares with pre-flare logs before comparing the
+    // run-up window against baseline days, and the smallest average stress rise
+    // / sleep drop in that window worth surfacing.
+    static let minimumFlaresForPattern: Int = 2
+    static let flarePrecursorWindowDays: Int = 3
+    static let flareStressDeltaThreshold: Double = 1.0
+    static let flareSleepDeltaThreshold: Double = 0.75
+
+    // Canonical window for pattern detection. Every surface (Insights tab,
+    // foreground notification check, insight history) computes over this window
+    // so they can never disagree about which patterns exist.
+    static let insightWindowDays: Int = 90
+}
+
+enum ChartThreshold {
+    // Minimum period-over-period delta before the trend comparison badge shows.
+    static let comparisonBadgeMinimumDelta: Double = 0.05
+}
+
+enum AppLaunch {
+    // Set by the UI test runner (see CadenceUITests). Switches the app to an
+    // in-memory store, fresh onboarding, and no permission prompts so UI tests
+    // are deterministic and never blocked by system dialogs.
+    static let isUITesting = ProcessInfo.processInfo.arguments.contains("--uitest")
 }

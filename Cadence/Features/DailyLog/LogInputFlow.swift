@@ -31,6 +31,14 @@ struct LogInputFlow: View {
     @State private var selectedFactors: [String] = []
     @State private var customValues: [UUID: Int] = [:]
     @State private var attachments: [Attachment] = []
+    // Filenames of already-persisted attachments the user removed this session.
+    // Their binaries are deleted only after a successful save, so a failed save
+    // or force-quit can't leave the stored log pointing at a missing file.
+    @State private var pendingFileDeletions: [String] = []
+    // IDs of attachments that were already persisted when the flow opened —
+    // used to tell "safe to delete from disk immediately" (added this session)
+    // from "defer deletion until the save that drops the reference succeeds".
+    @State private var hydratedAttachmentIDs: Set<UUID> = []
     @State private var photoItem: PhotosPickerItem?
     @State private var audioRecorder = AudioRecorder()
     private let attachmentStore = AttachmentStore()
@@ -94,6 +102,7 @@ struct LogInputFlow: View {
                     selectedFactors  = log.factors
                     customValues     = Dictionary(log.customMetrics.map { ($0.trackerID, $0.value) }, uniquingKeysWith: { a, _ in a })
                     attachments      = log.attachments
+                    hydratedAttachmentIDs = Set(log.attachments.map(\.id))
                     freeNote         = log.freeNote
                 } else {
                     hkTask = Task { await applyHealthKitData() }
@@ -103,8 +112,9 @@ struct LogInputFlow: View {
                 hkTask?.cancel()
                 // Safety net: persist progress on any dismissal (backgrounding,
                 // swipe-away) but only when a log is already in progress, to
-                // avoid phantom entries.
-                if existingLog != nil || createdLog != nil {
+                // avoid phantom entries. Attachments count as progress — their
+                // binaries are already on disk and would be orphaned otherwise.
+                if existingLog != nil || createdLog != nil || !attachments.isEmpty {
                     partialSave()
                 }
             }
@@ -182,15 +192,10 @@ struct LogInputFlow: View {
         .cadenceCard()
     }
 
+    // Shared with the watch app (MoodScale is a member of both targets) so the
+    // wrist and the phone always render the same face for the same value.
     private func moodEmoji(_ value: Int) -> String {
-        switch value {
-        case 1: return "😢"
-        case 2: return "😕"
-        case 3: return "😐"
-        case 4: return "🙂"
-        case 5: return "😊"
-        default: return "😐"
-        }
+        MoodScale.emoji(for: value)
     }
 
     private func moodLabel(_ value: Int) -> String {
@@ -431,29 +436,8 @@ struct LogInputFlow: View {
 
             let photos = attachments.filter { $0.kind == .photo }
             if !photos.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(photos) { photo in
-                            if let data = attachmentStore.data(for: photo.filename),
-                               let image = UIImage(data: data) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 64, height: 64)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .overlay(alignment: .topTrailing) {
-                                        Button {
-                                            removeAttachment(photo)
-                                        } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .foregroundStyle(.white, .black.opacity(0.5))
-                                        }
-                                        .padding(2)
-                                    }
-                                    .accessibilityLabel("Attached photo")
-                            }
-                        }
-                    }
+                AttachmentPhotoStrip(photos: photos, store: attachmentStore, tileSize: 64) { photo in
+                    removeAttachment(photo)
                 }
             }
         }
@@ -482,7 +466,15 @@ struct LogInputFlow: View {
     }
 
     private func removeAttachment(_ attachment: Attachment) {
-        attachmentStore.delete(attachment.filename)
+        // An attachment added this session was never persisted — its file can
+        // go immediately. A persisted one keeps its binary until the save that
+        // drops the reference succeeds; deleting first would leave the stored
+        // log pointing at a missing file if the save fails or never happens.
+        if hydratedAttachmentIDs.contains(attachment.id) {
+            pendingFileDeletions.append(attachment.filename)
+        } else {
+            attachmentStore.delete(attachment.filename)
+        }
         attachments.removeAll { $0.id == attachment.id }
     }
 
@@ -584,6 +576,17 @@ struct LogInputFlow: View {
     private func ensureLog() -> DailyLog {
         if let existing = existingLog { return existing }
         if let created = createdLog { return created }
+        // existingLog was captured when the sheet opened; with no DB-level
+        // unique constraint (CloudKit), today's log may have been created since
+        // (watch quick-log, CloudKit import). Re-fetch at save time and adopt
+        // it rather than inserting a same-date duplicate.
+        let today = Calendar.current.startOfDay(for: .now)
+        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == today })
+        if let concurrent = try? modelContext.fetch(descriptor).first {
+            createdLog = concurrent
+            logPersisted = true   // already in the store — never rollback-delete it
+            return concurrent
+        }
         let newLog = DailyLog()
         createdLog = newLog
         return newLog
@@ -644,6 +647,14 @@ struct LogInputFlow: View {
         do {
             try modelContext.save()
             logPersisted = true
+            // The save dropped the references to removed persisted attachments;
+            // now their binaries can safely go.
+            pendingFileDeletions.forEach(attachmentStore.delete)
+            pendingFileDeletions.removeAll()
+            // Keep the home-screen widget current without requiring a visit to
+            // the Dashboard tab.
+            let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
+            DashboardViewModel.publishWidgetSummary(logs: logs)
         } catch {
             Self.log.error("Partial save failed: \(error, privacy: .public)")
             if existingLog == nil, !logPersisted {
