@@ -131,6 +131,8 @@ struct DailyLogViewModelStepTests {
         vm.nextStep(); #expect(vm.currentStep == .basics)
         vm.nextStep(); #expect(vm.currentStep == .symptoms)
         vm.nextStep(); #expect(vm.currentStep == .factors)
+        vm.nextStep(); #expect(vm.currentStep == .peaksAndValleys)
+        vm.nextStep(); #expect(vm.currentStep == .intentions)
         vm.nextStep(); #expect(vm.currentStep == .note)
         vm.nextStep(); #expect(vm.currentStep == .done)
         #expect(vm.isDone == false)
@@ -256,19 +258,26 @@ struct WeeklyReviewViewModelSaveTests {
 @MainActor
 struct WeeklyReviewViewModelNavigationTests {
 
-    @Test("isLastPrompt is true only on the final prompt")
-    func isLastPrompt_trueOnlyOnFinalPrompt() {
+    @Test("isLastStep is true only once Intentions is reached")
+    func isLastStep_trueOnlyOnIntentions() {
         let vm = WeeklyReviewViewModel()
-        #expect(vm.isLastPrompt == false)
-        // Walk to the last prompt.
+        #expect(vm.isLastStep == false)
+        // Walk to the last prompt: reaching it isn't the end anymore — the two
+        // dedicated closing steps (Peaks & Valleys, Intentions) still follow.
         for _ in 0..<(vm.prompts.count - 1) { vm.next() }
-        #expect(vm.currentPromptIndex == vm.prompts.count - 1)
-        #expect(vm.isLastPrompt)
+        #expect(vm.currentStep == .prompt(vm.prompts.count - 1))
+        #expect(vm.isLastStep == false)
         #expect(vm.isComplete == false)
-        // next() on the last prompt completes rather than overflowing the index.
+        vm.next()
+        #expect(vm.currentStep == .peaksAndValleys)
+        #expect(vm.isLastStep == false)
+        vm.next()
+        #expect(vm.currentStep == .intentions)
+        #expect(vm.isLastStep)
+        #expect(vm.isComplete == false)
+        // next() on Intentions completes rather than overflowing the step sequence.
         vm.next()
         #expect(vm.isComplete)
-        #expect(vm.currentPromptIndex == vm.prompts.count - 1)
     }
 
     @Test("previous never goes below the first prompt")
@@ -276,9 +285,9 @@ struct WeeklyReviewViewModelNavigationTests {
         let vm = WeeklyReviewViewModel()
         vm.next()
         vm.previous()
-        #expect(vm.currentPromptIndex == 0)
+        #expect(vm.currentStep == .prompt(0))
         vm.previous()
-        #expect(vm.currentPromptIndex == 0)
+        #expect(vm.currentStep == .prompt(0))
     }
 
     @Test("progress advances from 0 toward 1 across prompts")
@@ -345,5 +354,74 @@ struct WeeklyReviewPopulateSummaryTests {
         #expect(review.avgEnergy == 0)
         #expect(review.avgSleep == 0)
         #expect(review.topSymptoms.isEmpty)
+    }
+}
+
+// MARK: - WeeklyReviewViewModel: step machine
+
+// Peaks & Valleys and Intentions are two dedicated closing steps appended
+// after the 7 default prompts (not part of the generic PromptResponse text
+// system, since Peaks & Valleys needs voice-memo support). These tests pin
+// the flattened step sequence: prompt(0)...prompt(6), peaksAndValleys,
+// intentions, then completion.
+@MainActor
+@Suite("WeeklyReviewViewModel – step machine")
+struct WeeklyReviewStepMachineTests {
+
+    @Test("next() walks all prompts, then Peaks & Valleys, then Intentions, then completes")
+    func nextWalksFullSequence() {
+        let vm = WeeklyReviewViewModel()
+        #expect(vm.currentStep == .prompt(0))
+        #expect(vm.totalSteps == vm.prompts.count + 2)
+
+        for i in 1..<vm.prompts.count {
+            vm.next()
+            #expect(vm.currentStep == .prompt(i))
+        }
+
+        vm.next()
+        #expect(vm.currentStep == .peaksAndValleys)
+        #expect(vm.isLastStep == false)
+
+        vm.next()
+        #expect(vm.currentStep == .intentions)
+        #expect(vm.isLastStep == true)
+
+        vm.next()
+        #expect(vm.isComplete == true)
+    }
+
+    @Test("previous() reverses through Intentions, Peaks & Valleys, and back into the prompts")
+    func previousReversesFullSequence() {
+        let vm = WeeklyReviewViewModel()
+        vm.currentStep = .intentions
+
+        vm.previous()
+        #expect(vm.currentStep == .peaksAndValleys)
+
+        vm.previous()
+        #expect(vm.currentStep == .prompt(vm.prompts.count - 1))
+
+        vm.previous()
+        #expect(vm.currentStep == .prompt(vm.prompts.count - 2))
+    }
+
+    @Test("previous() at the first prompt is a no-op")
+    func previousAtStartIsNoOp() {
+        let vm = WeeklyReviewViewModel()
+        vm.previous()
+        #expect(vm.currentStep == .prompt(0))
+    }
+
+    @Test("flatIndex and progress span the full step count including the two new steps")
+    func flatIndexAndProgress() {
+        let vm = WeeklyReviewViewModel()
+        #expect(vm.flatIndex(.prompt(0)) == 0)
+        #expect(vm.flatIndex(.peaksAndValleys) == vm.prompts.count)
+        #expect(vm.flatIndex(.intentions) == vm.prompts.count + 1)
+
+        vm.currentStep = .intentions
+        #expect(vm.currentFlatIndex == vm.totalSteps - 1)
+        #expect(vm.progress == Double(vm.totalSteps - 1) / Double(vm.totalSteps))
     }
 }

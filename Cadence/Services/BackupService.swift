@@ -40,6 +40,10 @@ enum BackupService {
         var basicsCompleted: [String] = []
         var factors: [String] = []
         var customMetrics: [MetricEntry] = []
+        // Voice memo binaries live outside SwiftData and aren't backed up (same
+        // rule as attachments); the text note is.
+        var peaksAndValleysNote: String = ""
+        var intentionsForTomorrow: String = ""
         var freeNote: String = ""
         var isComplete: Bool = false
         var didEditMood: Bool = false
@@ -56,6 +60,8 @@ enum BackupService {
         var weekStartDate: Date
         var promptResponses: [PromptResponse] = []
         var overallRating: Int = 0
+        var peaksAndValleysNote: String = ""
+        var intentionsForTomorrow: String = ""
         var avgMood: Double = 0
         var avgEnergy: Double = 0
         var avgSleep: Double = 0
@@ -113,6 +119,8 @@ enum BackupService {
                     sleepHours: log.sleepHours, sleepQuality: log.sleepQuality,
                     stressLevel: log.stressLevel, basicsCompleted: log.basicsCompleted,
                     factors: log.factors, customMetrics: log.customMetrics,
+                    peaksAndValleysNote: log.peaksAndValleysNote,
+                    intentionsForTomorrow: log.intentionsForTomorrow,
                     freeNote: log.freeNote, isComplete: log.isComplete,
                     didEditMood: log.didEditMood, didEditMetrics: log.didEditMetrics,
                     hkSteps: log.hkSteps, hkRestingHR: log.hkRestingHR, hkHRV: log.hkHRV,
@@ -123,7 +131,10 @@ enum BackupService {
             weeklyReviews: reviews.map { review in
                 WeeklyReviewBackup(
                     weekStartDate: review.weekStartDate, promptResponses: review.promptResponses,
-                    overallRating: review.overallRating, avgMood: review.avgMood,
+                    overallRating: review.overallRating,
+                    peaksAndValleysNote: review.peaksAndValleysNote,
+                    intentionsForTomorrow: review.intentionsForTomorrow,
+                    avgMood: review.avgMood,
                     avgEnergy: review.avgEnergy, avgSleep: review.avgSleep,
                     topSymptoms: review.topSymptoms, isComplete: review.isComplete
                 )
@@ -217,6 +228,8 @@ enum BackupService {
             log.basicsCompleted = backup.basicsCompleted
             log.factors = backup.factors
             log.customMetrics = backup.customMetrics
+            log.peaksAndValleysNote = backup.peaksAndValleysNote
+            log.intentionsForTomorrow = backup.intentionsForTomorrow
             log.freeNote = backup.freeNote
             log.isComplete = backup.isComplete
             log.didEditMood = backup.didEditMood
@@ -239,6 +252,8 @@ enum BackupService {
             let review = WeeklyReview(weekStartDate: week)
             review.promptResponses = backup.promptResponses
             review.overallRating = backup.overallRating
+            review.peaksAndValleysNote = backup.peaksAndValleysNote
+            review.intentionsForTomorrow = backup.intentionsForTomorrow
             review.avgMood = backup.avgMood
             review.avgEnergy = backup.avgEnergy
             review.avgSleep = backup.avgSleep

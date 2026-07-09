@@ -29,11 +29,15 @@ import SwiftData
         log.freeNote = "rough morning"
         log.isComplete = true
         log.hkSteps = 8200
+        log.peaksAndValleysNote = "Best: a walk. Worst: a headache."
+        log.intentionsForTomorrow = "Sleep earlier"
 
         var review = BackupService.WeeklyReviewBackup(weekStartDate: day(10).startOfWeek)
         review.overallRating = 4
         review.promptResponses = [PromptResponse(section: "Wins This Week", prompt: "What went well?", response: "Slept more")]
         review.isComplete = true
+        review.peaksAndValleysNote = "Best: the whole week went smoothly."
+        review.intentionsForTomorrow = "Start the week with a plan"
 
         return BackupService.Document(
             dailyLogs: [log],
@@ -59,7 +63,12 @@ import SwiftData
         #expect(log.factors == ["Alcohol"])
         #expect(log.customMetrics.first?.trackerID == trackerID)
         #expect(log.hkSteps == 8200)
-        #expect(decoded.weeklyReviews.first?.promptResponses.first?.response == "Slept more")
+        #expect(log.peaksAndValleysNote == "Best: a walk. Worst: a headache.")
+        #expect(log.intentionsForTomorrow == "Sleep earlier")
+        let review = try #require(decoded.weeklyReviews.first)
+        #expect(review.promptResponses.first?.response == "Slept more")
+        #expect(review.peaksAndValleysNote == "Best: the whole week went smoothly.")
+        #expect(review.intentionsForTomorrow == "Start the week with a plan")
         #expect(decoded.symptomTags.first?.name == "Tinnitus")
         #expect(decoded.medications.first?.dosage == "50 mg")
         #expect(decoded.flares.first?.peakSeverity == 8)
@@ -80,9 +89,14 @@ import SwiftData
         let logs = try context.fetch(FetchDescriptor<DailyLog>())
         #expect(logs.count == 1)
         #expect(logs.first?.customMetrics.first?.trackerID == trackerID)
+        #expect(logs.first?.peaksAndValleysNote == "Best: a walk. Worst: a headache.")
+        #expect(logs.first?.intentionsForTomorrow == "Sleep earlier")
         // Tracker id must survive restore — metric history is keyed by it.
         let trackers = try context.fetch(FetchDescriptor<CustomTracker>())
         #expect(trackers.first?.id == trackerID)
+        let reviews = try context.fetch(FetchDescriptor<WeeklyReview>())
+        #expect(reviews.first?.peaksAndValleysNote == "Best: the whole week went smoothly.")
+        #expect(reviews.first?.intentionsForTomorrow == "Start the week with a plan")
     }
 
     @Test("Restore merges: existing records win, missing ones are added")

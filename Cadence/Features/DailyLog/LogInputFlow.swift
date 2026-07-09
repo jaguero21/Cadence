@@ -42,6 +42,10 @@ struct LogInputFlow: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var audioRecorder = AudioRecorder()
     private let attachmentStore = AttachmentStore()
+    @State private var peaksAndValleysNote: String = ""
+    @State private var peaksAndValleysVoiceMemo: Attachment?
+    @State private var peaksAndValleysRecorder = AudioRecorder()
+    @State private var intentionsForTomorrow: String = ""
     @State private var freeNote: String = ""
     @State private var hkSnapshot: HealthKitSnapshot?
     @State private var isHydrated = false
@@ -67,6 +71,8 @@ struct LogInputFlow: View {
                         case .basics:      basicsStep
                         case .symptoms:    symptomStep
                         case .factors:     factorsStep
+                        case .peaksAndValleys: peaksAndValleysStep
+                        case .intentions:  intentionsStep
                         case .note:        noteStep
                         case .done:        doneStep
                         }
@@ -102,7 +108,10 @@ struct LogInputFlow: View {
                     selectedFactors  = log.factors
                     customValues     = Dictionary(log.customMetrics.map { ($0.trackerID, $0.value) }, uniquingKeysWith: { a, _ in a })
                     attachments      = log.attachments
-                    hydratedAttachmentIDs = Set(log.attachments.map(\.id))
+                    hydratedAttachmentIDs = Set(log.attachments.map(\.id) + [log.peaksAndValleysVoiceMemo?.id].compactMap { $0 })
+                    peaksAndValleysNote     = log.peaksAndValleysNote
+                    peaksAndValleysVoiceMemo = log.peaksAndValleysVoiceMemo
+                    intentionsForTomorrow   = log.intentionsForTomorrow
                     freeNote         = log.freeNote
                 } else {
                     hkTask = Task { await applyHealthKitData() }
@@ -114,7 +123,7 @@ struct LogInputFlow: View {
                 // swipe-away) but only when a log is already in progress, to
                 // avoid phantom entries. Attachments count as progress — their
                 // binaries are already on disk and would be orphaned otherwise.
-                if existingLog != nil || createdLog != nil || !attachments.isEmpty {
+                if existingLog != nil || createdLog != nil || !attachments.isEmpty || peaksAndValleysVoiceMemo != nil {
                     partialSave()
                 }
             }
@@ -379,6 +388,65 @@ struct LogInputFlow: View {
         .cadenceCard()
     }
 
+    // MARK: - Peaks & Valleys Step
+
+    private var peaksAndValleysStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            LogSectionHeader(icon: "arrow.up.arrow.down.circle", title: "PEAKS AND VALLEYS", time: "~60 sec")
+            Text("What were the peaks and valleys of your day?")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            TextField(
+                "The best and hardest parts of today…",
+                text: $peaksAndValleysNote,
+                axis: .vertical
+            )
+            .lineLimit(4...8)
+            .padding(12)
+            .background(Color(.systemFill), in: RoundedRectangle(cornerRadius: 10))
+
+            VoiceMemoRow(
+                attachment: $peaksAndValleysVoiceMemo,
+                recorder: peaksAndValleysRecorder,
+                store: attachmentStore,
+                onReplace: { old, _ in if let old { deleteVoiceMemoFile(old) } },
+                onDelete: { deleteVoiceMemoFile($0) }
+            )
+        }
+        .cadenceCard()
+    }
+
+    // Mirrors removeAttachment's hydrated-vs-session deletion bookkeeping: a
+    // memo added this session can go immediately, but a persisted one keeps
+    // its binary until the save that drops the reference succeeds.
+    private func deleteVoiceMemoFile(_ attachment: Attachment) {
+        if hydratedAttachmentIDs.contains(attachment.id) {
+            pendingFileDeletions.append(attachment.filename)
+        } else {
+            attachmentStore.delete(attachment.filename)
+        }
+    }
+
+    // MARK: - Intentions Step
+
+    private var intentionsStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            LogSectionHeader(icon: "sunrise.fill", title: "INTENTIONS FOR TOMORROW", time: "~30 sec")
+            Text("Write your intentions for tomorrow.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            TextField(
+                "What do you want to carry into tomorrow?",
+                text: $intentionsForTomorrow,
+                axis: .vertical
+            )
+            .lineLimit(4...8)
+            .padding(12)
+            .background(Color(.systemFill), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .cadenceCard()
+    }
+
     // MARK: - Note Step
 
     private var noteStep: some View {
@@ -608,6 +676,9 @@ struct LogInputFlow: View {
         log.factors         = selectedFactors
         log.customMetrics   = customValues.map { MetricEntry(trackerID: $0.key, value: $0.value) }
         log.attachments     = attachments
+        log.peaksAndValleysNote     = peaksAndValleysNote
+        log.peaksAndValleysVoiceMemo = peaksAndValleysVoiceMemo
+        log.intentionsForTomorrow   = intentionsForTomorrow
         log.freeNote        = freeNote
         log.didEditMetrics  = didEditMetrics
         if let snapshot = hkSnapshot {

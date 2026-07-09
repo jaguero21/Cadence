@@ -19,6 +19,9 @@ final class DailyLog {
     var factors: [String] = []   // contextual triggers logged that day (e.g. "Alcohol")
     var customMetrics: [MetricEntry] = []   // values for user-defined CustomTrackers
     var attachments: [Attachment] = []      // photo/voice references; binaries live on disk
+    var peaksAndValleysNote: String = ""    // "What were the peaks and valleys of your day?"
+    var peaksAndValleysVoiceMemo: Attachment?   // optional single voice memo; binary lives on disk (see AttachmentStore)
+    var intentionsForTomorrow: String = ""  // "Write your intentions for tomorrow."
     var freeNote: String = ""
     var isComplete: Bool = false
     var didEditMood: Bool = false
@@ -43,6 +46,8 @@ final class DailyLog {
         self.sleepQuality = 5
         self.stressLevel = 5
         self.basicsCompleted = []
+        self.peaksAndValleysNote = ""
+        self.intentionsForTomorrow = ""
         self.freeNote = ""
         self.isComplete = false
         self.didEditMood = false
@@ -85,6 +90,9 @@ struct DailyLogSnapshot: Sendable {
     let factors: [String]
     let customMetrics: [MetricEntry]
     let didEditMetrics: Bool
+    let peaksAndValleysNote: String
+    let hasPeaksAndValleysVoiceMemo: Bool
+    let intentionsForTomorrow: String
 
     init(_ log: DailyLog) {
         date           = log.date
@@ -96,6 +104,9 @@ struct DailyLogSnapshot: Sendable {
         factors        = log.factors
         customMetrics  = log.customMetrics
         didEditMetrics = log.didEditMetrics
+        peaksAndValleysNote = log.peaksAndValleysNote
+        hasPeaksAndValleysVoiceMemo = log.peaksAndValleysVoiceMemo != nil
+        intentionsForTomorrow = log.intentionsForTomorrow
     }
 
     init(
@@ -107,7 +118,10 @@ struct DailyLogSnapshot: Sendable {
         symptoms: [SymptomEntry] = [],
         factors: [String] = [],
         customMetrics: [MetricEntry] = [],
-        didEditMetrics: Bool = false
+        didEditMetrics: Bool = false,
+        peaksAndValleysNote: String = "",
+        hasPeaksAndValleysVoiceMemo: Bool = false,
+        intentionsForTomorrow: String = ""
     ) {
         self.date = date
         self.mood = mood
@@ -118,6 +132,9 @@ struct DailyLogSnapshot: Sendable {
         self.factors = factors
         self.customMetrics = customMetrics
         self.didEditMetrics = didEditMetrics
+        self.peaksAndValleysNote = peaksAndValleysNote
+        self.hasPeaksAndValleysVoiceMemo = hasPeaksAndValleysVoiceMemo
+        self.intentionsForTomorrow = intentionsForTomorrow
     }
 }
 
