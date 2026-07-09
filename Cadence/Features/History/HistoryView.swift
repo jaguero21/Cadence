@@ -378,7 +378,8 @@ struct LogDetailView: View {
                     }
                 }
 
-                if log.hkSteps != nil || log.hkHRV != nil {
+                if log.hkSteps != nil || log.hkHRV != nil || log.hkRestingHR != nil
+                    || log.hkSleepHours != nil || log.hkActiveEnergy != nil || log.hkMindfulMinutes != nil {
                     Section("HealthKit Data") {
                         if let steps = log.hkSteps {
                             Label("\(steps) steps", systemImage: "figure.walk")
@@ -388,6 +389,15 @@ struct LogDetailView: View {
                         }
                         if let hr = log.hkRestingHR {
                             Label(String(format: "Resting HR: %.0f bpm", hr), systemImage: "heart.fill")
+                        }
+                        if let sleep = log.hkSleepHours {
+                            Label(String(format: "Sleep (measured): %.1f hrs", sleep), systemImage: "moon.zzz.fill")
+                        }
+                        if let energy = log.hkActiveEnergy {
+                            Label(String(format: "Active energy: %.0f kcal", energy), systemImage: "flame.fill")
+                        }
+                        if let mindful = log.hkMindfulMinutes {
+                            Label(String(format: "Mindful minutes: %.0f min", mindful), systemImage: "brain.head.profile")
                         }
                     }
                 }
