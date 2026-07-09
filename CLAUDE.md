@@ -65,8 +65,18 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   the doctor PDF. `PatternEngine.flarePrecursors` compares the
   `flarePrecursorWindowDays` run-up before each flare against baseline days
   (in-flare days excluded from both sides) and surfaces stress-rise
-  (`flare-stress`) and sleep-dip (`flare-sleep`) early-warning cards; needs
+  (`flare-stress`), sleep-dip (`flare-sleep`), and overnight wrist-temperature
+  rise (`flare-temp`, from HealthKit-fed `hkWristTemp`; only days carrying a
+  measurement participate) early-warning cards; needs
   `minimumFlaresForPattern` flares with run-up data.
+- **HealthKit is always optional.** HK values only prefill or supplement —
+  the sleep sliders, the "Menstrual cycle" factor chip (auto-selected via
+  `LogInputFlow.menstrualCycleFactorName` when Health has a flow entry today),
+  and the `hk*` objective fields. Nothing is gated on Health access, prefills
+  never overwrite user-entered values (`didEditMetrics` guard), and every
+  loggable variable stays fully manual. Every type in
+  `HealthKitService.readTypes` must be fetched by `fetchLogSnapshot` —
+  requesting permission for data that's never read is a broken promise.
 - **Factor (trigger) logging:** `DailyLog.factors: [String]` holds contextual
   triggers chosen from a fixed list (`LogInputFlow.factorItems`) in the `.factors`
   log step — same hardcoded-list pattern as `basicsCompleted` (no model).

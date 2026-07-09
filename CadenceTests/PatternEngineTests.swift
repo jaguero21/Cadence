@@ -26,7 +26,8 @@ private func makeSnapshot(
     painLevel: Int = 0,
     brainFogLevel: Int = 0,
     hkSteps: Int? = nil,
-    hkRestingHR: Double? = nil
+    hkRestingHR: Double? = nil,
+    hkWristTemp: Double? = nil
 ) -> DailyLogSnapshot {
     let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)!
     return DailyLogSnapshot(
@@ -48,7 +49,8 @@ private func makeSnapshot(
         intentionsForTomorrow: intentionsForTomorrow,
         freeNote: freeNote,
         hkSteps: hkSteps,
-        hkRestingHR: hkRestingHR
+        hkRestingHR: hkRestingHR,
+        hkWristTemp: hkWristTemp
     )
 }
 
@@ -422,7 +424,7 @@ struct CSVBuilderTests {
             makeSnapshot(daysAgo: 2),
         ]
         let lines = CSVBuilder.csvString(from: logs).split(separator: "\n", omittingEmptySubsequences: false)
-        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes")
+        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes,HK Wrist Temp")
         #expect(lines.count == 3) // header + 2 rows
         // Oldest first: the day -2 row precedes the day 0 row.
         #expect(lines[1] < lines[2]) // ISO yyyy-MM-dd sorts chronologically as text
@@ -1042,6 +1044,32 @@ struct FlarePrecursorsTests {
     @Test("No precursor when the run-up looks like baseline")
     func noSignal() {
         let cards = flareCards(logs(preStress: 5, baseStress: 5, preSleep: 7.5, baseSleep: 7.5), flares: flares)
+        #expect(cards.isEmpty)
+    }
+
+    // Wrist-temperature run-up: only days carrying a measurement participate.
+    private func tempLogs(preTemp: Double?, baseTemp: Double?) -> [DailyLogSnapshot] {
+        (0..<30).map { daysAgo in
+            let isPre = (21...23).contains(daysAgo) || (9...11).contains(daysAgo)
+            return makeSnapshot(daysAgo: daysAgo, hkWristTemp: isPre ? preTemp : baseTemp)
+        }
+    }
+
+    @Test("Elevated overnight wrist temperature before flares surfaces flare-temp")
+    func temperaturePrecursor() {
+        let cards = flareCards(tempLogs(preTemp: 35.4, baseTemp: 34.9), flares: flares)
+        #expect(cards.map(\.key) == ["flare-temp"])
+    }
+
+    @Test("A sub-threshold temperature rise stays quiet")
+    func temperatureBelowThreshold() {
+        let cards = flareCards(tempLogs(preTemp: 35.0, baseTemp: 34.9), flares: flares)
+        #expect(cards.isEmpty)
+    }
+
+    @Test("No flare-temp without wrist-temperature data (no watch)")
+    func noTemperatureData() {
+        let cards = flareCards(tempLogs(preTemp: nil, baseTemp: nil), flares: flares)
         #expect(cards.isEmpty)
     }
 }

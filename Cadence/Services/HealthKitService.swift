@@ -50,9 +50,10 @@ final class HealthKitService: HealthKitServiceProtocol {
     private let readTypes: Set<HKObjectType> = {
         let quantity: [HKQuantityTypeIdentifier] = [
             .restingHeartRate, .heartRateVariabilitySDNN, .stepCount, .activeEnergyBurned,
+            .appleSleepingWristTemperature,
         ]
         let category: [HKCategoryTypeIdentifier] = [
-            .sleepAnalysis, .mindfulSession,
+            .sleepAnalysis, .mindfulSession, .menstrualFlow,
         ]
         let quantityTypes = quantity.compactMap { HKObjectType.quantityType(forIdentifier: $0) }
         let categoryTypes = category.compactMap { HKObjectType.categoryType(forIdentifier: $0) }
@@ -68,9 +69,11 @@ final class HealthKitService: HealthKitServiceProtocol {
     }
 
     // Fetches the right HealthKit data for today's daily log:
-    // - Steps, active energy, and mindful minutes from today (daytime activity
-    //   logged so far)
-    // - Resting HR, HRV, and sleep from yesterday (overnight metrics)
+    // - Steps, active energy, mindful minutes, and menstrual flow from today
+    // - Resting HR and HRV from yesterday (daily aggregates)
+    // - Sleep and wrist temperature from LAST NIGHT: 6pm yesterday → now, so
+    //   the post-midnight bulk of a normal night is included (a window that
+    //   ends at midnight silently drops most of it)
     // Every type in readTypes is fetched here — requesting permission for a
     // type this snapshot never reads would be a broken promise to the user.
     func fetchLogSnapshot() async -> HealthKitSnapshot {
@@ -78,15 +81,19 @@ final class HealthKitService: HealthKitServiceProtocol {
         let cal = Calendar.current
         let todayStart    = cal.startOfDay(for: .now)
         let yesterdayStart = cal.date(byAdding: .day, value: -1, to: todayStart) ?? todayStart
+        let lastNightStart = cal.date(byAdding: .hour, value: 18, to: yesterdayStart) ?? yesterdayStart
         let todayPredicate     = HKQuery.predicateForSamples(withStart: todayStart, end: .now)
         let yesterdayPredicate = HKQuery.predicateForSamples(withStart: yesterdayStart, end: todayStart)
+        let nightPredicate     = HKQuery.predicateForSamples(withStart: lastNightStart, end: .now)
 
         async let steps   = fetchSum(.stepCount, unit: .count(), predicate: todayPredicate)
         async let energy  = fetchSum(.activeEnergyBurned, unit: .kilocalorie(), predicate: todayPredicate)
         async let mindful = fetchDurationMinutes(.mindfulSession, predicate: todayPredicate)
+        async let flow    = fetchHasMenstrualFlow(predicate: todayPredicate)
         async let hr    = fetchLatest(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: yesterdayPredicate)
         async let hrv   = fetchLatest(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), predicate: yesterdayPredicate)
-        async let sleep = fetchSleepDetail(start: yesterdayStart, end: todayStart)
+        async let temp  = fetchAverage(.appleSleepingWristTemperature, unit: .degreeCelsius(), predicate: nightPredicate)
+        async let sleep = fetchSleepDetail(start: lastNightStart, end: .now)
 
         let sleepDetail = await sleep
         return await HealthKitSnapshot(
@@ -96,7 +103,9 @@ final class HealthKitService: HealthKitServiceProtocol {
             sleepHours: sleepDetail.hours,
             activeEnergy: energy,
             mindfulMinutes: mindful,
-            sleepQuality: sleepDetail.quality
+            sleepQuality: sleepDetail.quality,
+            wristTemperature: temp,
+            menstrualFlow: flow
         )
     }
 
@@ -147,6 +156,42 @@ final class HealthKitService: HealthKitServiceProtocol {
                 guard error == nil else { cont.resume(returning: nil); return }
                 let qty = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: unit)
                 cont.resume(returning: qty)
+            }
+            store.execute(query)
+        }
+    }
+
+    // Average of a discrete quantity (e.g. overnight wrist temperature).
+    nonisolated private func fetchAverage(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
+        guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
+        return await withCheckedContinuation { cont in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .discreteAverage) { _, stats, error in
+                if let error { Self.log.error("fetchAverage(\(id.rawValue, privacy: .public)) failed: \(error, privacy: .public)") }
+                guard error == nil else { cont.resume(returning: nil); return }
+                cont.resume(returning: stats?.averageQuantity()?.doubleValue(for: unit))
+            }
+            store.execute(query)
+        }
+    }
+
+    // Whether any menstrual-flow sample (of any intensity) overlaps the window.
+    // nil = no data (not asked / not tracked); false is never reported because
+    // an absent sample can't distinguish "no flow" from "doesn't track cycles".
+    nonisolated private func fetchHasMenstrualFlow(predicate: NSPredicate) async -> Bool? {
+        guard let type = HKObjectType.categoryType(forIdentifier: .menstrualFlow) else { return nil }
+        return await withCheckedContinuation { cont in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                if let error { Self.log.error("fetchHasMenstrualFlow failed: \(error, privacy: .public)") }
+                guard error == nil, let samples else { cont.resume(returning: nil); return }
+                // Raw value 5 = "none" in both HKCategoryValueMenstrualFlow and
+                // its iOS 18 rename HKCategoryValueVaginalBleeding — pinned
+                // numerically because the old name is deprecated and the new
+                // one needs iOS 18, while our target is iOS 17.
+                let noneRawValue = 5
+                let hasFlow = samples.contains {
+                    ($0 as? HKCategorySample).map { $0.value != noneRawValue } ?? false
+                }
+                cont.resume(returning: hasFlow ? true : nil)
             }
             store.execute(query)
         }
@@ -216,4 +261,6 @@ struct HealthKitSnapshot {
     var activeEnergy: Double?     // kcal, today's sum
     var mindfulMinutes: Double?   // minutes, today's sessions
     var sleepQuality: Int?        // 0–10, derived from sleep stages; nil without stage data
+    var wristTemperature: Double? // °C, last night's average (Watch Series 8+)
+    var menstrualFlow: Bool?      // true when Health has a flow entry today; nil = no data
 }

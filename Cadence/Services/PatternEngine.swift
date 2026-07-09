@@ -385,6 +385,29 @@ enum PatternEngine {
                 category: .sleep
             ))
         }
+
+        // Overnight wrist temperature (HealthKit, Watch Series 8+): only days
+        // that carry a measurement participate; users without a watch simply
+        // never see this card. Requires readings on both sides so a single
+        // warm night can't fabricate a pattern.
+        let preTemps = preFlareLogs.compactMap(\.hkWristTemp)
+        let baseTemps = baselineLogs.compactMap(\.hkWristTemp)
+        if preTemps.count >= PatternThreshold.minimumFlaresForPattern,
+           baseTemps.count >= PatternThreshold.minimumLogs {
+            let preTemp = preTemps.reduce(0, +) / Double(preTemps.count)
+            let baseTemp = baseTemps.reduce(0, +) / Double(baseTemps.count)
+            if preTemp - baseTemp >= PatternThreshold.flareTempDeltaThreshold {
+                cards.append(InsightCard(
+                    key: "flare-temp",
+                    title: "Wrist temperature tends to run high before your flares",
+                    detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, your overnight wrist temperature averaged \(String(format: "%.1f", preTemp))°C versus \(String(format: "%.1f", baseTemp))°C on typical days.",
+                    icon: "thermometer.medium",
+                    color: CadenceColor.energyOrange,
+                    confidence: min((preTemp - baseTemp) / (2 * PatternThreshold.flareTempDeltaThreshold), 1.0),
+                    category: .symptom
+                ))
+            }
+        }
         return cards
     }
 
