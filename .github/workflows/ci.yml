@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & test (iOS simulator)
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode on the runner
+        run: |
+          XCODE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+
+      # The Cadence scheme embeds the watch app, so building it requires a
+      # watchOS simulator runtime. Runner images usually ship one for the
+      # selected Xcode; download only if it's missing.
+      - name: Ensure watchOS simulator runtime
+        run: |
+          if ! xcrun simctl list runtimes | grep -q watchOS; then
+            echo "watchOS runtime missing — downloading"
+            sudo xcodebuild -downloadPlatform watchOS
+          fi
+          xcrun simctl list runtimes
+
+      - name: Pick an iPhone simulator destination
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime, devices in sorted(data['devices'].items(), reverse=True):
+              if 'iOS' not in runtime:
+                  continue
+              for d in devices:
+                  if 'iPhone' in d['name'] and d['isAvailable']:
+                      print(d['udid']); sys.exit(0)
+          sys.exit(1)")
+          echo "Selected simulator: $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build and run tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Cadence.xcodeproj \
+            -scheme Cadence \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            2>&1 | tee xcodebuild.log | grep -E "^(Test Suite|Test Case|✔|✘)|error:|warning: main actor|\*\* (BUILD|TEST)" || true
+          # Fail the job on the real xcodebuild exit code, not the grep's.
+          tail -5 xcodebuild.log
+          grep -q "\*\* TEST SUCCEEDED \*\*" xcodebuild.log
+
+      - name: Upload full build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log

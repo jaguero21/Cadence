@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import WidgetKit
 import OSLog
 
 
@@ -13,18 +14,30 @@ struct CadenceApp: App {
     static private(set) var usingFallbackStorage = false
     // Set when even the in-memory fallback failed; app runs without SwiftData.
     static private(set) var containerFailed = false
+    // Set when the CloudKit-mirrored store initialised (vs the local-only
+    // fallback). CloudSyncMonitor uses this to show a truthful sync status.
+    static private(set) var usingCloudKitStore = false
 
-    var sharedModelContainer: ModelContainer? = {
+    // Static so App Intents (which run outside the SwiftUI scene) reach the
+    // same container the UI uses; `static let` keeps it single-init even if
+    // the App struct is re-created.
+    static let sharedModelContainer: ModelContainer? = {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self])
+        // UI tests get an isolated in-memory store so runs are deterministic.
+        if AppLaunch.isUITesting {
+            let testConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try? ModelContainer(for: schema, configurations: [testConfig])
+        }
         // CloudKit mirroring: syncs across the user's devices once the iCloud +
         // CloudKit capability is enabled on the target. If the entitlement is
         // absent (e.g. a build without iCloud), this init fails and we fall back
         // to a local-only store below, so the app still works offline.
         let cloudConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
         if let container = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
+            CadenceApp.usingCloudKitStore = true
             return container
         }
         // Local-only persistent store (no CloudKit) — used when the iCloud
@@ -44,11 +57,13 @@ struct CadenceApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let container = sharedModelContainer {
+            if let container = Self.sharedModelContainer {
                 Group {
                     if appState.hasCompletedOnboarding {
                         ContentView()
                             .task {
+                                // No system permission prompts during UI tests.
+                                guard !AppLaunch.isUITesting else { return }
                                 appState.notificationsAuthorized = await NotificationService.shared.requestAuthorization()
                                 appState.healthKitAuthorized = (try? await HealthKitService.shared.requestAuthorization()) ?? HealthKitService.shared.isAuthorized
                                 if appState.notificationsAuthorized {
@@ -120,9 +135,11 @@ struct ContentView: View {
             guard phase == .active else { return }
             let startOfToday = Calendar.current.startOfDay(for: .now)
             if startOfToday != today { today = startOfToday }
+            applyPendingQuickLogs()
             checkForNewInsights()
         }
         .task { seedSymptomTagsIfNeeded() }
+        .task { applyPendingQuickLogs() }
         .sheet(isPresented: $appState.showingProPaywall) {
             ProPaywallView()
         }
@@ -133,28 +150,62 @@ struct ContentView: View {
         }
     }
 
-    // On foreground, recompute insights, persist any newly-emerged patterns, and
-    // notify the user about the most confident new one (Pro only — insights are a
-    // Pro feature). Recording is idempotent, so this notifies once per pattern.
+    // On foreground, recompute insights via the shared pipeline (same 90-day
+    // window and inputs as the Insights tab, so a notification can never
+    // advertise a pattern the tab doesn't show), persist newly-emerged ones,
+    // and notify about the most confident new pattern (Pro only). Throttled to
+    // once per calendar day — patterns move on daily granularity, and running
+    // the engine on every unlock/app-switch is wasted main-thread work.
     private func checkForNewInsights() {
         guard store.isPro else { return }
-        let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
-        guard logs.count >= PatternThreshold.minimumLogs else { return }
-        let medications = (try? modelContext.fetch(FetchDescriptor<Medication>())) ?? []
-        let insights = PatternEngine.allInsights(
-            from: logs.map(DailyLogSnapshot.init),
-            medications: medications.map(MedicationSnapshot.init)
-        )
-        let new = InsightRecorder.record(insights, context: modelContext)
+        let startOfToday = Calendar.current.startOfDay(for: .now)
+        let lastCheck = UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay)
+        guard lastCheck != startOfToday.timeIntervalSinceReferenceDate else { return }
+        UserDefaults.standard.set(startOfToday.timeIntervalSinceReferenceDate, forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        let new = InsightRecorder.detectAndRecord(context: modelContext)
         if let top = new.filter({ $0.confidence >= PatternThreshold.minimumConfidence })
             .max(by: { $0.confidence < $1.confidence }) {
             notificationService.sendInsightNotification(title: top.title)
         }
     }
 
+    // Persist mood taps made on the widget since the last foreground. Each tap
+    // carries the day it was made, and the upsert seam attributes it there — a
+    // tap from last night lands on yesterday's log, never clobbering today.
+    // After applying, the summary is republished so the widget's "mood saved"
+    // interim state resolves to real store-backed data.
+    private func applyPendingQuickLogs() {
+        guard !AppLaunch.isUITesting else { return }
+        let pending = WidgetData.consumePendingQuickLogs()
+        guard !pending.isEmpty else { return }
+        var applied = false
+        for entry in pending {
+            if PhoneConnectivityManager.applyQuickLog(entry.payload, context: modelContext) {
+                applied = true
+            }
+        }
+        if applied {
+            let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
+            DashboardViewModel.publishWidgetSummary(logs: logs)
+            // publishWidgetSummary skips its reload when the summary is
+            // unchanged — and a quick log doesn't complete the day, so it
+            // usually is. Reload explicitly so the widget's interim
+            // "mood saved" state clears now that the tap is store-backed.
+            WidgetCenter.shared.reloadTimelines(ofKind: WidgetData.widgetKind)
+        }
+    }
+
     private func seedSymptomTagsIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: symptomSeedKey) else { return }
-        for tag in SymptomTag.defaults { modelContext.insert(tag) }
+        // Dedup against tags already in the store (reinstall over an existing
+        // CloudKit database, or a sync that landed before first launch). A
+        // second device seeding before its first sync completes can still race;
+        // name-based dedup here covers every case where the data is visible.
+        let existingNames = Set(((try? modelContext.fetch(FetchDescriptor<SymptomTag>())) ?? []).map(\.name))
+        for tag in SymptomTag.defaults where !existingNames.contains(tag.name) {
+            modelContext.insert(tag)
+        }
         do {
             try modelContext.save()
             UserDefaults.standard.set(true, forKey: symptomSeedKey)

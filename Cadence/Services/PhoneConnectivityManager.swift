@@ -1,12 +1,14 @@
 import Foundation
 import SwiftData
 import WatchConnectivity
-import WidgetKit
 import OSLog
 
-// Receives quick-log payloads from the Watch app and persists them as today's
-// DailyLog. Payloads are plain [String: Any] dictionaries (keys: "mood",
-// "energy", "date") so no model types need to be shared with the watch target.
+// Receives quick-log payloads from the Watch app and persists them into the
+// day they were RECORDED (payload "date"), not the day they arrive — a
+// transferUserInfo payload queued overnight must not clobber the new day's
+// log. Payloads are plain [String: Any] dictionaries (keys: "mood", "energy",
+// "date" as timeIntervalSinceReferenceDate) so no model types are shared with
+// the watch target.
 @MainActor
 final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
     static let shared = PhoneConnectivityManager()
@@ -20,19 +22,24 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
         WCSession.default.activate()
     }
 
-    @MainActor
-    private func applyQuickLog(_ payload: [String: Any]) {
-        guard let container, let mood = payload["mood"] as? Int else { return }
-        let context = container.mainContext
-        let today = Calendar.current.startOfDay(for: .now)
+    // Core upsert, static and context-injected so tests can exercise it against
+    // an in-memory container (the seam the watch↔phone bridge hinges on).
+    // Returns whether anything was persisted.
+    @discardableResult
+    static func applyQuickLog(_ payload: [String: Any], context: ModelContext) -> Bool {
+        guard let mood = payload["mood"] as? Int else { return false }
 
-        // Upsert today's log so a wrist entry merges with an in-progress day.
-        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == today })
+        // Attribute the entry to the day it was recorded on the wrist.
+        let recordedAt = (payload["date"] as? TimeInterval).map(Date.init(timeIntervalSinceReferenceDate:)) ?? .now
+        let day = Calendar.current.startOfDay(for: recordedAt)
+
+        // Upsert that day's log so a wrist entry merges with an in-progress day.
+        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == day })
         let log: DailyLog
         if let existing = try? context.fetch(descriptor).first {
             log = existing
         } else {
-            log = DailyLog()
+            log = DailyLog(date: day)
             context.insert(log)
         }
 
@@ -45,9 +52,22 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
 
         do {
             try context.save()
-            WidgetCenter.shared.reloadAllTimelines()
+            return true
         } catch {
             Self.log.error("Failed to save watch quick-log: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    @MainActor
+    private func applyQuickLog(_ payload: [String: Any]) {
+        guard let container else { return }
+        let context = container.mainContext
+        if Self.applyQuickLog(payload, context: context) {
+            // Publish a fresh widget summary — a bare timeline reload would
+            // just republish the stale App Group data.
+            let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
+            DashboardViewModel.publishWidgetSummary(logs: logs)
         }
     }
 
@@ -55,6 +75,15 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         Task { @MainActor in self.applyQuickLog(message) }
+    }
+
+    // Reply-expected variant: the watch uses the reply as a delivery ack to
+    // show "Sent" vs "Queued" truthfully.
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        Task { @MainActor in
+            self.applyQuickLog(message)
+            replyHandler(["ok": true])
+        }
     }
 
     nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {

@@ -1,9 +1,13 @@
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 struct Provider: TimelineProvider {
-    private var fallback: WidgetData.Summary {
-        WidgetData.Summary(date: .now, loggedToday: false, streak: 0)
+    // Staleness resolution lives in WidgetData.resolved (shared with the app
+    // target and unit-tested there): the stored summary describes the day it
+    // was written and must be reinterpreted after midnight.
+    private func currentSummary() -> WidgetData.Summary {
+        WidgetData.resolved(WidgetData.read())
     }
 
     func placeholder(in context: Context) -> CadenceEntry {
@@ -11,12 +15,13 @@ struct Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CadenceEntry) -> Void) {
-        completion(CadenceEntry(date: .now, summary: WidgetData.read() ?? fallback))
+        completion(CadenceEntry(date: .now, summary: currentSummary(), pendingMood: WidgetData.pendingMood(on: .now)))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CadenceEntry>) -> Void) {
-        let entry = CadenceEntry(date: .now, summary: WidgetData.read() ?? fallback)
-        // Refresh after midnight so "today" status resets even if the app isn't opened.
+        let entry = CadenceEntry(date: .now, summary: currentSummary(), pendingMood: WidgetData.pendingMood(on: .now))
+        // Refresh after midnight so currentSummary() re-evaluates staleness for
+        // the new day even if the app isn't opened.
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
         let nextMidnight = Calendar.current.startOfDay(for: tomorrow)
         completion(Timeline(entries: [entry], policy: .after(nextMidnight)))
@@ -26,6 +31,8 @@ struct Provider: TimelineProvider {
 struct CadenceEntry: TimelineEntry {
     let date: Date
     let summary: WidgetData.Summary
+    // A mood tapped on the widget that the app hasn't picked up yet.
+    var pendingMood: Int?
 }
 
 struct CadenceWidgetEntryView: View {
@@ -56,18 +63,36 @@ struct CadenceWidgetEntryView: View {
                 Label("Logged today", systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.green)
-            } else {
-                Label("Not logged yet", systemImage: "circle")
+            } else if let mood = entry.pendingMood {
+                // A tap was recorded but the app hasn't opened to persist it —
+                // "saved", not "logged", stays truthful about the difference.
+                Label("\(MoodScale.emoji(for: mood)) Mood saved", systemImage: "checkmark.circle")
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.green)
+            } else {
+                moodButtons
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
+
+    // One-tap quick log straight from the home screen.
+    private var moodButtons: some View {
+        HStack(spacing: family == .systemSmall ? 2 : 6) {
+            ForEach(1...5, id: \.self) { value in
+                Button(intent: WidgetQuickLogIntent(mood: value)) {
+                    Text(MoodScale.emoji(for: value))
+                        .font(.system(size: family == .systemSmall ? 15 : 18))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Log mood \(value) of 5")
+            }
+        }
+    }
 }
 
 struct CadenceWidget: Widget {
-    let kind = "CadenceWidget"
+    let kind = WidgetData.widgetKind
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
