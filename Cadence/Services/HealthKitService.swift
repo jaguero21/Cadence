@@ -68,8 +68,11 @@ final class HealthKitService: HealthKitServiceProtocol {
     }
 
     // Fetches the right HealthKit data for today's daily log:
-    // - Steps from today (daytime activity logged so far)
+    // - Steps, active energy, and mindful minutes from today (daytime activity
+    //   logged so far)
     // - Resting HR, HRV, and sleep from yesterday (overnight metrics)
+    // Every type in readTypes is fetched here — requesting permission for a
+    // type this snapshot never reads would be a broken promise to the user.
     func fetchLogSnapshot() async -> HealthKitSnapshot {
         guard isAuthorized else { return HealthKitSnapshot() }
         let cal = Calendar.current
@@ -78,12 +81,21 @@ final class HealthKitService: HealthKitServiceProtocol {
         let todayPredicate     = HKQuery.predicateForSamples(withStart: todayStart, end: .now)
         let yesterdayPredicate = HKQuery.predicateForSamples(withStart: yesterdayStart, end: todayStart)
 
-        async let steps = fetchSum(.stepCount, unit: .count(), predicate: todayPredicate)
+        async let steps   = fetchSum(.stepCount, unit: .count(), predicate: todayPredicate)
+        async let energy  = fetchSum(.activeEnergyBurned, unit: .kilocalorie(), predicate: todayPredicate)
+        async let mindful = fetchDurationMinutes(.mindfulSession, predicate: todayPredicate)
         async let hr    = fetchLatest(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: yesterdayPredicate)
         async let hrv   = fetchLatest(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), predicate: yesterdayPredicate)
         async let sleep = fetchSleepHours(start: yesterdayStart, end: todayStart)
 
-        return await HealthKitSnapshot(steps: steps.map(Int.init), restingHR: hr, hrv: hrv, sleepHours: sleep)
+        return await HealthKitSnapshot(
+            steps: steps.map(Int.init),
+            restingHR: hr,
+            hrv: hrv,
+            sleepHours: sleep,
+            activeEnergy: energy,
+            mindfulMinutes: mindful
+        )
     }
 
     // MARK: - Private helpers
@@ -112,6 +124,22 @@ final class HealthKitService: HealthKitServiceProtocol {
                 guard error == nil else { cont.resume(returning: nil); return }
                 let qty = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: unit)
                 cont.resume(returning: qty)
+            }
+            store.execute(query)
+        }
+    }
+
+    // Sums the duration of category samples (e.g. mindful sessions) in minutes.
+    // Returns nil rather than 0 when there are no samples, so callers can
+    // distinguish "no data" from a genuine zero.
+    nonisolated private func fetchDurationMinutes(_ id: HKCategoryTypeIdentifier, predicate: NSPredicate) async -> Double? {
+        guard let type = HKObjectType.categoryType(forIdentifier: id) else { return nil }
+        return await withCheckedContinuation { cont in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                if let error { Self.log.error("fetchDurationMinutes(\(id.rawValue, privacy: .public)) failed: \(error, privacy: .public)") }
+                guard error == nil, let samples else { cont.resume(returning: nil); return }
+                let seconds = samples.reduce(0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+                cont.resume(returning: seconds > 0 ? seconds / 60 : nil)
             }
             store.execute(query)
         }
@@ -148,4 +176,6 @@ struct HealthKitSnapshot {
     var restingHR: Double?
     var hrv: Double?
     var sleepHours: Double?
+    var activeEnergy: Double?     // kcal, today's sum
+    var mindfulMinutes: Double?   // minutes, today's sessions
 }
