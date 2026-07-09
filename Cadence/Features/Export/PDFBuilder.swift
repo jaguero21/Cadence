@@ -304,6 +304,28 @@ enum PDFBuilder {
             review.weekLabel.draw(in: CGRect(x: 40, y: 40, width: 515, height: 30), withAttributes: headerAttrs)
             var y: CGFloat = 80
 
+            // The closing star rating and the auto-populated Week at a Glance
+            // stats, mirroring what the review flow itself shows.
+            var glanceLines: [String] = []
+            if review.overallRating > 0 {
+                let stars = String(repeating: "★", count: review.overallRating)
+                    + String(repeating: "☆", count: 5 - review.overallRating)
+                glanceLines.append("Overall week: \(stars) (\(review.overallRating)/5)")
+            }
+            if review.avgMood > 0 || review.avgEnergy > 0 || review.avgSleep > 0 {
+                glanceLines.append("Averages — mood \(String(format: "%.1f", review.avgMood))/5, energy \(String(format: "%.1f", review.avgEnergy))/10, sleep \(String(format: "%.1f", review.avgSleep)) hrs")
+            }
+            if !review.topSymptoms.isEmpty {
+                glanceLines.append("Top symptoms: \(review.topSymptoms.joined(separator: ", "))")
+            }
+            for line in glanceLines {
+                let h = textHeight(line, attrs: bodyAttrs, width: 515)
+                breakIfNeeded(y: &y, needing: h, ctx: ctx)
+                line.draw(in: CGRect(x: 40, y: y, width: 515, height: h), withAttributes: bodyAttrs)
+                y += h + 4
+            }
+            if !glanceLines.isEmpty { y += 12 }
+
             for response in review.promptResponses {
                 let sectionH = textHeight(response.section, attrs: sectionAttrs, width: 515)
                 let text = response.response.isEmpty ? "—" : response.response

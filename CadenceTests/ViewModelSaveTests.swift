@@ -412,3 +412,37 @@ struct WeeklyReviewStepMachineTests {
         #expect(vm.progress == Double(vm.totalSteps - 1) / Double(vm.totalSteps))
     }
 }
+
+// MARK: - WeeklyReviewSnapshot completeness
+
+// The personal PDF renders from this snapshot; every user-entered and derived
+// review field must survive the projection (only isComplete bookkeeping is
+// deliberately omitted). Regression for the audit that found the star rating
+// and Week at a Glance stats silently missing from the report.
+@MainActor
+@Suite("WeeklyReviewSnapshot – completeness")
+struct WeeklyReviewSnapshotTests {
+
+    @Test("Snapshot carries rating, intentions, prompts, and the at-a-glance stats")
+    func snapshotCarriesEveryField() {
+        let review = WeeklyReview(weekStartDate: .now)
+        review.promptResponses = [PromptResponse(section: "Wins This Week", prompt: "What went well?", response: "Slept more")]
+        review.overallRating = 4
+        review.intentionsForTomorrow = "Plan the week"
+        review.avgMood = 3.4
+        review.avgEnergy = 6.2
+        review.avgSleep = 7.1
+        review.topSymptoms = ["Headache", "Fatigue"]
+
+        let snapshot = WeeklyReviewSnapshot(review)
+
+        #expect(snapshot.promptResponses.first?.response == "Slept more")
+        #expect(snapshot.overallRating == 4)
+        #expect(snapshot.intentionsForTomorrow == "Plan the week")
+        #expect(snapshot.avgMood == 3.4)
+        #expect(snapshot.avgEnergy == 6.2)
+        #expect(snapshot.avgSleep == 7.1)
+        #expect(snapshot.topSymptoms == ["Headache", "Fatigue"])
+        #expect(snapshot.weekLabel == review.weekLabel)
+    }
+}
