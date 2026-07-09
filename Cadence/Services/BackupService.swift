@@ -54,6 +54,7 @@ enum BackupService {
         var hkSleepHours: Double?
         var hkActiveEnergy: Double?
         var hkMindfulMinutes: Double?
+        var hkWristTemp: Double?
     }
 
     struct WeeklyReviewBackup: Codable {
@@ -124,7 +125,7 @@ enum BackupService {
                     didEditMood: log.didEditMood, didEditMetrics: log.didEditMetrics,
                     hkSteps: log.hkSteps, hkRestingHR: log.hkRestingHR, hkHRV: log.hkHRV,
                     hkSleepHours: log.hkSleepHours, hkActiveEnergy: log.hkActiveEnergy,
-                    hkMindfulMinutes: log.hkMindfulMinutes
+                    hkMindfulMinutes: log.hkMindfulMinutes, hkWristTemp: log.hkWristTemp
                 )
             },
             weeklyReviews: reviews.map { review in
@@ -238,6 +239,7 @@ enum BackupService {
             log.hkSleepHours = backup.hkSleepHours
             log.hkActiveEnergy = backup.hkActiveEnergy
             log.hkMindfulMinutes = backup.hkMindfulMinutes
+            log.hkWristTemp = backup.hkWristTemp
             context.insert(log)
             summary.insertedLogs += 1
         }

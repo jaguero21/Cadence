@@ -95,6 +95,9 @@ enum PatternThreshold {
     static let flarePrecursorWindowDays: Int = 3
     static let flareStressDeltaThreshold: Double = 1.0
     static let flareSleepDeltaThreshold: Double = 0.75
+    // Smallest average overnight wrist-temperature rise (°C) in the run-up
+    // window worth surfacing as a flare precursor.
+    static let flareTempDeltaThreshold: Double = 0.3
 
     // Canonical window for pattern detection. Every surface (Insights tab,
     // foreground notification check, insight history) computes over this window
