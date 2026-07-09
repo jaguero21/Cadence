@@ -10,7 +10,7 @@ enum CSVBuilder {
         return f
     }()
 
-    private static let header = "Date,Mood,Energy,Sleep Hours,Stress,Symptoms,Factors"
+    private static let header = "Date,Mood,Energy,Sleep Hours,Stress,Symptoms,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow"
 
     // Pure string form, kept separate from file I/O so it's unit-testable.
     static func csvString(from logs: [DailyLogSnapshot]) -> String {
@@ -24,6 +24,9 @@ enum CSVBuilder {
                 "\(log.stressLevel)",
                 log.symptoms.map(\.name).joined(separator: "; "),
                 log.factors.joined(separator: "; "),
+                log.peaksAndValleysNote,
+                log.hasPeaksAndValleysVoiceMemo ? "Yes" : "No",
+                log.intentionsForTomorrow,
             ]
             rows.append(fields.map(escape).joined(separator: ","))
         }
