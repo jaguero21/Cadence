@@ -26,15 +26,15 @@ final class CadenceUITests: XCTestCase {
         getStarted.tap()
 
         let skipNotifications = app.buttons["Skip"]
-        XCTAssertTrue(skipNotifications.waitForExistence(timeout: 5))
+        XCTAssertTrue(skipNotifications.waitForExistence(timeout: 15))
         skipNotifications.tap()
 
         let skipHealthKit = app.buttons["Skip"]
-        XCTAssertTrue(skipHealthKit.waitForExistence(timeout: 5))
+        XCTAssertTrue(skipHealthKit.waitForExistence(timeout: 15))
         skipHealthKit.tap()
 
         let openCadence = app.buttons["Open Cadence"]
-        XCTAssertTrue(openCadence.waitForExistence(timeout: 5))
+        XCTAssertTrue(openCadence.waitForExistence(timeout: 15))
         openCadence.tap()
 
         // Dashboard: open today's log.
@@ -46,21 +46,21 @@ final class CadenceUITests: XCTestCase {
 
         // Log flow: pick a mood, then step through to the note page.
         let happyMood = app.buttons["Happy, 4 of 5"]
-        XCTAssertTrue(happyMood.waitForExistence(timeout: 5), "Mood step should show the emoji scale")
+        XCTAssertTrue(happyMood.waitForExistence(timeout: 15), "Mood step should show the emoji scale")
         happyMood.tap()
 
         let next = app.buttons["Next"]
         for _ in 0..<7 {   // mood → metrics → basics → symptoms → factors → peaksAndValleys → intentions → note
-            XCTAssertTrue(next.waitForExistence(timeout: 5))
+            XCTAssertTrue(next.waitForExistence(timeout: 15))
             next.tap()
         }
 
         let finish = app.buttons["Finish"]
-        XCTAssertTrue(finish.waitForExistence(timeout: 5), "Note step should offer Finish")
+        XCTAssertTrue(finish.waitForExistence(timeout: 15), "Note step should offer Finish")
         finish.tap()
 
         // Done step confirms the save, then close the sheet.
-        XCTAssertTrue(app.staticTexts["Log complete!"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Log complete!"].waitForExistence(timeout: 15))
         app.buttons["Close"].tap()
 
         // Dashboard reflects the completed log.

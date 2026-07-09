@@ -318,6 +318,11 @@ struct LogInputFlow: View {
 
     // MARK: - Factors Step
 
+    // Shared with the HealthKit auto-tag in applyHealthKitData — one name, so
+    // a cycle day tagged from Health and one tapped by hand are the same
+    // factor to PatternEngine and the reports.
+    static let menstrualCycleFactorName = "Menstrual cycle"
+
     private static let factorItems: [(name: String, icon: String)] = [
         ("Alcohol",          "wineglass"),
         ("Caffeine",         "cup.and.saucer.fill"),
@@ -328,7 +333,7 @@ struct LogInputFlow: View {
         ("Poor sleep",       "bed.double"),
         ("Late screen time", "iphone"),
         ("Weather change",   "cloud.sun"),
-        ("Menstrual cycle",  "drop.fill"),
+        (menstrualCycleFactorName, "drop.fill"),
     ]
 
     private var factorsStep: some View {
@@ -688,6 +693,7 @@ struct LogInputFlow: View {
             if let sleep   = snapshot.sleepHours     { log.hkSleepHours     = sleep }
             if let energy  = snapshot.activeEnergy   { log.hkActiveEnergy   = energy }
             if let mindful = snapshot.mindfulMinutes { log.hkMindfulMinutes = mindful }
+            if let temp    = snapshot.wristTemperature { log.hkWristTemp    = temp }
         }
     }
 
@@ -719,6 +725,12 @@ struct LogInputFlow: View {
             if let quality = snapshot.sleepQuality {
                 sleepQuality = quality
             }
+        }
+        // Health has a cycle entry for today → pre-select the factor chip the
+        // user would otherwise tap by hand. Just a pre-selection: the chip
+        // stays fully manual (toggle it off, or on without Health at all).
+        if snapshot.menstrualFlow == true, !selectedFactors.contains(Self.menstrualCycleFactorName) {
+            selectedFactors.append(Self.menstrualCycleFactorName)
         }
     }
 
