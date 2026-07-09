@@ -8,8 +8,6 @@ final class WeeklyReview {
     var weekStartDate: Date = Date.now.startOfWeek
     var promptResponses: [PromptResponse] = []
     var overallRating: Int = 0      // 1–5
-    var peaksAndValleysNote: String = ""    // "What were the peaks and valleys of your week?"
-    var peaksAndValleysVoiceMemo: Attachment?   // optional single voice memo; binary lives on disk (see AttachmentStore)
     var intentionsForTomorrow: String = ""  // "Write your intentions for tomorrow."
 
     // Auto-populated from daily logs
@@ -23,7 +21,6 @@ final class WeeklyReview {
         self.weekStartDate = weekStartDate.startOfWeek
         self.promptResponses = []
         self.overallRating = 0
-        self.peaksAndValleysNote = ""
         self.intentionsForTomorrow = ""
         self.avgMood = 0
         self.avgEnergy = 0
@@ -57,15 +54,11 @@ struct PromptResponse: Codable {
 struct WeeklyReviewSnapshot: Sendable {
     let weekLabel: String
     let promptResponses: [PromptResponse]
-    let peaksAndValleysNote: String
-    let hasPeaksAndValleysVoiceMemo: Bool
     let intentionsForTomorrow: String
 
     init(_ review: WeeklyReview) {
         weekLabel       = review.weekLabel
         promptResponses = review.promptResponses
-        peaksAndValleysNote = review.peaksAndValleysNote
-        hasPeaksAndValleysVoiceMemo = review.peaksAndValleysVoiceMemo != nil
         intentionsForTomorrow = review.intentionsForTomorrow
     }
 }

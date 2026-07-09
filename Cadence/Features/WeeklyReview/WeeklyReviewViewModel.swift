@@ -2,12 +2,10 @@ import SwiftUI
 import SwiftData
 import OSLog
 
-// The review's step sequence: the 7 default prompts, then the two dedicated
-// closing steps (which need voice-memo support the generic PromptResponse
-// text-only system doesn't have), then completion.
+// The review's step sequence: the 7 default prompts, then the dedicated
+// Intentions closing step, then completion.
 enum ReviewStep: Equatable {
     case prompt(Int)
-    case peaksAndValleys
     case intentions
 }
 
@@ -22,14 +20,13 @@ final class WeeklyReviewViewModel {
 
     let prompts = Prompt.weeklyDefaults
 
-    // Two extra steps beyond the prompt list: Peaks & Valleys, Intentions.
-    var totalSteps: Int { prompts.count + 2 }
+    // One extra step beyond the prompt list: Intentions.
+    var totalSteps: Int { prompts.count + 1 }
 
     func flatIndex(_ step: ReviewStep) -> Int {
         switch step {
-        case .prompt(let i):   return i
-        case .peaksAndValleys: return prompts.count
-        case .intentions:      return prompts.count + 1
+        case .prompt(let i): return i
+        case .intentions:    return prompts.count
         }
     }
 
@@ -41,9 +38,7 @@ final class WeeklyReviewViewModel {
         withAnimation(CadenceAnimation.spring) {
             switch currentStep {
             case .prompt(let i):
-                currentStep = (i + 1 < prompts.count) ? .prompt(i + 1) : .peaksAndValleys
-            case .peaksAndValleys:
-                currentStep = .intentions
+                currentStep = (i + 1 < prompts.count) ? .prompt(i + 1) : .intentions
             case .intentions:
                 isComplete = true
             }
@@ -55,10 +50,8 @@ final class WeeklyReviewViewModel {
             switch currentStep {
             case .prompt(let i):
                 if i > 0 { currentStep = .prompt(i - 1) }
-            case .peaksAndValleys:
-                currentStep = .prompt(prompts.count - 1)
             case .intentions:
-                currentStep = .peaksAndValleys
+                currentStep = .prompt(prompts.count - 1)
             }
         }
     }
@@ -91,8 +84,6 @@ final class WeeklyReviewViewModel {
            ).first {
             persisted.promptResponses = review.promptResponses
             persisted.overallRating = review.overallRating
-            persisted.peaksAndValleysNote = review.peaksAndValleysNote
-            persisted.peaksAndValleysVoiceMemo = review.peaksAndValleysVoiceMemo
             persisted.intentionsForTomorrow = review.intentionsForTomorrow
             persisted.avgMood = review.avgMood
             persisted.avgEnergy = review.avgEnergy
