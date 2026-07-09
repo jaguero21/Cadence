@@ -67,6 +67,9 @@
 		AABBCCDD0000000000000212 /* CloudSyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000112 /* CloudSyncMonitor.swift */; };
 		AABBCCDD0000000000000213 /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000113 /* BackupService.swift */; };
 		AABBCCDD0000000000000214 /* SyncBackupSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000114 /* SyncBackupSection.swift */; };
+		AABBCCDD0000000000000215 /* CheckInIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000115 /* CheckInIntents.swift */; };
+		AABBCCDD0000000000000216 /* QuickLogIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000116 /* QuickLogIntent.swift */; };
+		AABBCCDD0000000000000217 /* MoodScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000111 /* MoodScale.swift */; };
 		B52AE232D80E6360C8C86490 /* SymptomPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5792500A97EE8C382CEFDD9 /* SymptomPickerView.swift */; };
 		B6B76E4EF6D92F7B5179ADC8 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680C40C33549B696DF6BA3A5 /* WeeklyReviewView.swift */; };
 		B6EB3F0F0BE48CBDC5D5BA4A /* SwiftUI in Frameworks */ = {isa = PBXBuildFile; fileRef = A0D01DD5A2B033204335261E /* SwiftUI */; };
@@ -204,6 +207,8 @@
 		AABBCCDD0000000000000112 /* CloudSyncMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudSyncMonitor.swift; path = ./Cadence/Services/CloudSyncMonitor.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000113 /* BackupService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BackupService.swift; path = ./Cadence/Services/BackupService.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000114 /* SyncBackupSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyncBackupSection.swift; path = ./Cadence/Features/Settings/SyncBackupSection.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000115 /* CheckInIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CheckInIntents.swift; path = ./Cadence/App/CheckInIntents.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000116 /* QuickLogIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = QuickLogIntent.swift; path = ./CadenceWidget/QuickLogIntent.swift; sourceTree = "<absolute>"; };
 		ABD3C5951CAE74F5C1693742 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ADCC6B77E8E1D5DB3D6A5BDA /* HealthKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogInputFlow.swift; path = ./Cadence/Features/DailyLog/LogInputFlow.swift; sourceTree = "<absolute>"; };
@@ -412,6 +417,7 @@
 			children = (
 				C91AC27A765654C1A1DFFBD5 /* AppState.swift */,
 				5C4C885C564C706B8D84B907 /* CadenceApp.swift */,
+				AABBCCDD0000000000000115 /* CheckInIntents.swift */,
 				26D33A415B0A6E15E6DA6EA9 /* Info.plist */,
 			);
 			name = App;
@@ -456,6 +462,7 @@
 			children = (
 				D55E0D4A1C0EC289C9F389C4 /* Constants.swift */,
 				AABBCCDD000000000000010E /* WidgetData.swift */,
+				AABBCCDD0000000000000116 /* QuickLogIntent.swift */,
 				5D8C849E3B044CB78A9DB7B5 /* EnvironmentValues+Services.swift */,
 				E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */,
 				AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */,
@@ -734,6 +741,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AABBCCDD0000000000000217 /* MoodScale.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -797,6 +805,8 @@
 				AABBCCDD0000000000000212 /* CloudSyncMonitor.swift in Sources */,
 				AABBCCDD0000000000000213 /* BackupService.swift in Sources */,
 				AABBCCDD0000000000000214 /* SyncBackupSection.swift in Sources */,
+				AABBCCDD0000000000000215 /* CheckInIntents.swift in Sources */,
+				AABBCCDD0000000000000216 /* QuickLogIntent.swift in Sources */,
 				AABBCCDD000000000000020A /* InsightHistoryView.swift in Sources */,
 				AABBCCDD000000000000020B /* Attachment.swift in Sources */,
 				AABBCCDD000000000000020C /* AttachmentStore.swift in Sources */,

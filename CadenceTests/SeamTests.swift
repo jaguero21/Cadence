@@ -156,3 +156,85 @@ struct WidgetStalenessTests {
         #expect(resolved.streak == 0)
     }
 }
+
+// MARK: Widget → app pending quick-log queue
+
+// The widget's mood buttons can't write to SwiftData; they stash taps in the
+// App Group and the app applies them on foreground through the same upsert
+// seam the watch uses. These tests pin the queue semantics with an isolated
+// UserDefaults suite.
+@Suite("WidgetData – pending quick logs")
+@MainActor
+struct PendingQuickLogTests {
+
+    private func isolatedDefaults() -> UserDefaults {
+        let name = "pending-quicklog-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        return defaults
+    }
+
+    @Test("Stash then consume returns the tap and clears the queue")
+    func stashConsumeRoundTrip() {
+        let defaults = isolatedDefaults()
+        WidgetData.stashPendingQuickLog(mood: 4, defaults: defaults)
+
+        let consumed = WidgetData.consumePendingQuickLogs(defaults: defaults)
+        #expect(consumed.map(\.mood) == [4])
+        #expect(WidgetData.consumePendingQuickLogs(defaults: defaults).isEmpty)
+    }
+
+    @Test("Multiple taps queue in order and consume together")
+    func multipleTaps() {
+        let defaults = isolatedDefaults()
+        WidgetData.stashPendingQuickLog(mood: 2, defaults: defaults)
+        WidgetData.stashPendingQuickLog(mood: 5, defaults: defaults)
+
+        #expect(WidgetData.consumePendingQuickLogs(defaults: defaults).map(\.mood) == [2, 5])
+    }
+
+    @Test("pendingMood returns the latest tap for the given day only")
+    func pendingMoodPerDay() {
+        let defaults = isolatedDefaults()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now)!
+        WidgetData.stashPendingQuickLog(mood: 1, date: yesterday, defaults: defaults)
+        WidgetData.stashPendingQuickLog(mood: 3, defaults: defaults)
+        WidgetData.stashPendingQuickLog(mood: 5, defaults: defaults)
+
+        #expect(WidgetData.pendingMood(on: .now, defaults: defaults) == 5)
+        #expect(WidgetData.pendingMood(on: yesterday, defaults: defaults) == 1)
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: .now)!
+        #expect(WidgetData.pendingMood(on: tomorrow, defaults: defaults) == nil)
+    }
+
+    @Test("The queue is bounded: oldest taps drop past the cap")
+    func queueIsBounded() {
+        let defaults = isolatedDefaults()
+        for mood in 0..<40 {
+            WidgetData.stashPendingQuickLog(mood: (mood % 5) + 1, defaults: defaults)
+        }
+        #expect(WidgetData.consumePendingQuickLogs(defaults: defaults).count == 30)
+    }
+
+    // End-to-end: a tap stashed yesterday flows through the payload bridge into
+    // the same wrong-day-safe upsert the watch path uses.
+    @Test("A stashed tap from yesterday lands on yesterday's log via the upsert seam")
+    func stashedTapLandsOnRecordedDay() throws {
+        let defaults = isolatedDefaults()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now)!
+        WidgetData.stashPendingQuickLog(mood: 2, date: yesterday, defaults: defaults)
+
+        let schema = Schema([DailyLog.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let context = ModelContext(try ModelContainer(for: schema, configurations: [config]))
+
+        for entry in WidgetData.consumePendingQuickLogs(defaults: defaults) {
+            #expect(PhoneConnectivityManager.applyQuickLog(entry.payload, context: context))
+        }
+
+        let logs = try context.fetch(FetchDescriptor<DailyLog>())
+        #expect(logs.count == 1)
+        #expect(logs.first?.date == Calendar.current.startOfDay(for: yesterday))
+        #expect(logs.first?.mood == 2)
+    }
+}
