@@ -262,15 +262,12 @@ struct WeeklyReviewViewModelNavigationTests {
     func isLastStep_trueOnlyOnIntentions() {
         let vm = WeeklyReviewViewModel()
         #expect(vm.isLastStep == false)
-        // Walk to the last prompt: reaching it isn't the end anymore — the two
-        // dedicated closing steps (Peaks & Valleys, Intentions) still follow.
+        // Walk to the last prompt: reaching it isn't the end anymore — the
+        // dedicated Intentions closing step still follows.
         for _ in 0..<(vm.prompts.count - 1) { vm.next() }
         #expect(vm.currentStep == .prompt(vm.prompts.count - 1))
         #expect(vm.isLastStep == false)
         #expect(vm.isComplete == false)
-        vm.next()
-        #expect(vm.currentStep == .peaksAndValleys)
-        #expect(vm.isLastStep == false)
         vm.next()
         #expect(vm.currentStep == .intentions)
         #expect(vm.isLastStep)
@@ -359,29 +356,23 @@ struct WeeklyReviewPopulateSummaryTests {
 
 // MARK: - WeeklyReviewViewModel: step machine
 
-// Peaks & Valleys and Intentions are two dedicated closing steps appended
-// after the 7 default prompts (not part of the generic PromptResponse text
-// system, since Peaks & Valleys needs voice-memo support). These tests pin
-// the flattened step sequence: prompt(0)...prompt(6), peaksAndValleys,
-// intentions, then completion.
+// Intentions is a dedicated closing step appended after the 7 default prompts
+// (not part of the generic PromptResponse text system). These tests pin the
+// flattened step sequence: prompt(0)...prompt(6), intentions, then completion.
 @MainActor
 @Suite("WeeklyReviewViewModel – step machine")
 struct WeeklyReviewStepMachineTests {
 
-    @Test("next() walks all prompts, then Peaks & Valleys, then Intentions, then completes")
+    @Test("next() walks all prompts, then Intentions, then completes")
     func nextWalksFullSequence() {
         let vm = WeeklyReviewViewModel()
         #expect(vm.currentStep == .prompt(0))
-        #expect(vm.totalSteps == vm.prompts.count + 2)
+        #expect(vm.totalSteps == vm.prompts.count + 1)
 
         for i in 1..<vm.prompts.count {
             vm.next()
             #expect(vm.currentStep == .prompt(i))
         }
-
-        vm.next()
-        #expect(vm.currentStep == .peaksAndValleys)
-        #expect(vm.isLastStep == false)
 
         vm.next()
         #expect(vm.currentStep == .intentions)
@@ -391,13 +382,10 @@ struct WeeklyReviewStepMachineTests {
         #expect(vm.isComplete == true)
     }
 
-    @Test("previous() reverses through Intentions, Peaks & Valleys, and back into the prompts")
+    @Test("previous() reverses through Intentions and back into the prompts")
     func previousReversesFullSequence() {
         let vm = WeeklyReviewViewModel()
         vm.currentStep = .intentions
-
-        vm.previous()
-        #expect(vm.currentStep == .peaksAndValleys)
 
         vm.previous()
         #expect(vm.currentStep == .prompt(vm.prompts.count - 1))
@@ -413,12 +401,11 @@ struct WeeklyReviewStepMachineTests {
         #expect(vm.currentStep == .prompt(0))
     }
 
-    @Test("flatIndex and progress span the full step count including the two new steps")
+    @Test("flatIndex and progress span the full step count including Intentions")
     func flatIndexAndProgress() {
         let vm = WeeklyReviewViewModel()
         #expect(vm.flatIndex(.prompt(0)) == 0)
-        #expect(vm.flatIndex(.peaksAndValleys) == vm.prompts.count)
-        #expect(vm.flatIndex(.intentions) == vm.prompts.count + 1)
+        #expect(vm.flatIndex(.intentions) == vm.prompts.count)
 
         vm.currentStep = .intentions
         #expect(vm.currentFlatIndex == vm.totalSteps - 1)

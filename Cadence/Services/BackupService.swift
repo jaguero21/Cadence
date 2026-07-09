@@ -60,7 +60,6 @@ enum BackupService {
         var weekStartDate: Date
         var promptResponses: [PromptResponse] = []
         var overallRating: Int = 0
-        var peaksAndValleysNote: String = ""
         var intentionsForTomorrow: String = ""
         var avgMood: Double = 0
         var avgEnergy: Double = 0
@@ -132,7 +131,6 @@ enum BackupService {
                 WeeklyReviewBackup(
                     weekStartDate: review.weekStartDate, promptResponses: review.promptResponses,
                     overallRating: review.overallRating,
-                    peaksAndValleysNote: review.peaksAndValleysNote,
                     intentionsForTomorrow: review.intentionsForTomorrow,
                     avgMood: review.avgMood,
                     avgEnergy: review.avgEnergy, avgSleep: review.avgSleep,
@@ -252,7 +250,6 @@ enum BackupService {
             let review = WeeklyReview(weekStartDate: week)
             review.promptResponses = backup.promptResponses
             review.overallRating = backup.overallRating
-            review.peaksAndValleysNote = backup.peaksAndValleysNote
             review.intentionsForTomorrow = backup.intentionsForTomorrow
             review.avgMood = backup.avgMood
             review.avgEnergy = backup.avgEnergy
