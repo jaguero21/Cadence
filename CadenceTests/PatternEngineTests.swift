@@ -16,7 +16,10 @@ private func makeSnapshot(
     symptoms: [SymptomEntry] = [],
     factors: [String] = [],
     customMetrics: [MetricEntry] = [],
-    didEditMetrics: Bool = false
+    didEditMetrics: Bool = false,
+    peaksAndValleysNote: String = "",
+    hasPeaksAndValleysVoiceMemo: Bool = false,
+    intentionsForTomorrow: String = ""
 ) -> DailyLogSnapshot {
     let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)!
     return DailyLogSnapshot(
@@ -28,7 +31,10 @@ private func makeSnapshot(
         symptoms: symptoms,
         factors: factors,
         customMetrics: customMetrics,
-        didEditMetrics: didEditMetrics
+        didEditMetrics: didEditMetrics,
+        peaksAndValleysNote: peaksAndValleysNote,
+        hasPeaksAndValleysVoiceMemo: hasPeaksAndValleysVoiceMemo,
+        intentionsForTomorrow: intentionsForTomorrow
     )
 }
 
@@ -402,10 +408,22 @@ struct CSVBuilderTests {
             makeSnapshot(daysAgo: 2),
         ]
         let lines = CSVBuilder.csvString(from: logs).split(separator: "\n", omittingEmptySubsequences: false)
-        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Stress,Symptoms,Factors")
+        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Stress,Symptoms,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow")
         #expect(lines.count == 3) // header + 2 rows
         // Oldest first: the day -2 row precedes the day 0 row.
         #expect(lines[1] < lines[2]) // ISO yyyy-MM-dd sorts chronologically as text
+    }
+
+    @Test("Includes Peaks & Valleys note, voice memo flag, and Intentions for Tomorrow")
+    func csv_includesPeaksAndValleysAndIntentions() {
+        let logs = [
+            makeSnapshot(daysAgo: 0, peaksAndValleysNote: "Best: a walk. Worst: a headache.",
+                        hasPeaksAndValleysVoiceMemo: true, intentionsForTomorrow: "Sleep earlier"),
+        ]
+        let csv = CSVBuilder.csvString(from: logs)
+        #expect(csv.contains("Best: a walk. Worst: a headache."))
+        #expect(csv.contains(",Yes,"))
+        #expect(csv.contains("Sleep earlier"))
     }
 
     @Test("Quotes and escapes fields containing commas or quotes")

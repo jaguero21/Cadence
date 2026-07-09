@@ -164,6 +164,44 @@ enum PDFBuilder {
             }
         }
 
+        let peaksAndValleysDays = logs
+            .filter { !$0.peaksAndValleysNote.isEmpty || $0.hasPeaksAndValleysVoiceMemo }
+            .sorted { $0.date > $1.date }
+        if !peaksAndValleysDays.isEmpty {
+            y += 16
+            breakIfNeeded(y: &y, needing: 44, ctx: ctx)
+            "Peaks & Valleys".draw(in: CGRect(x: 40, y: y, width: 515, height: 20), withAttributes: sectionAttrs)
+            y += 24
+            let dateFmt = Date.FormatStyle().month(.abbreviated).day()
+            for log in peaksAndValleysDays {
+                var line = "\(log.date.formatted(dateFmt)): "
+                line += log.peaksAndValleysNote.isEmpty ? "(voice memo only)" : log.peaksAndValleysNote
+                if log.hasPeaksAndValleysVoiceMemo && !log.peaksAndValleysNote.isEmpty {
+                    line += " (+ voice memo)"
+                }
+                let h = textHeight(line, attrs: bodyAttrs, width: 505)
+                breakIfNeeded(y: &y, needing: h, ctx: ctx)
+                line.draw(in: CGRect(x: 50, y: y, width: 505, height: h), withAttributes: bodyAttrs)
+                y += h + 2
+            }
+        }
+
+        let intentionDays = logs.filter { !$0.intentionsForTomorrow.isEmpty }.sorted { $0.date > $1.date }
+        if !intentionDays.isEmpty {
+            y += 16
+            breakIfNeeded(y: &y, needing: 44, ctx: ctx)
+            "Intentions for Tomorrow".draw(in: CGRect(x: 40, y: y, width: 515, height: 20), withAttributes: sectionAttrs)
+            y += 24
+            let dateFmt = Date.FormatStyle().month(.abbreviated).day()
+            for log in intentionDays {
+                let line = "\(log.date.formatted(dateFmt)): \(log.intentionsForTomorrow)"
+                let h = textHeight(line, attrs: bodyAttrs, width: 505)
+                breakIfNeeded(y: &y, needing: h, ctx: ctx)
+                line.draw(in: CGRect(x: 50, y: y, width: 505, height: h), withAttributes: bodyAttrs)
+                y += h + 2
+            }
+        }
+
         y += 16
         breakIfNeeded(y: &y, needing: 44, ctx: ctx)
         "Pattern Insights".draw(in: CGRect(x: 40, y: y, width: 515, height: 20), withAttributes: sectionAttrs)
@@ -207,6 +245,33 @@ enum PDFBuilder {
 
                 breakIfNeeded(y: &y, needing: blockH, ctx: ctx)
                 response.section.draw(in: CGRect(x: 40, y: y, width: 515, height: sectionH), withAttributes: sectionAttrs)
+                y += sectionH + 4
+                text.draw(in: CGRect(x: 50, y: y, width: 505, height: bodyH), withAttributes: bodyAttrs)
+                y += bodyH + 16
+            }
+
+            if !review.peaksAndValleysNote.isEmpty || review.hasPeaksAndValleysVoiceMemo {
+                let title = "Peaks & Valleys"
+                var text = review.peaksAndValleysNote.isEmpty ? "(voice memo only)" : review.peaksAndValleysNote
+                if review.hasPeaksAndValleysVoiceMemo && !review.peaksAndValleysNote.isEmpty {
+                    text += " (+ voice memo)"
+                }
+                let sectionH = textHeight(title, attrs: sectionAttrs, width: 515)
+                let bodyH = textHeight(text, attrs: bodyAttrs, width: 505)
+                breakIfNeeded(y: &y, needing: sectionH + 4 + bodyH + 16, ctx: ctx)
+                title.draw(in: CGRect(x: 40, y: y, width: 515, height: sectionH), withAttributes: sectionAttrs)
+                y += sectionH + 4
+                text.draw(in: CGRect(x: 50, y: y, width: 505, height: bodyH), withAttributes: bodyAttrs)
+                y += bodyH + 16
+            }
+
+            if !review.intentionsForTomorrow.isEmpty {
+                let title = "Intentions for Tomorrow"
+                let text = review.intentionsForTomorrow
+                let sectionH = textHeight(title, attrs: sectionAttrs, width: 515)
+                let bodyH = textHeight(text, attrs: bodyAttrs, width: 505)
+                breakIfNeeded(y: &y, needing: sectionH + 4 + bodyH + 16, ctx: ctx)
+                title.draw(in: CGRect(x: 40, y: y, width: 515, height: sectionH), withAttributes: sectionAttrs)
                 y += sectionH + 4
                 text.draw(in: CGRect(x: 50, y: y, width: 505, height: bodyH), withAttributes: bodyAttrs)
                 y += bodyH + 16

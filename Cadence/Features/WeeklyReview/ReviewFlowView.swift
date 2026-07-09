@@ -6,6 +6,8 @@ struct ReviewFlowView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var vm = WeeklyReviewViewModel()
     @State private var review: WeeklyReview
+    @State private var peaksAndValleysRecorder = AudioRecorder()
+    private let attachmentStore = AttachmentStore()
     let existingReview: WeeklyReview?
     let logs: [DailyLog]
 
@@ -27,10 +29,10 @@ struct ReviewFlowView: View {
                         progressBar
                         ScrollView {
                             VStack(spacing: 20) {
-                                if vm.currentPromptIndex == 0 {
+                                if vm.currentStep == .prompt(0) {
                                     WeekSummaryView(review: review)
                                 }
-                                promptCard
+                                stepContent
                             }
                             .padding()
                         }
@@ -85,8 +87,19 @@ struct ReviewFlowView: View {
     }
 
     @ViewBuilder
-    private var promptCard: some View {
-        let prompt = vm.currentPrompt
+    private var stepContent: some View {
+        switch vm.currentStep {
+        case .prompt(let i):
+            promptCard(for: vm.prompts[i])
+        case .peaksAndValleys:
+            peaksAndValleysCard
+        case .intentions:
+            intentionsCard
+            StarRatingView(rating: $review.overallRating)
+        }
+    }
+
+    private func promptCard(for prompt: Prompt) -> some View {
         let binding = Binding<String>(
             get: { review.promptResponses.first { $0.section == prompt.section }?.response ?? "" },
             set: { newVal in
@@ -97,16 +110,70 @@ struct ReviewFlowView: View {
                 }
             }
         )
-        PromptCardView(prompt: prompt, response: binding, index: vm.currentPromptIndex, total: vm.prompts.count)
+        return PromptCardView(prompt: prompt, response: binding, index: vm.currentFlatIndex, total: vm.totalSteps)
+    }
 
-        if vm.isLastPrompt {
-            StarRatingView(rating: $review.overallRating)
+    private var peaksAndValleysCard: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("\(vm.currentFlatIndex + 1) of \(vm.totalSteps)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("Peaks & Valleys")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(CadenceColor.sleepPurple)
+            }
+
+            Text("What were the peaks and valleys of your week?")
+                .font(.title3.bold())
+                .fixedSize(horizontal: false, vertical: true)
+
+            TextField("The best and hardest parts of this week…", text: $review.peaksAndValleysNote, axis: .vertical)
+                .font(.body)
+                .lineLimit(5...12)
+                .padding(14)
+                .background(Color(.systemFill), in: RoundedRectangle(cornerRadius: 12))
+
+            VoiceMemoRow(
+                attachment: $review.peaksAndValleysVoiceMemo,
+                recorder: peaksAndValleysRecorder,
+                store: attachmentStore,
+                onReplace: { old, _ in if let old { attachmentStore.delete(old.filename) } },
+                onDelete: { attachmentStore.delete($0.filename) }
+            )
         }
+        .cadenceCard()
+    }
+
+    private var intentionsCard: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("\(vm.currentFlatIndex + 1) of \(vm.totalSteps)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("Intentions")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(CadenceColor.sleepPurple)
+            }
+
+            Text("Write your intentions for tomorrow.")
+                .font(.title3.bold())
+                .fixedSize(horizontal: false, vertical: true)
+
+            TextField("What do you want to carry into tomorrow?", text: $review.intentionsForTomorrow, axis: .vertical)
+                .font(.body)
+                .lineLimit(5...12)
+                .padding(14)
+                .background(Color(.systemFill), in: RoundedRectangle(cornerRadius: 12))
+        }
+        .cadenceCard()
     }
 
     private var navBar: some View {
         HStack(spacing: 16) {
-            if vm.currentPromptIndex > 0 {
+            if vm.currentStep != .prompt(0) {
                 Button {
                     vm.previous()
                 } label: {
@@ -118,14 +185,14 @@ struct ReviewFlowView: View {
             }
             Spacer()
             Button {
-                if vm.isLastPrompt {
+                if vm.isLastStep {
                     guard vm.save(review: review, context: modelContext) else { return }
                 }
                 vm.next()
             } label: {
                 HStack {
-                    Text(vm.isLastPrompt ? "Complete" : "Next").font(.body.bold())
-                    if !vm.isLastPrompt {
+                    Text(vm.isLastStep ? "Complete" : "Next").font(.body.bold())
+                    if !vm.isLastStep {
                         Image(systemName: "chevron.right")
                     }
                 }
