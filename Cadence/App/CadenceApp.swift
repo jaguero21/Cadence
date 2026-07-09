@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import WidgetKit
 import OSLog
 
 
@@ -17,7 +18,10 @@ struct CadenceApp: App {
     // fallback). CloudSyncMonitor uses this to show a truthful sync status.
     static private(set) var usingCloudKitStore = false
 
-    var sharedModelContainer: ModelContainer? = {
+    // Static so App Intents (which run outside the SwiftUI scene) reach the
+    // same container the UI uses; `static let` keeps it single-init even if
+    // the App struct is re-created.
+    static let sharedModelContainer: ModelContainer? = {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
@@ -53,7 +57,7 @@ struct CadenceApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let container = sharedModelContainer {
+            if let container = Self.sharedModelContainer {
                 Group {
                     if appState.hasCompletedOnboarding {
                         ContentView()
@@ -131,9 +135,11 @@ struct ContentView: View {
             guard phase == .active else { return }
             let startOfToday = Calendar.current.startOfDay(for: .now)
             if startOfToday != today { today = startOfToday }
+            applyPendingQuickLogs()
             checkForNewInsights()
         }
         .task { seedSymptomTagsIfNeeded() }
+        .task { applyPendingQuickLogs() }
         .sheet(isPresented: $appState.showingProPaywall) {
             ProPaywallView()
         }
@@ -161,6 +167,32 @@ struct ContentView: View {
         if let top = new.filter({ $0.confidence >= PatternThreshold.minimumConfidence })
             .max(by: { $0.confidence < $1.confidence }) {
             notificationService.sendInsightNotification(title: top.title)
+        }
+    }
+
+    // Persist mood taps made on the widget since the last foreground. Each tap
+    // carries the day it was made, and the upsert seam attributes it there — a
+    // tap from last night lands on yesterday's log, never clobbering today.
+    // After applying, the summary is republished so the widget's "mood saved"
+    // interim state resolves to real store-backed data.
+    private func applyPendingQuickLogs() {
+        guard !AppLaunch.isUITesting else { return }
+        let pending = WidgetData.consumePendingQuickLogs()
+        guard !pending.isEmpty else { return }
+        var applied = false
+        for entry in pending {
+            if PhoneConnectivityManager.applyQuickLog(entry.payload, context: modelContext) {
+                applied = true
+            }
+        }
+        if applied {
+            let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
+            DashboardViewModel.publishWidgetSummary(logs: logs)
+            // publishWidgetSummary skips its reload when the summary is
+            // unchanged — and a quick log doesn't complete the day, so it
+            // usually is. Reload explicitly so the widget's interim
+            // "mood saved" state clears now that the tap is store-backed.
+            WidgetCenter.shared.reloadTimelines(ofKind: WidgetData.widgetKind)
         }
     }
 

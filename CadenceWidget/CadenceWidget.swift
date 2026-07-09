@@ -1,5 +1,6 @@
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 struct Provider: TimelineProvider {
     // Staleness resolution lives in WidgetData.resolved (shared with the app
@@ -14,11 +15,11 @@ struct Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CadenceEntry) -> Void) {
-        completion(CadenceEntry(date: .now, summary: currentSummary()))
+        completion(CadenceEntry(date: .now, summary: currentSummary(), pendingMood: WidgetData.pendingMood(on: .now)))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CadenceEntry>) -> Void) {
-        let entry = CadenceEntry(date: .now, summary: currentSummary())
+        let entry = CadenceEntry(date: .now, summary: currentSummary(), pendingMood: WidgetData.pendingMood(on: .now))
         // Refresh after midnight so currentSummary() re-evaluates staleness for
         // the new day even if the app isn't opened.
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
@@ -30,6 +31,8 @@ struct Provider: TimelineProvider {
 struct CadenceEntry: TimelineEntry {
     let date: Date
     let summary: WidgetData.Summary
+    // A mood tapped on the widget that the app hasn't picked up yet.
+    var pendingMood: Int?
 }
 
 struct CadenceWidgetEntryView: View {
@@ -60,18 +63,36 @@ struct CadenceWidgetEntryView: View {
                 Label("Logged today", systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.green)
-            } else {
-                Label("Not logged yet", systemImage: "circle")
+            } else if let mood = entry.pendingMood {
+                // A tap was recorded but the app hasn't opened to persist it —
+                // "saved", not "logged", stays truthful about the difference.
+                Label("\(MoodScale.emoji(for: mood)) Mood saved", systemImage: "checkmark.circle")
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.green)
+            } else {
+                moodButtons
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
+
+    // One-tap quick log straight from the home screen.
+    private var moodButtons: some View {
+        HStack(spacing: family == .systemSmall ? 2 : 6) {
+            ForEach(1...5, id: \.self) { value in
+                Button(intent: WidgetQuickLogIntent(mood: value)) {
+                    Text(MoodScale.emoji(for: value))
+                        .font(.system(size: family == .systemSmall ? 15 : 18))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Log mood \(value) of 5")
+            }
+        }
+    }
 }
 
 struct CadenceWidget: Widget {
-    let kind = "CadenceWidget"
+    let kind = WidgetData.widgetKind
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in

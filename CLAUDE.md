@@ -119,6 +119,28 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   exactly one day past its summary.
 - App bundle id is **`com.carpecadence.app`** (unified with the code's
   `com.carpecadence` convention); widget is `com.carpecadence.app.CadenceWidget`.
+- **Interactive mood buttons** (`WidgetQuickLogIntent` in
+  `CadenceWidget/QuickLogIntent.swift`, member of both app and widget targets):
+  the widget can't open the app's SwiftData store, so a tap is **stashed** in
+  the App Group (`WidgetData.stashPendingQuickLog`, date-stamped, queue capped)
+  and the widget shows an interim "Mood saved" state. The app consumes the
+  queue on foreground (`ContentView.applyPendingQuickLogs`) through the same
+  `applyQuickLog` upsert seam the watch uses — so an overnight tap lands on
+  the day it was made — then republishes the summary AND explicitly reloads
+  the timeline (the summary is usually unchanged, since a quick log doesn't
+  complete the day, and the skip-if-unchanged guard would strand the interim
+  state). Widget kind string lives in `WidgetData.widgetKind`.
+
+## App Intents (Siri / Shortcuts)
+
+- `LogCheckInIntent` (`Cadence/App/CheckInIntents.swift`, app target only) is
+  the Siri/Shortcuts check-in: mood (`MoodOption` AppEnum, emoji order matches
+  `MoodScale`) + optional energy. It runs in the app's process and writes via
+  `PhoneConnectivityManager.applyQuickLog` + `publishWidgetSummary` — every
+  quick-log surface (watch, widget, Siri) funnels through that one tested
+  upsert. Phrases live in `CadenceShortcuts: AppShortcutsProvider`.
+- `CadenceApp.sharedModelContainer` is **static** so intents (which run outside
+  the SwiftUI scene) reach the same container the UI uses.
 
 ## Watch app
 
