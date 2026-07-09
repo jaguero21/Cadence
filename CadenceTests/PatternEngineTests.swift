@@ -14,9 +14,19 @@ private func makeSnapshot(
     energy: Int = 5,
     stressLevel: Int = 5,
     symptoms: [SymptomEntry] = [],
+    basicsCompleted: [String] = [],
     factors: [String] = [],
     customMetrics: [MetricEntry] = [],
-    didEditMetrics: Bool = false
+    didEditMetrics: Bool = false,
+    peaksAndValleysNote: String = "",
+    hasPeaksAndValleysVoiceMemo: Bool = false,
+    intentionsForTomorrow: String = "",
+    freeNote: String = "",
+    sleepQuality: Int = 5,
+    painLevel: Int = 0,
+    brainFogLevel: Int = 0,
+    hkSteps: Int? = nil,
+    hkRestingHR: Double? = nil
 ) -> DailyLogSnapshot {
     let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)!
     return DailyLogSnapshot(
@@ -24,11 +34,21 @@ private func makeSnapshot(
         mood: mood,
         energy: energy,
         sleepHours: sleepHours,
+        sleepQuality: sleepQuality,
+        painLevel: painLevel,
+        brainFogLevel: brainFogLevel,
         stressLevel: stressLevel,
         symptoms: symptoms,
+        basicsCompleted: basicsCompleted,
         factors: factors,
         customMetrics: customMetrics,
-        didEditMetrics: didEditMetrics
+        didEditMetrics: didEditMetrics,
+        peaksAndValleysNote: peaksAndValleysNote,
+        hasPeaksAndValleysVoiceMemo: hasPeaksAndValleysVoiceMemo,
+        intentionsForTomorrow: intentionsForTomorrow,
+        freeNote: freeNote,
+        hkSteps: hkSteps,
+        hkRestingHR: hkRestingHR
     )
 }
 
@@ -402,10 +422,42 @@ struct CSVBuilderTests {
             makeSnapshot(daysAgo: 2),
         ]
         let lines = CSVBuilder.csvString(from: logs).split(separator: "\n", omittingEmptySubsequences: false)
-        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Stress,Symptoms,Factors")
+        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes")
         #expect(lines.count == 3) // header + 2 rows
         // Oldest first: the day -2 row precedes the day 0 row.
         #expect(lines[1] < lines[2]) // ISO yyyy-MM-dd sorts chronologically as text
+    }
+
+    @Test("Every logged field lands in its column; missing HealthKit cells stay empty")
+    func csv_carriesEveryField() {
+        let logs = [makeSnapshot(
+            daysAgo: 0, sleepHours: 6.5, mood: 2, energy: 4, stressLevel: 8,
+            symptoms: [headacheEntry()],
+            basicsCompleted: ["Hydration", "Movement"],
+            factors: ["Travel"],
+            peaksAndValleysNote: "peak note",
+            intentionsForTomorrow: "rest more",
+            freeNote: "long day",
+            sleepQuality: 3, painLevel: 6, brainFogLevel: 7,
+            hkSteps: 9500, hkRestingHR: 61
+        )]
+        let row = CSVBuilder.csvString(from: logs).split(separator: "\n")[1]
+        #expect(row.contains(",6.5,3,6,7,8,"))          // sleep hrs, quality, pain, fog, anxiety
+        #expect(row.contains("Hydration; Movement"))
+        #expect(row.contains("long day"))
+        #expect(row.contains("9500,61,,,,"))            // steps + HR present; HRV/sleep/energy/mindful empty
+    }
+
+    @Test("Includes Peaks & Valleys note, voice memo flag, and Intentions for Tomorrow")
+    func csv_includesPeaksAndValleysAndIntentions() {
+        let logs = [
+            makeSnapshot(daysAgo: 0, peaksAndValleysNote: "Best: a walk. Worst: a headache.",
+                        hasPeaksAndValleysVoiceMemo: true, intentionsForTomorrow: "Sleep earlier"),
+        ]
+        let csv = CSVBuilder.csvString(from: logs)
+        #expect(csv.contains("Best: a walk. Worst: a headache."))
+        #expect(csv.contains(",Yes,"))
+        #expect(csv.contains("Sleep earlier"))
     }
 
     @Test("Quotes and escapes fields containing commas or quotes")

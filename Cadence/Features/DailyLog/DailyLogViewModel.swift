@@ -56,6 +56,8 @@ enum LogStep: Int, CaseIterable {
     case basics
     case symptoms
     case factors
+    case peaksAndValleys
+    case intentions
     case note
     case done
 
@@ -63,25 +65,29 @@ enum LogStep: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .mood:        return "Overall Mood"
-        case .bodyMetrics: return "Body Metrics"
-        case .basics:      return "Basics Done Today"
-        case .symptoms:    return "Symptoms"
-        case .factors:     return "Possible Triggers"
-        case .note:        return "One-Line Note"
-        case .done:        return "All done!"
+        case .mood:           return "Overall Mood"
+        case .bodyMetrics:    return "Body Metrics"
+        case .basics:         return "Basics Done Today"
+        case .symptoms:       return "Symptoms"
+        case .factors:        return "Possible Triggers"
+        case .peaksAndValleys: return "Peaks & Valleys"
+        case .intentions:     return "Intentions for Tomorrow"
+        case .note:           return "One-Line Note"
+        case .done:           return "All done!"
         }
     }
 
     var icon: String {
         switch self {
-        case .mood:        return "face.smiling"
-        case .bodyMetrics: return "waveform.path.ecg"
-        case .basics:      return "checklist"
-        case .symptoms:    return "bandage"
-        case .factors:     return "exclamationmark.triangle"
-        case .note:        return "pencil.line"
-        case .done:        return "checkmark.circle.fill"
+        case .mood:           return "face.smiling"
+        case .bodyMetrics:    return "waveform.path.ecg"
+        case .basics:         return "checklist"
+        case .symptoms:       return "bandage"
+        case .factors:        return "exclamationmark.triangle"
+        case .peaksAndValleys: return "arrow.up.arrow.down.circle"
+        case .intentions:     return "sunrise.fill"
+        case .note:           return "pencil.line"
+        case .done:           return "checkmark.circle.fill"
         }
     }
 }
