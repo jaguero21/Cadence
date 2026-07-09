@@ -2,34 +2,57 @@ import SwiftUI
 import SwiftData
 import OSLog
 
+// The review's step sequence: the 7 default prompts, then the dedicated
+// Intentions closing step, then completion.
+enum ReviewStep: Equatable {
+    case prompt(Int)
+    case intentions
+}
+
 @MainActor
 @Observable
 final class WeeklyReviewViewModel {
     private static let log = Logger(subsystem: "com.carpecadence", category: "WeeklyReview")
-    var currentPromptIndex: Int = 0
+    var currentStep: ReviewStep = .prompt(0)
     var isComplete: Bool = false
     var saveError: String?
     var savedSuccessfully = false
 
     let prompts = Prompt.weeklyDefaults
 
-    var currentPrompt: Prompt { prompts[min(currentPromptIndex, max(prompts.count - 1, 0))] }
-    var progress: Double { prompts.isEmpty ? 1 : Double(currentPromptIndex) / Double(prompts.count) }
-    var isLastPrompt: Bool { prompts.isEmpty || currentPromptIndex >= prompts.count - 1 }
+    // One extra step beyond the prompt list: Intentions.
+    var totalSteps: Int { prompts.count + 1 }
+
+    func flatIndex(_ step: ReviewStep) -> Int {
+        switch step {
+        case .prompt(let i): return i
+        case .intentions:    return prompts.count
+        }
+    }
+
+    var currentFlatIndex: Int { flatIndex(currentStep) }
+    var progress: Double { Double(currentFlatIndex) / Double(totalSteps) }
+    var isLastStep: Bool { currentStep == .intentions }
 
     func next() {
         withAnimation(CadenceAnimation.spring) {
-            if isLastPrompt {
+            switch currentStep {
+            case .prompt(let i):
+                currentStep = (i + 1 < prompts.count) ? .prompt(i + 1) : .intentions
+            case .intentions:
                 isComplete = true
-            } else {
-                currentPromptIndex += 1
             }
         }
     }
 
     func previous() {
         withAnimation(CadenceAnimation.spring) {
-            if currentPromptIndex > 0 { currentPromptIndex -= 1 }
+            switch currentStep {
+            case .prompt(let i):
+                if i > 0 { currentStep = .prompt(i - 1) }
+            case .intentions:
+                currentStep = .prompt(prompts.count - 1)
+            }
         }
     }
 
@@ -61,6 +84,7 @@ final class WeeklyReviewViewModel {
            ).first {
             persisted.promptResponses = review.promptResponses
             persisted.overallRating = review.overallRating
+            persisted.intentionsForTomorrow = review.intentionsForTomorrow
             persisted.avgMood = review.avgMood
             persisted.avgEnergy = review.avgEnergy
             persisted.avgSleep = review.avgSleep

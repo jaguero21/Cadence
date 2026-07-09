@@ -8,6 +8,7 @@ final class WeeklyReview {
     var weekStartDate: Date = Date.now.startOfWeek
     var promptResponses: [PromptResponse] = []
     var overallRating: Int = 0      // 1–5
+    var intentionsForTomorrow: String = ""  // "Write your intentions for tomorrow."
 
     // Auto-populated from daily logs
     var avgMood: Double = 0
@@ -20,6 +21,7 @@ final class WeeklyReview {
         self.weekStartDate = weekStartDate.startOfWeek
         self.promptResponses = []
         self.overallRating = 0
+        self.intentionsForTomorrow = ""
         self.avgMood = 0
         self.avgEnergy = 0
         self.avgSleep = 0
@@ -48,13 +50,27 @@ struct PromptResponse: Codable {
     var response: String
 }
 
-// Sendable projection of WeeklyReview for off-main-actor PDF export.
+// Sendable projection of WeeklyReview for off-main-actor PDF export. Carries
+// EVERY user-entered and derived field (only the isComplete bookkeeping flag
+// is omitted) so reports can never silently drop a review input.
 struct WeeklyReviewSnapshot: Sendable {
     let weekLabel: String
     let promptResponses: [PromptResponse]
+    let overallRating: Int
+    let intentionsForTomorrow: String
+    let avgMood: Double
+    let avgEnergy: Double
+    let avgSleep: Double
+    let topSymptoms: [String]
 
     init(_ review: WeeklyReview) {
         weekLabel       = review.weekLabel
         promptResponses = review.promptResponses
+        overallRating   = review.overallRating
+        intentionsForTomorrow = review.intentionsForTomorrow
+        avgMood         = review.avgMood
+        avgEnergy       = review.avgEnergy
+        avgSleep        = review.avgSleep
+        topSymptoms     = review.topSymptoms
     }
 }

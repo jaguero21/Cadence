@@ -50,7 +50,7 @@ final class CadenceUITests: XCTestCase {
         happyMood.tap()
 
         let next = app.buttons["Next"]
-        for _ in 0..<5 {   // mood → metrics → basics → symptoms → factors → note
+        for _ in 0..<7 {   // mood → metrics → basics → symptoms → factors → peaksAndValleys → intentions → note
             XCTAssertTrue(next.waitForExistence(timeout: 5))
             next.tap()
         }

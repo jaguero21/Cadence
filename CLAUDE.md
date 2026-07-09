@@ -25,6 +25,28 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   same insight) and into trend charts via `ChartSeries.custom` (days without an
   entry are skipped, never drawn as zero; the comparison badge is neutral
   because a custom tracker's desirable direction is unknowable).
+- **Peaks & Valleys / Intentions for Tomorrow:** closing reflection steps
+  positioned right before each flow's final step. The **daily log** has both:
+  `peaksAndValleysNote: String` + `peaksAndValleysVoiceMemo: Attachment?` +
+  `intentionsForTomorrow: String` on `DailyLog`. The **weekly review** has
+  only Intentions (`intentionsForTomorrow` on `WeeklyReview`) — a weekly
+  Peaks & Valleys step shipped briefly and was removed after real use; don't
+  reintroduce it. These are dedicated fields, not the generic `PromptResponse`
+  system (text-only, and Peaks & Valleys needs voice-memo support). The single
+  optional voice memo is recorded via the shared `VoiceMemoRow` component
+  (`Cadence/Shared/Components/VoiceMemoRow.swift`), distinct from the note
+  step's multi-attachment list — exactly one memo, replaced/deleted in place.
+  `LogInputFlow` stages these like every other field (local `@State`, applied
+  to the model at save time); `ReviewFlowView` binds directly to the `@Model`
+  (`$review.intentionsForTomorrow`, matching how `overallRating` is already
+  bound) since that flow doesn't stage. `WeeklyReviewViewModel.ReviewStep`
+  (`.prompt(Int) / .intentions`) extends the flat prompt index into the extra
+  step — `flatIndex`/`totalSteps` give every step (prompts included) one
+  unified "N of 8" position. Surfaces in the doctor PDF (per-day, from
+  `DailyLogSnapshot`), the personal PDF (per-week Intentions, from
+  `WeeklyReviewSnapshot`), and the CSV export; voice memo binaries are never
+  backed up (`BackupService` carries only the text fields, same rule as
+  `attachments`).
 - **Insight history & notifications:** every `InsightCard` carries a **stable
   semantic `key`** (e.g. `med-effect:Sertraline`) set at the PatternEngine
   creation site — never derive identity from the display title, which changes
