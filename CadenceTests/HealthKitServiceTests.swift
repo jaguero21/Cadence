@@ -78,6 +78,12 @@ struct HealthKitSnapshotDefaultInitTests {
     func snapshot_hrv_defaultsToNil() {
         #expect(HealthKitSnapshot().hrv == nil)
     }
+
+    @Test("Default snapshot has activeEnergy and mindfulMinutes = nil")
+    func snapshot_energyAndMindful_defaultToNil() {
+        #expect(HealthKitSnapshot().activeEnergy == nil)
+        #expect(HealthKitSnapshot().mindfulMinutes == nil)
+    }
 }
 
 @Suite("HealthKitSnapshot – explicit values")
@@ -85,11 +91,14 @@ struct HealthKitSnapshotValueTests {
 
     @Test("Snapshot stores all non-nil values correctly")
     func snapshot_storesNonNilValues() {
-        let snapshot = HealthKitSnapshot(steps: 8432, restingHR: 62.5, hrv: 45.3, sleepHours: 7.25)
+        let snapshot = HealthKitSnapshot(steps: 8432, restingHR: 62.5, hrv: 45.3, sleepHours: 7.25,
+                                         activeEnergy: 420, mindfulMinutes: 12)
         #expect(snapshot.steps == 8432)
         #expect(snapshot.restingHR == 62.5)
         #expect(snapshot.hrv == 45.3)
         #expect(snapshot.sleepHours == 7.25)
+        #expect(snapshot.activeEnergy == 420)
+        #expect(snapshot.mindfulMinutes == 12)
     }
 
     @Test("Snapshot with only steps populated leaves other fields nil")

@@ -682,10 +682,12 @@ struct LogInputFlow: View {
         log.freeNote        = freeNote
         log.didEditMetrics  = didEditMetrics
         if let snapshot = hkSnapshot {
-            if let steps = snapshot.steps      { log.hkSteps     = steps }
-            if let hr    = snapshot.restingHR  { log.hkRestingHR = hr }
-            if let hrv   = snapshot.hrv        { log.hkHRV       = hrv }
-            if let sleep = snapshot.sleepHours { log.hkSleepHours = sleep }
+            if let steps   = snapshot.steps          { log.hkSteps          = steps }
+            if let hr      = snapshot.restingHR      { log.hkRestingHR      = hr }
+            if let hrv     = snapshot.hrv            { log.hkHRV            = hrv }
+            if let sleep   = snapshot.sleepHours     { log.hkSleepHours     = sleep }
+            if let energy  = snapshot.activeEnergy   { log.hkActiveEnergy   = energy }
+            if let mindful = snapshot.mindfulMinutes { log.hkMindfulMinutes = mindful }
         }
     }
 
