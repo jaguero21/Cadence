@@ -61,6 +61,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         // symptom logged in another Health-connected app prefill Cadence.
         let symptomTypes = Set(HealthKitService.symptomTypeByName.values).compactMap { HKObjectType.categoryType(forIdentifier: $0) }
         var types = Set(quantityTypes + categoryTypes + symptomTypes)
+        types.insert(HKObjectType.workoutType())
         if #available(iOS 18.0, *) {
             types.insert(HKObjectType.stateOfMindType())
         }
@@ -114,6 +115,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         async let sleep = fetchSleepDetail(start: lastNightStart, end: .now)
         async let symptoms = fetchExternalSymptoms(start: todayStart, end: .now)
         async let mood = fetchExternalDailyMood(start: todayStart, end: .now)
+        async let workout = fetchHadIntenseWorkout(predicate: todayPredicate)
 
         let sleepDetail = await sleep
         return await HealthKitSnapshot(
@@ -127,7 +129,8 @@ final class HealthKitService: HealthKitServiceProtocol {
             wristTemperature: temp,
             menstrualFlow: flow,
             symptoms: symptoms,
-            mood: mood
+            mood: mood,
+            intenseWorkout: workout
         )
     }
 
@@ -388,6 +391,35 @@ final class HealthKitService: HealthKitServiceProtocol {
         }
     }
 
+    // Whether the day's workouts add up to "Intense exercise" (see
+    // isIntenseExercise). nil = no workouts, so the factor chip stays untouched;
+    // false is never reported for the same reason as menstrual flow below.
+    nonisolated private func fetchHadIntenseWorkout(predicate: NSPredicate) async -> Bool? {
+        await withCheckedContinuation { cont in
+            let query = HKSampleQuery(sampleType: HKObjectType.workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                if let error { Self.log.error("fetchHadIntenseWorkout failed: \(error, privacy: .public)") }
+                guard error == nil, let workouts = samples as? [HKWorkout], !workouts.isEmpty else {
+                    cont.resume(returning: nil); return
+                }
+                let minutes = workouts.reduce(0) { $0 + $1.duration } / 60
+                let kilocalories = workouts.reduce(0.0) { total, workout in
+                    let energy = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?
+                        .sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
+                    return total + energy
+                }
+                cont.resume(returning: Self.isIntenseExercise(totalMinutes: minutes, totalKilocalories: kilocalories) ? true : nil)
+            }
+            store.execute(query)
+        }
+    }
+
+    // Pure gate for the "Intense exercise" auto-factor: enough time OR enough
+    // energy — a long easy hike and a short hard run both count.
+    nonisolated static func isIntenseExercise(totalMinutes: Double, totalKilocalories: Double) -> Bool {
+        totalMinutes >= HealthThreshold.intenseWorkoutMinutes
+            || totalKilocalories >= HealthThreshold.intenseWorkoutKilocalories
+    }
+
     // Whether any menstrual-flow sample (of any intensity) overlaps the window.
     // nil = no data (not asked / not tracked); false is never reported because
     // an absent sample can't distinguish "no flow" from "doesn't track cycles".
@@ -479,4 +511,5 @@ struct HealthKitSnapshot {
     var menstrualFlow: Bool?      // true when Health has a flow entry today; nil = no data
     var symptoms: [SymptomEntry] = []   // today's symptoms from OTHER apps, mapped to Cadence names
     var mood: Int?                // 1–5, today's State of Mind daily mood from another app (iOS 18+)
+    var intenseWorkout: Bool?     // true when today's workouts clear the intensity gate; nil = none
 }

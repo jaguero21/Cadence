@@ -318,16 +318,17 @@ struct LogInputFlow: View {
 
     // MARK: - Factors Step
 
-    // Shared with the HealthKit auto-tag in applyHealthKitData — one name, so
-    // a cycle day tagged from Health and one tapped by hand are the same
-    // factor to PatternEngine and the reports.
+    // Shared with the HealthKit auto-tags in applyHealthKitData — one name, so
+    // a factor tagged from Health and one tapped by hand are the same factor
+    // to PatternEngine and the reports.
     static let menstrualCycleFactorName = "Menstrual cycle"
+    static let intenseExerciseFactorName = "Intense exercise"
 
     private static let factorItems: [(name: String, icon: String)] = [
         ("Alcohol",          "wineglass"),
         ("Caffeine",         "cup.and.saucer.fill"),
         ("Skipped meal",     "takeoutbag.and.cup.and.straw"),
-        ("Intense exercise", "figure.run"),
+        (intenseExerciseFactorName, "figure.run"),
         ("Travel",           "airplane"),
         ("Stressful event",  "exclamationmark.bubble"),
         ("Poor sleep",       "bed.double"),
@@ -732,6 +733,10 @@ struct LogInputFlow: View {
         // stays fully manual (toggle it off, or on without Health at all).
         if snapshot.menstrualFlow == true, !selectedFactors.contains(Self.menstrualCycleFactorName) {
             selectedFactors.append(Self.menstrualCycleFactorName)
+        }
+        // Same for a day whose workouts clear the intensity gate.
+        if snapshot.intenseWorkout == true, !selectedFactors.contains(Self.intenseExerciseFactorName) {
+            selectedFactors.append(Self.intenseExerciseFactorName)
         }
         // Symptoms another app already logged in Health today prefill the
         // picker — only while the user hasn't chosen any themselves.
