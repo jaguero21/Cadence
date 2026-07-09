@@ -360,21 +360,7 @@ struct LogDetailView: View {
                 let photos = log.attachments.filter { $0.kind == .photo }
                 if !photos.isEmpty {
                     Section("Photos") {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                ForEach(photos) { photo in
-                                    if let data = attachmentStore.data(for: photo.filename),
-                                       let image = UIImage(data: data) {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 88, height: 88)
-                                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
+                        AttachmentPhotoStrip(photos: photos, store: attachmentStore, tileSize: 88)
                     }
                 }
 

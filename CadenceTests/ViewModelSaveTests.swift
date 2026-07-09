@@ -44,6 +44,7 @@ private final class ThrowingPersistence: ModelPersisting {
     private(set) var deleteCount = 0
     func insert<T: PersistentModel>(_ model: T) { insertCount += 1 }
     func delete<T: PersistentModel>(_ model: T) { deleteCount += 1 }
+    func fetch<T: PersistentModel>(_ descriptor: FetchDescriptor<T>) throws -> [T] { [] }
     func save() throws { throw StubError() }
 }
 
@@ -206,6 +207,28 @@ struct WeeklyReviewViewModelSaveTests {
 
         let fetched = try context.fetch(FetchDescriptor<WeeklyReview>())
         #expect(fetched.count == 1)
+    }
+
+    // Regression: with the unique constraint gone (CloudKit), a review for this
+    // week can already exist even though the sheet was presented with nil
+    // (stale snapshot / CloudKit sync). save() must merge into it, not insert
+    // a same-week duplicate.
+    @Test("Saving a fresh review for an already-reviewed week merges instead of duplicating")
+    func save_duplicateWeek_mergesIntoPersisted() throws {
+        let context = try makeContext()
+        let vm = WeeklyReviewViewModel()
+        let persisted = WeeklyReview(weekStartDate: .now)
+        context.insert(persisted)
+        try context.save()
+
+        let fresh = WeeklyReview(weekStartDate: .now)
+        fresh.overallRating = 4
+        #expect(vm.save(review: fresh, context: context))
+
+        let stored = try context.fetch(FetchDescriptor<WeeklyReview>())
+        #expect(stored.count == 1)
+        #expect(stored.first?.overallRating == 4)   // fresh data merged in
+        #expect(stored.first?.isComplete == true)
     }
 
     // Mirrors ReviewFlowView.onDisappear: a new review that was inserted but

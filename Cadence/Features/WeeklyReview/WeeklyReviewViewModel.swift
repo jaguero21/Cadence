@@ -49,13 +49,33 @@ final class WeeklyReviewViewModel {
 
     @discardableResult
     func save(review: WeeklyReview, context: any ModelPersisting) -> Bool {
-        context.insert(review)
-        let wasComplete = review.isComplete
-        review.isComplete = true
+        // With no DB-level unique constraint (CloudKit), a review for this week
+        // may exist in the store even though the sheet was presented with a nil
+        // existingReview (stale @Query snapshot, CloudKit sync mid-flow). Merge
+        // into the persisted one instead of inserting a same-week duplicate.
+        let target: WeeklyReview
+        let weekStart = review.weekStartDate
+        if review.modelContext == nil,
+           let persisted = try? context.fetch(
+               FetchDescriptor<WeeklyReview>(predicate: #Predicate { $0.weekStartDate == weekStart })
+           ).first {
+            persisted.promptResponses = review.promptResponses
+            persisted.overallRating = review.overallRating
+            persisted.avgMood = review.avgMood
+            persisted.avgEnergy = review.avgEnergy
+            persisted.avgSleep = review.avgSleep
+            persisted.topSymptoms = review.topSymptoms
+            target = persisted
+        } else {
+            target = review
+        }
+        context.insert(target)
+        let wasComplete = target.isComplete
+        target.isComplete = true
         do {
             try context.save()
         } catch {
-            review.isComplete = wasComplete
+            target.isComplete = wasComplete
             Self.log.error("Failed to save weekly review: \(error.localizedDescription)")
             saveError = String(localized: "Your review couldn't be saved. Please try again.")
             return false

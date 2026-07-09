@@ -1,69 +1,116 @@
 import SwiftUI
 import Charts
 
+// What a trend chart draws: display metadata plus a per-log value extractor.
+// Built-in metrics (ChartMetric.series) and user-defined trackers (.custom)
+// both map into this, so custom trackers get the identical average-line and
+// period-comparison treatment. `value` returns nil for days without data —
+// a custom tracker not logged that day is skipped, never drawn as zero.
+struct ChartSeries {
+    let label: String
+    let icon: String
+    let color: Color
+    let yDomain: ClosedRange<Double>
+    // nil = direction unknowable (custom trackers: is "Hydration" up good? is
+    // "Screen time"?). The comparison badge then shows the delta neutrally
+    // instead of guessing Improved/Worsened.
+    let higherIsBetter: Bool?
+    let value: (DailyLog) -> Double?
+
+    func isImprovement(delta: Double) -> Bool? {
+        higherIsBetter.map { (delta > 0) == $0 }
+    }
+
+    static func custom(_ tracker: CustomTracker) -> ChartSeries {
+        // Capture plain values, not the @Model, so the closure can't touch a
+        // deleted tracker's backing data.
+        let id = tracker.id
+        let range = tracker.range
+        return ChartSeries(
+            label: tracker.name,
+            icon: "slider.horizontal.3",
+            color: CadenceColor.accent,
+            yDomain: Double(range.lowerBound)...Double(range.upperBound),
+            higherIsBetter: nil,
+            value: { log in
+                log.customMetrics.first { $0.trackerID == id }.map { Double($0.value) }
+            }
+        )
+    }
+}
+
 struct TrendChartView: View {
     let logs: [DailyLog]   // pre-filtered and sorted ascending by caller
-    let metric: ChartMetric
+    let series: ChartSeries
     let range: InsightsViewModel.ChartRange
     var previousLogs: [DailyLog] = []   // same-length window immediately before, for comparison
+
+    private var points: [(date: Date, value: Double)] {
+        logs.compactMap { log in series.value(log).map { (log.date, $0) } }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label(metric.label, systemImage: metric.icon)
+                Label(series.label, systemImage: series.icon)
                     .font(.headline)
-                    .foregroundStyle(metric.color)
+                    .foregroundStyle(series.color)
                 Spacer()
+                // The period average itself is annotated on the chart's RuleMark,
+                // so the header only carries the period-over-period badge.
                 comparisonBadge
-                if let avg = average {
-                    Text("Avg: \(String(format: "%.1f", avg))")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
             }
 
-            Chart {
-                ForEach(logs) { log in
-                    AreaMark(
-                        x: .value("Date", log.date),
-                        y: .value(metric.label, metric.value(for: log))
-                    )
-                    .foregroundStyle(metric.color.opacity(0.15))
+            let points = points
+            if points.isEmpty {
+                Text("No entries in this period.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 60)
+            } else {
+                Chart {
+                    ForEach(points, id: \.date) { point in
+                        AreaMark(
+                            x: .value("Date", point.date),
+                            y: .value(series.label, point.value)
+                        )
+                        .foregroundStyle(series.color.opacity(0.15))
 
-                    LineMark(
-                        x: .value("Date", log.date),
-                        y: .value(metric.label, metric.value(for: log))
-                    )
-                    .foregroundStyle(metric.color)
-                    .interpolationMethod(.catmullRom)
+                        LineMark(
+                            x: .value("Date", point.date),
+                            y: .value(series.label, point.value)
+                        )
+                        .foregroundStyle(series.color)
+                        .interpolationMethod(.catmullRom)
 
-                    PointMark(
-                        x: .value("Date", log.date),
-                        y: .value(metric.label, metric.value(for: log))
-                    )
-                    .foregroundStyle(metric.color)
-                    .symbolSize(25)
+                        PointMark(
+                            x: .value("Date", point.date),
+                            y: .value(series.label, point.value)
+                        )
+                        .foregroundStyle(series.color)
+                        .symbolSize(25)
+                    }
+
+                    if let avg = average {
+                        RuleMark(y: .value("Average", avg))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .foregroundStyle(series.color.opacity(0.5))
+                            .annotation(position: .topLeading, alignment: .leading) {
+                                Text("avg \(String(format: "%.1f", avg))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                    }
                 }
-
-                if let avg = average {
-                    RuleMark(y: .value("Average", avg))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                        .foregroundStyle(metric.color.opacity(0.5))
-                        .annotation(position: .topLeading, alignment: .leading) {
-                            Text("avg \(String(format: "%.1f", avg))")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
+                .chartYScale(domain: series.yDomain)
+                .chartXAxis {
+                    AxisMarks(preset: .aligned, values: .stride(by: .day, count: range == .sevenDay ? 1 : 7)) { _ in
+                        AxisGridLine()
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                    }
                 }
+                .frame(height: 160)
             }
-            .chartYScale(domain: metric.yDomain)
-            .chartXAxis {
-                AxisMarks(preset: .aligned, values: .stride(by: .day, count: range == .sevenDay ? 1 : 7)) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                }
-            }
-            .frame(height: 160)
         }
         .cadenceCard()
     }
@@ -72,21 +119,36 @@ struct TrendChartView: View {
     private var comparisonBadge: some View {
         if let avg = average, let prev = previousAverage {
             let delta = avg - prev
-            if abs(delta) >= 0.05 {
-                let improved = metric.isImprovement(delta: delta)
+            if abs(delta) >= ChartThreshold.comparisonBadgeMinimumDelta {
+                let improved = series.isImprovement(delta: delta)
+                // Built with String(localized:) so the direction words extract
+                // into the catalog; a bare ternary String would not localize.
+                let direction: String = switch improved {
+                case true?:  String(localized: "Improved")
+                case false?: String(localized: "Worsened")
+                case nil:    String(localized: "Changed")
+                }
                 HStack(spacing: 2) {
                     Image(systemName: delta > 0 ? "arrow.up.right" : "arrow.down.right")
                     Text(String(format: "%+.1f", delta))
                 }
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(improved ? CadenceColor.successGreen : CadenceColor.stressRed)
-                .accessibilityLabel("\(improved ? "Improved" : "Worsened") by \(String(format: "%.1f", abs(delta))) versus the previous \(range.voiceLabel)")
+                .foregroundStyle(badgeColor(improved: improved))
+                .accessibilityLabel("\(direction) by \(String(format: "%.1f", abs(delta))) versus the previous \(range.voiceLabel)")
             }
         }
     }
 
-    private var average: Double? { Self.mean(logs.map { metric.value(for: $0) }) }
-    private var previousAverage: Double? { Self.mean(previousLogs.map { metric.value(for: $0) }) }
+    private func badgeColor(improved: Bool?) -> Color {
+        switch improved {
+        case true?:  return CadenceColor.successGreen
+        case false?: return CadenceColor.stressRed
+        case nil:    return .secondary
+        }
+    }
+
+    private var average: Double? { Self.mean(logs.compactMap { series.value($0) }) }
+    private var previousAverage: Double? { Self.mean(previousLogs.compactMap { series.value($0) }) }
 
     static func mean(_ values: [Double]) -> Double? {
         guard !values.isEmpty else { return nil }
@@ -96,6 +158,17 @@ struct TrendChartView: View {
 
 enum ChartMetric: CaseIterable {
     case mood, energy, sleep, stress
+
+    var series: ChartSeries {
+        ChartSeries(
+            label: label,
+            icon: icon,
+            color: color,
+            yDomain: yDomain,
+            higherIsBetter: higherIsBetter,
+            value: { [self] log in value(for: log) }
+        )
+    }
 
     var label: String {
         switch self {

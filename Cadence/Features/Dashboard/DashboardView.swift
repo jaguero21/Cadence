@@ -6,6 +6,7 @@ struct DashboardView: View {
     @Environment(\.notificationService) private var notificationService
     @Query private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
+    @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
     @State private var vm = DashboardViewModel()
     @State private var showingDailyLog = false
     @State private var showingWeeklyReview = false
@@ -51,9 +52,9 @@ struct DashboardView: View {
                     }
                 }
             }
-            .onAppear { vm.refresh(logs: logs, reviews: reviews, notifications: notificationService) }
-            .onChange(of: logs)    { _, _ in vm.refresh(logs: logs, reviews: reviews, notifications: notificationService) }
-            .onChange(of: reviews) { _, _ in vm.refresh(logs: logs, reviews: reviews, notifications: notificationService) }
+            .onAppear { vm.refresh(logs: logs, reviews: reviews, medications: medications, notifications: notificationService) }
+            .onChange(of: logs)    { _, _ in vm.refresh(logs: logs, reviews: reviews, medications: medications, notifications: notificationService) }
+            .onChange(of: reviews) { _, _ in vm.refresh(logs: logs, reviews: reviews, medications: medications, notifications: notificationService) }
         }
     }
 

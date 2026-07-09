@@ -42,4 +42,12 @@ struct FlareSnapshot: Sendable {
         note = flare.note
         durationDays = flare.durationDays
     }
+
+    init(startDate: Date, endDate: Date? = nil, peakSeverity: Int = 5, note: String = "", durationDays: Int = 1) {
+        self.startDate = startDate
+        self.endDate = endDate
+        self.peakSeverity = peakSeverity
+        self.note = note
+        self.durationDays = durationDays
+    }
 }

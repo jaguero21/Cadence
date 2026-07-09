@@ -2,7 +2,7 @@ import Foundation
 
 enum AttachmentKind: String, Codable, Sendable {
     case photo
-    case audio   // reserved for voice memos (recorder is a planned follow-up)
+    case audio   // voice notes, recorded via AudioRecorder (VoiceNote.swift)
 }
 
 // A media attachment on a DailyLog. The binary lives on disk (see AttachmentStore);
