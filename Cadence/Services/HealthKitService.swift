@@ -57,13 +57,31 @@ final class HealthKitService: HealthKitServiceProtocol {
         ]
         let quantityTypes = quantity.compactMap { HKObjectType.quantityType(forIdentifier: $0) }
         let categoryTypes = category.compactMap { HKObjectType.categoryType(forIdentifier: $0) }
-        return Set(quantityTypes + categoryTypes)
+        // Symptoms are read AND written (see shareTypes); reading lets a
+        // symptom logged in another Health-connected app prefill Cadence.
+        let symptomTypes = Set(HealthKitService.symptomTypeByName.values).compactMap { HKObjectType.categoryType(forIdentifier: $0) }
+        var types = Set(quantityTypes + categoryTypes + symptomTypes)
+        if #available(iOS 18.0, *) {
+            types.insert(HKObjectType.stateOfMindType())
+        }
+        return types
+    }()
+
+    // What Cadence writes back to Health: the day's symptoms and (iOS 18+) the
+    // daily mood as State of Mind. Writing is a courtesy to the user's health
+    // record — a denied share permission never blocks logging in Cadence.
+    private let shareTypes: Set<HKSampleType> = {
+        var types = Set(Set(HealthKitService.symptomTypeByName.values).compactMap { HKObjectType.categoryType(forIdentifier: $0) as HKSampleType? })
+        if #available(iOS 18.0, *) {
+            types.insert(HKObjectType.stateOfMindType())
+        }
+        return types
     }()
 
     @discardableResult
     func requestAuthorization() async throws -> Bool {
         guard isAvailable else { return false }
-        try await store.requestAuthorization(toShare: [], read: readTypes)
+        try await store.requestAuthorization(toShare: shareTypes, read: readTypes)
         cachedIsAuthorized = nil   // authorization status may have changed; re-evaluate
         return isAuthorized
     }
@@ -94,6 +112,8 @@ final class HealthKitService: HealthKitServiceProtocol {
         async let hrv   = fetchLatest(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), predicate: yesterdayPredicate)
         async let temp  = fetchAverage(.appleSleepingWristTemperature, unit: .degreeCelsius(), predicate: nightPredicate)
         async let sleep = fetchSleepDetail(start: lastNightStart, end: .now)
+        async let symptoms = fetchExternalSymptoms(start: todayStart, end: .now)
+        async let mood = fetchExternalDailyMood(start: todayStart, end: .now)
 
         let sleepDetail = await sleep
         return await HealthKitSnapshot(
@@ -105,8 +125,148 @@ final class HealthKitService: HealthKitServiceProtocol {
             mindfulMinutes: mindful,
             sleepQuality: sleepDetail.quality,
             wristTemperature: temp,
-            menstrualFlow: flow
+            menstrualFlow: flow,
+            symptoms: symptoms,
+            mood: mood
         )
+    }
+
+    // MARK: - Write-back (Health record sync)
+
+    // Mirrors a saved day's log into Health: mapped symptoms as severity
+    // samples, and (iOS 18+) the mood as a State of Mind daily-mood entry when
+    // the user actually set one. Delete-then-write per type keeps re-saves
+    // idempotent — HealthKit only ever deletes samples this app created, so
+    // other apps' data is untouchable by construction. Best-effort: failures
+    // are logged and swallowed; Health sync must never block or degrade
+    // logging in Cadence.
+    func publish(log: DailyLogSnapshot) async {
+        guard isAvailable else { return }
+        let cal = Calendar.current
+        let dayStart = cal.startOfDay(for: log.date)
+        let dayEnd = min(cal.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart, .now)
+        guard dayEnd > dayStart else { return }
+        let dayPredicate = HKQuery.predicateForSamples(withStart: dayStart, end: dayEnd)
+
+        let entriesByType = Dictionary(
+            grouping: log.symptoms.compactMap { entry in
+                Self.symptomTypeIdentifier(for: entry.name).map { (id: $0, entry: entry) }
+            },
+            by: \.id
+        )
+
+        // Every mapped type gets the delete pass — a symptom removed in
+        // Cadence must also leave the Health record.
+        for identifier in Set(Self.symptomTypeByName.values) {
+            guard let type = HKObjectType.categoryType(forIdentifier: identifier),
+                  store.authorizationStatus(for: type) == .sharingAuthorized else { continue }
+            do {
+                _ = try? await store.deleteObjects(of: type, predicate: dayPredicate)
+                if let worst = entriesByType[identifier]?.map(\.entry).max(by: { $0.severity < $1.severity }) {
+                    let sample = HKCategorySample(
+                        type: type,
+                        value: Self.hkSeverityValue(forSeverity: worst.severity),
+                        start: dayStart,
+                        end: dayEnd
+                    )
+                    try await store.save(sample)
+                }
+            } catch {
+                Self.log.error("Health symptom write-back (\(identifier.rawValue, privacy: .public)) failed: \(error, privacy: .public)")
+            }
+        }
+
+        if #available(iOS 18.0, *) {
+            let type = HKObjectType.stateOfMindType()
+            if store.authorizationStatus(for: type) == .sharingAuthorized, log.didEditMood {
+                do {
+                    _ = try? await store.deleteObjects(of: type, predicate: dayPredicate)
+                    let entry = HKStateOfMind(
+                        date: dayEnd,
+                        kind: .dailyMood,
+                        valence: Self.valence(forMood: log.mood),
+                        labels: [],
+                        associations: []
+                    )
+                    try await store.save(entry)
+                } catch {
+                    Self.log.error("Health mood write-back failed: \(error, privacy: .public)")
+                }
+            }
+        }
+    }
+
+    // MARK: - Symptom & mood mapping (pure, unit-tested)
+
+    // Cadence symptom names ↔ HealthKit symptom category types. Only honest
+    // mappings — a Cadence symptom with no real HK counterpart (e.g. "Brain
+    // Fog") simply doesn't sync. Keys are lowercased names.
+    nonisolated static let symptomTypeByName: [String: HKCategoryTypeIdentifier] = [
+        "headache":            .headache,
+        "fatigue":             .fatigue,
+        "nausea":              .nausea,
+        "dizziness":           .dizziness,
+        "fever":               .fever,
+        "coughing":            .coughing,
+        "cough":               .coughing,
+        "chills":              .chills,
+        "bloating":            .bloating,
+        "constipation":        .constipation,
+        "diarrhea":            .diarrhea,
+        "heartburn":           .heartburn,
+        "sore throat":         .soreThroat,
+        "runny nose":          .runnyNose,
+        "shortness of breath": .shortnessOfBreath,
+        "lower back pain":     .lowerBackPain,
+        "pelvic pain":         .pelvicPain,
+        "hot flashes":         .hotFlashes,
+        "night sweats":        .nightSweats,
+        "pain":                .generalizedBodyAche,
+        "body ache":           .generalizedBodyAche,
+    ]
+
+    nonisolated static func symptomTypeIdentifier(for name: String) -> HKCategoryTypeIdentifier? {
+        symptomTypeByName[name.lowercased()]
+    }
+
+    // The reverse map for reading Health symptoms into Cadence. Where several
+    // names share a type (cough/coughing, pain/body ache), the canonical
+    // Cadence display name wins.
+    nonisolated static func symptomName(for identifier: HKCategoryTypeIdentifier) -> String? {
+        switch identifier {
+        case .coughing:            return "Coughing"
+        case .generalizedBodyAche: return "Pain"
+        default:
+            return symptomTypeByName.first { $0.value == identifier }?.key.capitalized
+        }
+    }
+
+    // Cadence severity (1–10) → HKCategoryValueSeverity raw value.
+    nonisolated static func hkSeverityValue(forSeverity severity: Int) -> Int {
+        switch severity {
+        case ..<4:  return HKCategoryValueSeverity.mild.rawValue
+        case 4...7: return HKCategoryValueSeverity.moderate.rawValue
+        default:    return HKCategoryValueSeverity.severe.rawValue
+        }
+    }
+
+    // HKCategoryValueSeverity raw value → a representative Cadence severity.
+    nonisolated static func cadenceSeverity(fromHKSeverity raw: Int) -> Int {
+        switch HKCategoryValueSeverity(rawValue: raw) {
+        case .mild:     return 2
+        case .moderate: return 5
+        case .severe:   return 9
+        default:        return 5
+        }
+    }
+
+    // Cadence mood (1–5) ↔ State of Mind valence (-1…1).
+    nonisolated static func valence(forMood mood: Int) -> Double {
+        Double(mood.clamped(to: 1...5) - 3) / 2
+    }
+
+    nonisolated static func mood(forValence valence: Double) -> Int {
+        (Int((valence * 2).rounded()) + 3).clamped(to: 1...5)
     }
 
     // Derives a 0–10 sleep-quality score from stage totals. Returns nil unless
@@ -156,6 +316,60 @@ final class HealthKitService: HealthKitServiceProtocol {
                 guard error == nil else { cont.resume(returning: nil); return }
                 let qty = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: unit)
                 cont.resume(returning: qty)
+            }
+            store.execute(query)
+        }
+    }
+
+    // Today's symptoms logged by OTHER apps/Health itself, mapped to Cadence
+    // entries so the symptom picker can prefill. Our own written samples are
+    // excluded — otherwise a symptom the user removed in Cadence would
+    // resurrect from Health on the next open.
+    nonisolated private func fetchExternalSymptoms(start: Date, end: Date) async -> [SymptomEntry] {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+        let ownBundle = Bundle.main.bundleIdentifier
+        var entries: [SymptomEntry] = []
+        await withTaskGroup(of: SymptomEntry?.self) { group in
+            for identifier in Set(Self.symptomTypeByName.values) {
+                group.addTask { [store] in
+                    guard let type = HKObjectType.categoryType(forIdentifier: identifier),
+                          let name = Self.symptomName(for: identifier) else { return nil }
+                    let sample: HKCategorySample? = await withCheckedContinuation { cont in
+                        let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                            if let error { Self.log.error("fetchExternalSymptoms(\(identifier.rawValue, privacy: .public)) failed: \(error, privacy: .public)") }
+                            let external = (samples as? [HKCategorySample])?
+                                .filter { $0.sourceRevision.source.bundleIdentifier != ownBundle }
+                            // Worst severity of the day wins.
+                            cont.resume(returning: external?.max { $0.value < $1.value })
+                        }
+                        store.execute(query)
+                    }
+                    guard let sample else { return nil }
+                    let emoji = SymptomTag.defaults.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.emoji ?? "🤒"
+                    return SymptomEntry(name: name, severity: Self.cadenceSeverity(fromHKSeverity: sample.value), emoji: emoji)
+                }
+            }
+            for await entry in group {
+                if let entry { entries.append(entry) }
+            }
+        }
+        return entries.sorted { $0.name < $1.name }
+    }
+
+    // Today's State of Mind daily mood from Health (iOS 18+), excluding our own
+    // written entry, mapped back to the 1–5 scale.
+    nonisolated private func fetchExternalDailyMood(start: Date, end: Date) async -> Int? {
+        guard #available(iOS 18.0, *) else { return nil }
+        let type = HKObjectType.stateOfMindType()
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+        let ownBundle = Bundle.main.bundleIdentifier
+        return await withCheckedContinuation { cont in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { _, samples, error in
+                if let error { Self.log.error("fetchExternalDailyMood failed: \(error, privacy: .public)") }
+                let latest = (samples as? [HKStateOfMind])?.first {
+                    $0.kind == .dailyMood && $0.sourceRevision.source.bundleIdentifier != ownBundle
+                }
+                cont.resume(returning: latest.map { Self.mood(forValence: $0.valence) })
             }
             store.execute(query)
         }
@@ -263,4 +477,6 @@ struct HealthKitSnapshot {
     var sleepQuality: Int?        // 0–10, derived from sleep stages; nil without stage data
     var wristTemperature: Double? // °C, last night's average (Watch Series 8+)
     var menstrualFlow: Bool?      // true when Health has a flow entry today; nil = no data
+    var symptoms: [SymptomEntry] = []   // today's symptoms from OTHER apps, mapped to Cadence names
+    var mood: Int?                // 1–5, today's State of Mind daily mood from another app (iOS 18+)
 }
