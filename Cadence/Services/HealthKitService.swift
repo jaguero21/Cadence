@@ -50,7 +50,8 @@ final class HealthKitService: HealthKitServiceProtocol {
     private let readTypes: Set<HKObjectType> = {
         let quantity: [HKQuantityTypeIdentifier] = [
             .restingHeartRate, .heartRateVariabilitySDNN, .stepCount, .activeEnergyBurned,
-            .appleSleepingWristTemperature,
+            .appleSleepingWristTemperature, .respiratoryRate, .oxygenSaturation,
+            .timeInDaylight, .dietaryCaffeine, .dietaryWater,
         ]
         let category: [HKCategoryTypeIdentifier] = [
             .sleepAnalysis, .mindfulSession, .menstrualFlow,
@@ -116,6 +117,11 @@ final class HealthKitService: HealthKitServiceProtocol {
         async let symptoms = fetchExternalSymptoms(start: todayStart, end: .now)
         async let mood = fetchExternalDailyMood(start: todayStart, end: .now)
         async let workout = fetchHadIntenseWorkout(predicate: todayPredicate)
+        async let respiratory = fetchAverage(.respiratoryRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: nightPredicate)
+        async let spo2 = fetchAverage(.oxygenSaturation, unit: .percent(), predicate: nightPredicate)
+        async let daylight = fetchSum(.timeInDaylight, unit: .minute(), predicate: todayPredicate)
+        async let caffeine = fetchSum(.dietaryCaffeine, unit: .gramUnit(with: .milli), predicate: todayPredicate)
+        async let water = fetchSum(.dietaryWater, unit: .liter(), predicate: todayPredicate)
 
         let sleepDetail = await sleep
         return await HealthKitSnapshot(
@@ -130,7 +136,12 @@ final class HealthKitService: HealthKitServiceProtocol {
             menstrualFlow: flow,
             symptoms: symptoms,
             mood: mood,
-            intenseWorkout: workout
+            intenseWorkout: workout,
+            respiratoryRate: respiratory,
+            bloodOxygen: spo2.map { $0 * 100 },   // HK .percent() is 0–1; store 0–100
+            daylightMinutes: daylight,
+            caffeineMilligrams: caffeine,
+            waterLiters: water
         )
     }
 
@@ -512,4 +523,9 @@ struct HealthKitSnapshot {
     var symptoms: [SymptomEntry] = []   // today's symptoms from OTHER apps, mapped to Cadence names
     var mood: Int?                // 1–5, today's State of Mind daily mood from another app (iOS 18+)
     var intenseWorkout: Bool?     // true when today's workouts clear the intensity gate; nil = none
+    var respiratoryRate: Double?  // breaths/min, overnight average
+    var bloodOxygen: Double?      // %, overnight average SpO2 (0–100)
+    var daylightMinutes: Double?  // minutes of daylight today
+    var caffeineMilligrams: Double?   // mg logged in Health today (drives the "Caffeine" factor)
+    var waterLiters: Double?      // litres logged in Health today (drives the "Hydration" basic)
 }

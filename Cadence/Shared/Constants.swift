@@ -115,6 +115,11 @@ enum HealthThreshold {
     // that factor chip) when they total at least this much time or energy.
     static let intenseWorkoutMinutes: Double = 45
     static let intenseWorkoutKilocalories: Double = 400
+    // Logged dietary caffeine (mg) that auto-selects the "Caffeine" factor —
+    // roughly half a cup of coffee; trace amounts don't count.
+    static let caffeineMilligrams: Double = 50
+    // Logged dietary water (litres) that auto-checks the "Hydration" basic.
+    static let hydrationLiters: Double = 1.5
 }
 
 enum AppLaunch {
