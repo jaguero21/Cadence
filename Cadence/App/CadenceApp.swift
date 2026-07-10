@@ -218,6 +218,16 @@ struct ContentView: View {
             // usually is. Reload explicitly so the widget's interim
             // "mood saved" state clears now that the tap is store-backed.
             WidgetCenter.shared.reloadTimelines(ofKind: WidgetData.widgetKind)
+            // Mirror the applied days' moods into Health's State of Mind —
+            // a widget tap is still a check-in. Best-effort, fire-and-forget.
+            let appliedDays = Set(pending.map { Calendar.current.startOfDay(for: $0.date) })
+            let snapshots = logs.filter { appliedDays.contains($0.date) }.map(DailyLogSnapshot.init)
+            let service = healthKitService
+            Task {
+                for snapshot in snapshots {
+                    await service.publish(log: snapshot)
+                }
+            }
         }
     }
 
