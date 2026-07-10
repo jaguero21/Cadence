@@ -170,6 +170,9 @@ enum PDFBuilder {
         hkAverage("Active energy", logs.compactMap(\.hkActiveEnergy)) { String(format: "%.0f kcal", $0) }
         hkAverage("Mindful minutes", logs.compactMap(\.hkMindfulMinutes)) { String(format: "%.0f min", $0) }
         hkAverage("Overnight wrist temp", logs.compactMap(\.hkWristTemp)) { String(format: "%.1f °C", $0) }
+        hkAverage("Respiratory rate", logs.compactMap(\.hkRespiratoryRate)) { String(format: "%.1f breaths/min", $0) }
+        hkAverage("Blood oxygen", logs.compactMap(\.hkBloodOxygen)) { String(format: "%.0f%%", $0) }
+        hkAverage("Time in daylight", logs.compactMap(\.hkDaylightMinutes)) { String(format: "%.0f min", $0) }
         if !hkLines.isEmpty {
             y += 16
             breakIfNeeded(y: &y, needing: 44, ctx: ctx)
