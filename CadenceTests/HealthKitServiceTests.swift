@@ -361,3 +361,27 @@ struct ExternalMoodResolutionTests {
         #expect(HealthKitService.resolveExternalMood(latestDailyValence: nil, momentaryValences: []) == nil)
     }
 }
+
+// MARK: - Symptom library
+
+// The Settings toggle list. Every library name must resolve to a HealthKit
+// symptom type (that's the promise the footer makes about Health sync), and
+// no entry may collide with a seeded default.
+@Suite("SymptomTag – optional catalog")
+struct SymptomCatalogTests {
+
+    @Test("Every catalog entry maps to a HealthKit symptom type")
+    func catalogNamesAllMapToHealth() {
+        for entry in SymptomTag.optionalCatalog {
+            #expect(HealthKitService.symptomTypeIdentifier(for: entry.name) != nil, "\(entry.name) has no HK mapping")
+        }
+    }
+
+    @Test("No duplicates within the catalog or against the defaults")
+    func catalogHasNoDuplicates() {
+        let names = SymptomTag.optionalCatalog.map { $0.name.lowercased() }
+        #expect(Set(names).count == names.count)
+        let defaultNames = Set(SymptomTag.defaults.map { $0.name.lowercased() })
+        #expect(defaultNames.isDisjoint(with: names))
+    }
+}
