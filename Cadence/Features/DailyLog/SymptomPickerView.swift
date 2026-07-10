@@ -44,33 +44,37 @@ struct SymptomPickerView: View {
         let severity = selectedSymptoms.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }?.severity ?? 5
 
         return VStack(spacing: 8) {
-            Button {
-                toggleSymptom(name: name, emoji: emoji)
-            } label: {
-                VStack(spacing: 6) {
-                    Text(emoji)
-                        .font(.title2)
-                    Text(name)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(isSelected ? .white : .primary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    isSelected ? CadenceColor.stressRed : CadenceColor.cardBG,
-                    in: RoundedRectangle(cornerRadius: 12)
-                )
+            // Deliberately NOT a Button: a Button cancels touch tracking during
+            // a hold, so an attached onLongPressGesture never fires on device —
+            // "hold to rate severity" silently did nothing. Plain tap + long
+            // press gestures coexist correctly.
+            VStack(spacing: 6) {
+                Text(emoji)
+                    .font(.title2)
+                Text(name)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(isSelected ? .white : .primary)
             }
-            .buttonStyle(.plain)
-            .hapticFeedback(.medium)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                isSelected ? CadenceColor.stressRed : CadenceColor.cardBG,
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .onTapGesture {
+                toggleSymptom(name: name, emoji: emoji)
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
+            .onLongPressGesture(minimumDuration: 0.4) {
+                expandSeverity(name: name, emoji: emoji)
+            }
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(name)
-            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
             .accessibilityHint(isSelected ? "Double-tap and hold to adjust severity" : "Double-tap to select, then hold to rate severity")
-            .onLongPressGesture {
-                withAnimation(CadenceAnimation.spring) {
-                    expandedTag = expandedTag == name ? nil : name
-                }
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            .accessibilityAction(named: "Rate severity") {
+                expandSeverity(name: name, emoji: emoji)
             }
 
             if isSelected && expandedTag == name {
@@ -118,6 +122,18 @@ struct SymptomPickerView: View {
         .sheet(isPresented: $showingAddSheet) {
             AddSymptomSheet(onSave: { _, _ in showingAddSheet = false })
         }
+    }
+
+    // Long-pressing an unselected chip selects it first, so "hold to rate"
+    // always produces a visible slider instead of silently setting state.
+    private func expandSeverity(name: String, emoji: String) {
+        if !selectedSymptoms.contains(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+            selectedSymptoms.append(SymptomEntry(name: name, severity: 5, emoji: emoji))
+        }
+        withAnimation(CadenceAnimation.spring) {
+            expandedTag = expandedTag == name ? nil : name
+        }
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
     }
 
     private func toggleSymptom(name: String, emoji: String) {
