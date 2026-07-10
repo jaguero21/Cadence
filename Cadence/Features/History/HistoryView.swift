@@ -378,7 +378,10 @@ struct LogDetailView: View {
                     }
                 }
 
-                if log.hkSteps != nil || log.hkHRV != nil {
+                if log.hkSteps != nil || log.hkHRV != nil || log.hkRestingHR != nil
+                    || log.hkSleepHours != nil || log.hkActiveEnergy != nil || log.hkMindfulMinutes != nil
+                    || log.hkWristTemp != nil || log.hkRespiratoryRate != nil || log.hkBloodOxygen != nil
+                    || log.hkDaylightMinutes != nil || log.hkDaytimeHR != nil {
                     Section("HealthKit Data") {
                         if let steps = log.hkSteps {
                             Label("\(steps) steps", systemImage: "figure.walk")
@@ -388,6 +391,30 @@ struct LogDetailView: View {
                         }
                         if let hr = log.hkRestingHR {
                             Label(String(format: "Resting HR: %.0f bpm", hr), systemImage: "heart.fill")
+                        }
+                        if let sleep = log.hkSleepHours {
+                            Label(String(format: "Sleep (measured): %.1f hrs", sleep), systemImage: "moon.zzz.fill")
+                        }
+                        if let energy = log.hkActiveEnergy {
+                            Label(String(format: "Active energy: %.0f kcal", energy), systemImage: "flame.fill")
+                        }
+                        if let mindful = log.hkMindfulMinutes {
+                            Label(String(format: "Mindful minutes: %.0f min", mindful), systemImage: "brain.head.profile")
+                        }
+                        if let temp = log.hkWristTemp {
+                            Label(String(format: "Wrist temp: %.1f °C", temp), systemImage: "thermometer.medium")
+                        }
+                        if let resp = log.hkRespiratoryRate {
+                            Label(String(format: "Respiratory rate: %.1f/min", resp), systemImage: "lungs.fill")
+                        }
+                        if let spo2 = log.hkBloodOxygen {
+                            Label(String(format: "Blood oxygen: %.0f%%", spo2), systemImage: "drop.circle")
+                        }
+                        if let daylight = log.hkDaylightMinutes {
+                            Label(String(format: "Daylight: %.0f min", daylight), systemImage: "sun.max")
+                        }
+                        if let daytimeHR = log.hkDaytimeHR {
+                            Label(String(format: "Daytime HR: %.0f bpm", daytimeHR), systemImage: "heart.circle")
                         }
                     }
                 }

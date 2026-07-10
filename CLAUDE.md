@@ -65,8 +65,42 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   the doctor PDF. `PatternEngine.flarePrecursors` compares the
   `flarePrecursorWindowDays` run-up before each flare against baseline days
   (in-flare days excluded from both sides) and surfaces stress-rise
-  (`flare-stress`) and sleep-dip (`flare-sleep`) early-warning cards; needs
-  `minimumFlaresForPattern` flares with run-up data.
+  (`flare-stress`), sleep-dip (`flare-sleep`), overnight wrist-temperature
+  rise (`flare-temp`), and overnight respiratory-rate rise
+  (`flare-respiratory`) early-warning cards (the HealthKit-fed ones use
+  `hkWristTemp`/`hkRespiratoryRate`; only days carrying a measurement
+  participate); needs `minimumFlaresForPattern` flares with run-up data.
+  `daylightMoodCorrelation` (`daylight-mood`) mirrors mood-sleep for
+  HealthKit's time-in-daylight — only the actionable direction (more daylight
+  → better mood) surfaces.
+- **HealthKit is always optional.** HK values only prefill or supplement —
+  the sleep sliders, the "Menstrual cycle" factor chip (auto-selected via
+  `LogInputFlow.menstrualCycleFactorName` when Health has a flow entry today),
+  and the `hk*` objective fields. Nothing is gated on Health access, prefills
+  never overwrite user-entered values (`didEditMetrics` guard), and every
+  loggable variable stays fully manual. Every type in
+  `HealthKitService.readTypes` must be fetched by `fetchLogSnapshot` —
+  requesting permission for data that's never read is a broken promise.
+- **Health two-way sync:** `HealthKitService.publish(log:)` (called from
+  `LogInputFlow` after every successful save, fire-and-forget) mirrors the
+  day into Health — mapped symptoms as severity samples, and the mood as a
+  State of Mind daily-mood entry (iOS 18+, only when `didEditMood`).
+  Delete-then-write per type keeps re-saves idempotent; HK can only delete
+  our own samples, so other apps' data is untouchable by construction.
+  Reads exclude our own bundle's samples (else a symptom removed in Cadence
+  would resurrect from Health). The name↔type/severity/valence maps are pure
+  statics on `HealthKitService` (`symptomTypeByName` etc.), unit-tested; only
+  honest mappings — a Cadence symptom with no real HK counterpart (e.g.
+  "Brain Fog") simply doesn't sync.
+- **HealthKit freshness:** `HealthDataRefresher.refreshToday` tops up TODAY's
+  existing log's `hk*` fields (via the shared
+  `DailyLog.applyObjectiveHealthData`, which never blanks a value on nil and
+  never touches user-entered fields) — it **never creates a log** (no phantom
+  entries from background data). Driven by `HealthKitService
+  .startObservingChanges` (HKObserverQuery + hourly background delivery;
+  entitlement `com.apple.developer.healthkit.background-delivery`) started in
+  `CadenceApp`, with a foreground fallback in `ContentView`'s scenePhase
+  handler.
 - **Factor (trigger) logging:** `DailyLog.factors: [String]` holds contextual
   triggers chosen from a fixed list (`LogInputFlow.factorItems`) in the `.factors`
   log step — same hardcoded-list pattern as `basicsCompleted` (no model).

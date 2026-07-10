@@ -26,7 +26,10 @@ private func makeSnapshot(
     painLevel: Int = 0,
     brainFogLevel: Int = 0,
     hkSteps: Int? = nil,
-    hkRestingHR: Double? = nil
+    hkRestingHR: Double? = nil,
+    hkWristTemp: Double? = nil,
+    hkRespiratoryRate: Double? = nil,
+    hkDaylightMinutes: Double? = nil
 ) -> DailyLogSnapshot {
     let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)!
     return DailyLogSnapshot(
@@ -48,7 +51,10 @@ private func makeSnapshot(
         intentionsForTomorrow: intentionsForTomorrow,
         freeNote: freeNote,
         hkSteps: hkSteps,
-        hkRestingHR: hkRestingHR
+        hkRestingHR: hkRestingHR,
+        hkWristTemp: hkWristTemp,
+        hkRespiratoryRate: hkRespiratoryRate,
+        hkDaylightMinutes: hkDaylightMinutes
     )
 }
 
@@ -422,7 +428,7 @@ struct CSVBuilderTests {
             makeSnapshot(daysAgo: 2),
         ]
         let lines = CSVBuilder.csvString(from: logs).split(separator: "\n", omittingEmptySubsequences: false)
-        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes")
+        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes,HK Wrist Temp,HK Respiratory Rate,HK Blood Oxygen,HK Daylight Minutes,HK Daytime HR")
         #expect(lines.count == 3) // header + 2 rows
         // Oldest first: the day -2 row precedes the day 0 row.
         #expect(lines[1] < lines[2]) // ISO yyyy-MM-dd sorts chronologically as text
@@ -1044,6 +1050,32 @@ struct FlarePrecursorsTests {
         let cards = flareCards(logs(preStress: 5, baseStress: 5, preSleep: 7.5, baseSleep: 7.5), flares: flares)
         #expect(cards.isEmpty)
     }
+
+    // Wrist-temperature run-up: only days carrying a measurement participate.
+    private func tempLogs(preTemp: Double?, baseTemp: Double?) -> [DailyLogSnapshot] {
+        (0..<30).map { daysAgo in
+            let isPre = (21...23).contains(daysAgo) || (9...11).contains(daysAgo)
+            return makeSnapshot(daysAgo: daysAgo, hkWristTemp: isPre ? preTemp : baseTemp)
+        }
+    }
+
+    @Test("Elevated overnight wrist temperature before flares surfaces flare-temp")
+    func temperaturePrecursor() {
+        let cards = flareCards(tempLogs(preTemp: 35.4, baseTemp: 34.9), flares: flares)
+        #expect(cards.map(\.key) == ["flare-temp"])
+    }
+
+    @Test("A sub-threshold temperature rise stays quiet")
+    func temperatureBelowThreshold() {
+        let cards = flareCards(tempLogs(preTemp: 35.0, baseTemp: 34.9), flares: flares)
+        #expect(cards.isEmpty)
+    }
+
+    @Test("No flare-temp without wrist-temperature data (no watch)")
+    func noTemperatureData() {
+        let cards = flareCards(tempLogs(preTemp: nil, baseTemp: nil), flares: flares)
+        #expect(cards.isEmpty)
+    }
 }
 
 // MARK: - ChartSeries
@@ -1076,5 +1108,91 @@ struct ChartSeriesTests {
         #expect(series.value(unlogged) == nil)
         // The tracker's declared range drives the chart's y-axis.
         #expect(series.yDomain == 0...8)
+    }
+}
+
+// MARK: - PatternEngine: daylightMoodCorrelation
+
+@Suite("PatternEngine – daylightMoodCorrelation")
+struct DaylightMoodCorrelationTests {
+
+    private func daylightCards(_ logs: [DailyLogSnapshot]) -> [InsightCard] {
+        PatternEngine.allInsights(from: logs).filter { $0.key == "daylight-mood" }
+    }
+
+    // 5 bright days (120 min, mood 5) + 5 dim days (10 min, mood 3) → diff 2.0.
+    private func splitLogs(brightMood: Int, dimMood: Int) -> [DailyLogSnapshot] {
+        let bright = (0..<5).map { makeSnapshot(daysAgo: $0, mood: brightMood, hkDaylightMinutes: 120) }
+        let dim = (5..<10).map { makeSnapshot(daysAgo: $0, mood: dimMood, hkDaylightMinutes: 10) }
+        return bright + dim
+    }
+
+    @Test("Higher mood on bright days surfaces the daylight insight")
+    func brightDaysBetterMood() {
+        let cards = daylightCards(splitLogs(brightMood: 5, dimMood: 3))
+        #expect(cards.count == 1)
+        #expect(cards.first?.category == .mood)
+    }
+
+    @Test("No insight when the mood difference is under the threshold")
+    func smallDifferenceStaysQuiet() {
+        #expect(daylightCards(splitLogs(brightMood: 4, dimMood: 3)).isEmpty)
+    }
+
+    @Test("The inverse direction (brighter, worse mood) is not surfaced")
+    func inverseDirectionStaysQuiet() {
+        #expect(daylightCards(splitLogs(brightMood: 3, dimMood: 5)).isEmpty)
+    }
+
+    @Test("Days without a daylight measurement are ignored, not counted as zero")
+    func unmeasuredDaysIgnored() {
+        // Only 5 measured days (< minimumDaylightDays) — the 10 unmeasured
+        // low-mood days must not be pulled in as dim days.
+        let measured = (0..<5).map { makeSnapshot(daysAgo: $0, mood: 5, hkDaylightMinutes: 120) }
+        let unmeasured = (5..<15).map { makeSnapshot(daysAgo: $0, mood: 1) }
+        #expect(daylightCards(measured + unmeasured).isEmpty)
+    }
+}
+
+// MARK: - PatternEngine: flare respiratory precursor
+
+@Suite("PatternEngine – flare respiratory precursor")
+struct FlareRespiratoryPrecursorTests {
+
+    private func day(_ daysAgo: Int) -> Date {
+        Calendar.current.startOfDay(for: Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)!)
+    }
+
+    private var flares: [FlareSnapshot] {
+        [
+            FlareSnapshot(startDate: day(20), endDate: day(18)),
+            FlareSnapshot(startDate: day(8), endDate: day(6)),
+        ]
+    }
+
+    private func respLogs(preResp: Double?, baseResp: Double?) -> [DailyLogSnapshot] {
+        (0..<30).map { daysAgo in
+            let isPre = (21...23).contains(daysAgo) || (9...11).contains(daysAgo)
+            return makeSnapshot(daysAgo: daysAgo, hkRespiratoryRate: isPre ? preResp : baseResp)
+        }
+    }
+
+    private func cards(_ logs: [DailyLogSnapshot]) -> [InsightCard] {
+        PatternEngine.allInsights(from: logs, flares: flares).filter { $0.key == "flare-respiratory" }
+    }
+
+    @Test("A breathing-rate rise before flares surfaces flare-respiratory")
+    func respiratoryPrecursor() {
+        #expect(cards(respLogs(preResp: 16.5, baseResp: 14.8)).count == 1)
+    }
+
+    @Test("A sub-threshold rise stays quiet")
+    func belowThreshold() {
+        #expect(cards(respLogs(preResp: 15.2, baseResp: 14.8)).isEmpty)
+    }
+
+    @Test("No card without respiratory data")
+    func noData() {
+        #expect(cards(respLogs(preResp: nil, baseResp: nil)).isEmpty)
     }
 }

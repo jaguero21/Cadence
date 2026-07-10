@@ -82,7 +82,17 @@ struct CadenceApp: App {
                 .environment(appState)
                 .environment(store)
                 .modelContainer(container)
-                .task { PhoneConnectivityManager.shared.start(container: container) }
+                .task {
+                    PhoneConnectivityManager.shared.start(container: container)
+                    guard !AppLaunch.isUITesting else { return }
+                    // Keep today's log's HealthKit numbers fresh (end-of-day
+                    // steps, morning sleep) even when the log flow isn't
+                    // opened again; wakes the app when suspended via HK
+                    // background delivery.
+                    HealthKitService.shared.startObservingChanges {
+                        await HealthDataRefresher.refreshToday(container: container)
+                    }
+                }
             } else {
                 StorageFatalErrorView()
             }
@@ -95,6 +105,7 @@ struct ContentView: View {
     @Environment(StoreService.self) private var store
     @Environment(\.modelContext) private var modelContext
     @Environment(\.notificationService) private var notificationService
+    @Environment(\.healthKitService) private var healthKitService
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .dashboard
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
@@ -137,6 +148,7 @@ struct ContentView: View {
             if startOfToday != today { today = startOfToday }
             applyPendingQuickLogs()
             checkForNewInsights()
+            refreshTodayHealthData()
         }
         .task { seedSymptomTagsIfNeeded() }
         .task { applyPendingQuickLogs() }
@@ -170,6 +182,19 @@ struct ContentView: View {
         }
     }
 
+    // Foreground fallback for the HK observer path: top up today's log's
+    // objective HealthKit fields on every return to the app, so the numbers
+    // stay current even if background delivery is unavailable.
+    private func refreshTodayHealthData() {
+        guard !AppLaunch.isUITesting else { return }
+        let service = healthKitService
+        let context = modelContext
+        Task {
+            let snapshot = await service.fetchLogSnapshot()
+            HealthDataRefresher.refreshToday(context: context, snapshot: snapshot)
+        }
+    }
+
     // Persist mood taps made on the widget since the last foreground. Each tap
     // carries the day it was made, and the upsert seam attributes it there — a
     // tap from last night lands on yesterday's log, never clobbering today.
@@ -193,6 +218,16 @@ struct ContentView: View {
             // usually is. Reload explicitly so the widget's interim
             // "mood saved" state clears now that the tap is store-backed.
             WidgetCenter.shared.reloadTimelines(ofKind: WidgetData.widgetKind)
+            // Mirror the applied days' moods into Health's State of Mind —
+            // a widget tap is still a check-in. Best-effort, fire-and-forget.
+            let appliedDays = Set(pending.map { Calendar.current.startOfDay(for: $0.date) })
+            let snapshots = logs.filter { appliedDays.contains($0.date) }.map(DailyLogSnapshot.init)
+            let service = healthKitService
+            Task {
+                for snapshot in snapshots {
+                    await service.publish(log: snapshot)
+                }
+            }
         }
     }
 
