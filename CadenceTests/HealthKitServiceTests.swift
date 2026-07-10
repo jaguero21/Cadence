@@ -330,3 +330,34 @@ struct HealthDataRefresherTests {
         #expect(log.hkSteps == 500)
     }
 }
+
+// MARK: - External mood resolution
+
+// The prefill rule for State of Mind reads: an explicit daily-mood entry is
+// the person's own summary and always wins; without one, the day's momentary
+// emotions (what the watch's built-in tracker usually logs) average into an
+// estimate.
+@Suite("HealthKitService – resolveExternalMood")
+struct ExternalMoodResolutionTests {
+
+    @Test("A daily mood wins even when momentary emotions disagree")
+    func dailyWins() {
+        let mood = HealthKitService.resolveExternalMood(
+            latestDailyValence: 1.0,           // "great day"
+            momentaryValences: [-1.0, -1.0]    // two rough moments
+        )
+        #expect(mood == 5)
+    }
+
+    @Test("Without a daily mood, momentary emotions average")
+    func momentaryAverage() {
+        // 1.0 and 0.0 average to 0.5 → mood 4.
+        let mood = HealthKitService.resolveExternalMood(latestDailyValence: nil, momentaryValences: [1.0, 0.0])
+        #expect(mood == 4)
+    }
+
+    @Test("No entries at all → nil, so the mood step stays untouched")
+    func noEntries() {
+        #expect(HealthKitService.resolveExternalMood(latestDailyValence: nil, momentaryValences: []) == nil)
+    }
+}

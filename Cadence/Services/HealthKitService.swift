@@ -440,8 +440,10 @@ final class HealthKitService: HealthKitServiceProtocol {
         return entries.sorted { $0.name < $1.name }
     }
 
-    // Today's State of Mind daily mood from Health (iOS 18+), excluding our own
-    // written entry, mapped back to the 1–5 scale.
+    // Today's State of Mind mood from Health (iOS 18+), excluding our own
+    // written entries, mapped back to the 1–5 scale. A daily-mood entry wins;
+    // otherwise momentary emotions average out — the watch's built-in tracker
+    // usually logs momentary emotions, and those should still land in Cadence.
     nonisolated private func fetchExternalDailyMood(start: Date, end: Date) async -> Int? {
         guard #available(iOS 18.0, *) else { return nil }
         let type = HKObjectType.stateOfMindType()
@@ -450,13 +452,26 @@ final class HealthKitService: HealthKitServiceProtocol {
         return await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { _, samples, error in
                 if let error { Self.log.error("fetchExternalDailyMood failed: \(error, privacy: .public)") }
-                let latest = (samples as? [HKStateOfMind])?.first {
-                    $0.kind == .dailyMood && $0.sourceRevision.source.bundleIdentifier != ownBundle
-                }
-                cont.resume(returning: latest.map { Self.mood(forValence: $0.valence) })
+                let external = (samples as? [HKStateOfMind])?.filter {
+                    $0.sourceRevision.source.bundleIdentifier != ownBundle
+                } ?? []
+                // Samples are sorted latest-first, so the first daily mood is the latest.
+                let latestDaily = external.first { $0.kind == .dailyMood }?.valence
+                let momentary = external.filter { $0.kind == .momentaryEmotion }.map(\.valence)
+                cont.resume(returning: Self.resolveExternalMood(latestDailyValence: latestDaily, momentaryValences: momentary))
             }
             store.execute(query)
         }
+    }
+
+    // Pure resolution rule for the mood prefill: an explicit daily mood is the
+    // person's own summary of the day and always wins; without one, the day's
+    // momentary emotions average into an estimate.
+    nonisolated static func resolveExternalMood(latestDailyValence: Double?, momentaryValences: [Double]) -> Int? {
+        if let latestDailyValence { return mood(forValence: latestDailyValence) }
+        guard !momentaryValences.isEmpty else { return nil }
+        let average = momentaryValences.reduce(0, +) / Double(momentaryValences.count)
+        return mood(forValence: average)
     }
 
     // Average of a discrete quantity (e.g. overnight wrist temperature).
