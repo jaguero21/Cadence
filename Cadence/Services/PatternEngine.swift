@@ -30,7 +30,10 @@ enum PatternEngine {
         cards.append(contentsOf: trackerCorrelations(trackers: trackers, logs: sorted))
         cards.append(contentsOf: flarePrecursors(flares: flares, logs: sorted))
 
-        return cards
+        // Strongest signal first: the dashboard headline takes the first card,
+        // and the PDF prints in this order — detector order is meaningless to
+        // the user, confidence order is not.
+        return cards.sorted { $0.confidence > $1.confidence }
     }
 
     // MARK: - Statistics
@@ -50,6 +53,38 @@ enum PatternEngine {
         let center = p + z2 / (2 * n)
         let margin = z * (p * (1 - p) / n + z2 / (4 * n * n)).squareRoot()
         return max(0, (center - margin) / denominator)
+    }
+
+    // The one two-group comparison every mean-based detector shares (factor
+    // days vs other days, before vs after a medication, pre-flare vs baseline,
+    // bright vs dim days …). One tested code path instead of a hand-rolled
+    // copy per detector.
+    struct MeanComparison {
+        let meanA: Double
+        let meanB: Double
+        let sampleSize: Int   // the thinner side — what the evidence rests on
+        var delta: Double { meanA - meanB }
+    }
+
+    static func compareMeans(_ a: [Double], _ b: [Double], minimumPerSide: Int = 1) -> MeanComparison? {
+        guard a.count >= max(minimumPerSide, 1), b.count >= max(minimumPerSide, 1) else { return nil }
+        return MeanComparison(
+            meanA: a.reduce(0, +) / Double(a.count),
+            meanB: b.reduce(0, +) / Double(b.count),
+            sampleSize: min(a.count, b.count)
+        )
+    }
+
+    // Confidence for a mean-difference pattern: the normalised effect size,
+    // damped by how much data supports it — n/(n + smallSampleShrinkage) on the
+    // comparison's thinner side. The counterpart of the Wilson bound for the
+    // proportion-based detectors: the same delta over 4 days must not display
+    // the same confidence as over 40.
+    static func comparativeConfidence(delta: Double, scale: Double = PatternThreshold.confidenceScale, sampleSize: Int) -> Double {
+        guard delta > 0, sampleSize > 0, scale > 0 else { return 0 }
+        let effect = min(delta / scale, 1.0)
+        let support = Double(sampleSize) / (Double(sampleSize) + PatternThreshold.smallSampleShrinkage)
+        return effect * support
     }
 
     // MARK: - Pattern Detectors
@@ -182,15 +217,14 @@ enum PatternEngine {
         guard recent.count == PatternThreshold.energyTrendWindow else { return nil }
         let firstHalf  = Array(recent.prefix(halfWindow)).map { Double($0.energy) }
         let secondHalf = Array(recent.suffix(halfWindow)).map { Double($0.energy) }
-        let firstAvg = firstHalf.reduce(0,+) / Double(halfWindow)
-        let secondAvg = secondHalf.reduce(0,+) / Double(halfWindow)
-        let drop = firstAvg - secondAvg
+        guard let comparison = compareMeans(firstHalf, secondHalf) else { return nil }
+        let drop = comparison.delta
         guard drop > PatternThreshold.energyDropThreshold else { return nil }
-        let confidence = min(drop / PatternThreshold.confidenceScale, 1.0)
+        let confidence = comparativeConfidence(delta: drop, sampleSize: comparison.sampleSize)
         return InsightCard(
             key: "energy-decline",
             title: "Energy declining week-over-week",
-            detail: "Your average energy dropped from \(String(format: "%.1f", firstAvg)) to \(String(format: "%.1f", secondAvg)) over the past two weeks.",
+            detail: "Your average energy dropped from \(String(format: "%.1f", comparison.meanA)) to \(String(format: "%.1f", comparison.meanB)) over the past two weeks.",
             icon: "arrow.down.circle.fill",
             color: CadenceColor.energyOrange,
             confidence: confidence,
@@ -218,12 +252,12 @@ enum PatternEngine {
                 if let windowEnd { return log.date <= windowEnd }
                 return true
             }
-            guard before.count >= PatternThreshold.minimumMedEffectDays,
-                  after.count >= PatternThreshold.minimumMedEffectDays else { continue }
-
-            let beforeAvg = before.map { Double($0.symptoms.count) }.reduce(0, +) / Double(before.count)
-            let afterAvg = after.map { Double($0.symptoms.count) }.reduce(0, +) / Double(after.count)
-            let delta = beforeAvg - afterAvg   // positive = fewer symptoms after starting
+            guard let comparison = compareMeans(
+                before.map { Double($0.symptoms.count) },
+                after.map { Double($0.symptoms.count) },
+                minimumPerSide: PatternThreshold.minimumMedEffectDays
+            ) else { continue }
+            let delta = comparison.delta   // positive = fewer symptoms after starting
             guard abs(delta) >= PatternThreshold.medSymptomDeltaThreshold else { continue }
 
             let improved = delta > 0
@@ -234,10 +268,10 @@ enum PatternEngine {
                 title: improved
                     ? "Fewer symptoms since starting \(med.name)"
                     : "More symptoms since starting \(med.name)",
-                detail: "Your average daily symptoms went from \(String(format: "%.1f", beforeAvg)) to \(String(format: "%.1f", afterAvg)) after you started \(med.displayLabel).",
+                detail: "Your average daily symptoms went from \(String(format: "%.1f", comparison.meanA)) to \(String(format: "%.1f", comparison.meanB)) after you started \(med.displayLabel).",
                 icon: "pills.fill",
                 color: improved ? CadenceColor.successGreen : CadenceColor.stressRed,
-                confidence: min(abs(delta) / PatternThreshold.confidenceScale, 1.0),
+                confidence: comparativeConfidence(delta: abs(delta), sampleSize: comparison.sampleSize),
                 category: .symptom
             ))
         }
@@ -256,21 +290,21 @@ enum PatternEngine {
         for factor in allFactors.sorted() {
             let withFactor = logs.filter { $0.factors.contains(factor) }
             let withoutFactor = logs.filter { !$0.factors.contains(factor) }
-            guard withFactor.count >= PatternThreshold.minimumFactorDays,
-                  withoutFactor.count >= PatternThreshold.minimumFactorDays else { continue }
-
-            let withAvg = withFactor.map { Double($0.symptoms.count) }.reduce(0, +) / Double(withFactor.count)
-            let withoutAvg = withoutFactor.map { Double($0.symptoms.count) }.reduce(0, +) / Double(withoutFactor.count)
-            let delta = withAvg - withoutAvg   // positive = more symptoms on factor days
+            guard let comparison = compareMeans(
+                withFactor.map { Double($0.symptoms.count) },
+                withoutFactor.map { Double($0.symptoms.count) },
+                minimumPerSide: PatternThreshold.minimumFactorDays
+            ) else { continue }
+            let delta = comparison.delta   // positive = more symptoms on factor days
             guard delta >= PatternThreshold.factorSymptomDeltaThreshold else { continue }
 
             cards.append(InsightCard(
                 key: "factor:\(factor)",
                 title: "\(factor) days tend to have more symptoms",
-                detail: "On days you logged \(factor), you averaged \(String(format: "%.1f", withAvg)) symptoms versus \(String(format: "%.1f", withoutAvg)) on other days.",
+                detail: "On days you logged \(factor), you averaged \(String(format: "%.1f", comparison.meanA)) symptoms versus \(String(format: "%.1f", comparison.meanB)) on other days.",
                 icon: "exclamationmark.triangle.fill",
                 color: CadenceColor.stressRed,
-                confidence: min(delta / PatternThreshold.confidenceScale, 1.0),
+                confidence: comparativeConfidence(delta: delta, sampleSize: comparison.sampleSize),
                 category: .symptom
             ))
         }
@@ -290,16 +324,16 @@ enum PatternEngine {
             let entries: [(log: DailyLogSnapshot, value: Double)] = logs.compactMap { log in
                 log.customMetrics.first { $0.trackerID == tracker.id }.map { (log, Double($0.value)) }
             }
-            guard entries.count >= 2 * PatternThreshold.minimumTrackerDays else { continue }
+            guard !entries.isEmpty else { continue }
             let mean = entries.map(\.value).reduce(0, +) / Double(entries.count)
             let high = entries.filter { $0.value > mean }
             let low = entries.filter { $0.value <= mean }
-            guard high.count >= PatternThreshold.minimumTrackerDays,
-                  low.count >= PatternThreshold.minimumTrackerDays else { continue }
-
-            let highAvg = high.map { Double($0.log.symptoms.count) }.reduce(0, +) / Double(high.count)
-            let lowAvg = low.map { Double($0.log.symptoms.count) }.reduce(0, +) / Double(low.count)
-            let delta = highAvg - lowAvg   // positive = more symptoms on high-value days
+            guard let comparison = compareMeans(
+                high.map { Double($0.log.symptoms.count) },
+                low.map { Double($0.log.symptoms.count) },
+                minimumPerSide: PatternThreshold.minimumTrackerDays
+            ) else { continue }
+            let delta = comparison.delta   // positive = more symptoms on high-value days
             guard abs(delta) >= PatternThreshold.trackerSymptomDeltaThreshold else { continue }
 
             let moreOnHigh = delta > 0
@@ -310,10 +344,10 @@ enum PatternEngine {
                 title: moreOnHigh
                     ? "Higher \(tracker.name) days tend to have more symptoms"
                     : "Lower \(tracker.name) days tend to have more symptoms",
-                detail: "On days your \(tracker.name) was \(moreOnHigh ? "above" : "at or below") its average, you logged \(String(format: "%.1f", max(highAvg, lowAvg))) symptoms versus \(String(format: "%.1f", min(highAvg, lowAvg))) on other days.",
+                detail: "On days your \(tracker.name) was \(moreOnHigh ? "above" : "at or below") its average, you logged \(String(format: "%.1f", max(comparison.meanA, comparison.meanB))) symptoms versus \(String(format: "%.1f", min(comparison.meanA, comparison.meanB))) on other days.",
                 icon: "slider.horizontal.3",
                 color: CadenceColor.accent,
-                confidence: min(abs(delta) / PatternThreshold.confidenceScale, 1.0),
+                confidence: comparativeConfidence(delta: abs(delta), sampleSize: comparison.sampleSize),
                 category: .symptom
             ))
         }
@@ -359,30 +393,32 @@ enum PatternEngine {
               !baselineLogs.isEmpty else { return [] }
 
         var cards: [InsightCard] = []
-        let preStress = preFlareLogs.map { Double($0.stressLevel) }.reduce(0, +) / Double(preFlareLogs.count)
-        let baseStress = baselineLogs.map { Double($0.stressLevel) }.reduce(0, +) / Double(baselineLogs.count)
-        if preStress - baseStress >= PatternThreshold.flareStressDeltaThreshold {
+        if let stress = compareMeans(
+            preFlareLogs.map { Double($0.stressLevel) },
+            baselineLogs.map { Double($0.stressLevel) }
+        ), stress.delta >= PatternThreshold.flareStressDeltaThreshold {
             cards.append(InsightCard(
                 key: "flare-stress",
                 title: "Stress tends to rise before your flares",
-                detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, your average stress was \(String(format: "%.1f", preStress)) versus \(String(format: "%.1f", baseStress)) on typical days.",
+                detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, your average stress was \(String(format: "%.1f", stress.meanA)) versus \(String(format: "%.1f", stress.meanB)) on typical days.",
                 icon: "flame.fill",
                 color: CadenceColor.stressRed,
-                confidence: min((preStress - baseStress) / PatternThreshold.confidenceScale, 1.0),
+                confidence: comparativeConfidence(delta: stress.delta, sampleSize: stress.sampleSize),
                 category: .stress
             ))
         }
 
-        let preSleep = preFlareLogs.map(\.sleepHours).reduce(0, +) / Double(preFlareLogs.count)
-        let baseSleep = baselineLogs.map(\.sleepHours).reduce(0, +) / Double(baselineLogs.count)
-        if baseSleep - preSleep >= PatternThreshold.flareSleepDeltaThreshold {
+        if let sleep = compareMeans(
+            baselineLogs.map(\.sleepHours),
+            preFlareLogs.map(\.sleepHours)
+        ), sleep.delta >= PatternThreshold.flareSleepDeltaThreshold {
             cards.append(InsightCard(
                 key: "flare-sleep",
                 title: "Sleep tends to dip before your flares",
-                detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, you averaged \(String(format: "%.1f", preSleep)) hours of sleep versus \(String(format: "%.1f", baseSleep)) on typical days.",
+                detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, you averaged \(String(format: "%.1f", sleep.meanB)) hours of sleep versus \(String(format: "%.1f", sleep.meanA)) on typical days.",
                 icon: "moon.zzz.fill",
                 color: CadenceColor.sleepPurple,
-                confidence: min((baseSleep - preSleep) / PatternThreshold.confidenceScale, 1.0),
+                confidence: comparativeConfidence(delta: sleep.delta, sampleSize: sleep.sampleSize),
                 category: .sleep
             ))
         }
@@ -394,20 +430,18 @@ enum PatternEngine {
         let preTemps = preFlareLogs.compactMap(\.hkWristTemp)
         let baseTemps = baselineLogs.compactMap(\.hkWristTemp)
         if preTemps.count >= PatternThreshold.minimumFlaresForPattern,
-           baseTemps.count >= PatternThreshold.minimumLogs {
-            let preTemp = preTemps.reduce(0, +) / Double(preTemps.count)
-            let baseTemp = baseTemps.reduce(0, +) / Double(baseTemps.count)
-            if preTemp - baseTemp >= PatternThreshold.flareTempDeltaThreshold {
-                cards.append(InsightCard(
-                    key: "flare-temp",
-                    title: "Wrist temperature tends to run high before your flares",
-                    detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, your overnight wrist temperature averaged \(String(format: "%.1f", preTemp))°C versus \(String(format: "%.1f", baseTemp))°C on typical days.",
-                    icon: "thermometer.medium",
-                    color: CadenceColor.energyOrange,
-                    confidence: min((preTemp - baseTemp) / (2 * PatternThreshold.flareTempDeltaThreshold), 1.0),
-                    category: .symptom
-                ))
-            }
+           baseTemps.count >= PatternThreshold.minimumLogs,
+           let temp = compareMeans(preTemps, baseTemps),
+           temp.delta >= PatternThreshold.flareTempDeltaThreshold {
+            cards.append(InsightCard(
+                key: "flare-temp",
+                title: "Wrist temperature tends to run high before your flares",
+                detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, your overnight wrist temperature averaged \(String(format: "%.1f", temp.meanA))°C versus \(String(format: "%.1f", temp.meanB))°C on typical days.",
+                icon: "thermometer.medium",
+                color: CadenceColor.energyOrange,
+                confidence: comparativeConfidence(delta: temp.delta, scale: 2 * PatternThreshold.flareTempDeltaThreshold, sampleSize: temp.sampleSize),
+                category: .symptom
+            ))
         }
 
         // Overnight respiratory rate: same gating and measured-days-only rule
@@ -415,20 +449,18 @@ enum PatternEngine {
         let preResps = preFlareLogs.compactMap(\.hkRespiratoryRate)
         let baseResps = baselineLogs.compactMap(\.hkRespiratoryRate)
         if preResps.count >= PatternThreshold.minimumFlaresForPattern,
-           baseResps.count >= PatternThreshold.minimumLogs {
-            let preResp = preResps.reduce(0, +) / Double(preResps.count)
-            let baseResp = baseResps.reduce(0, +) / Double(baseResps.count)
-            if preResp - baseResp >= PatternThreshold.flareRespiratoryDeltaThreshold {
-                cards.append(InsightCard(
-                    key: "flare-respiratory",
-                    title: "Breathing rate tends to rise before your flares",
-                    detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, your overnight respiratory rate averaged \(String(format: "%.1f", preResp)) breaths/min versus \(String(format: "%.1f", baseResp)) on typical days.",
-                    icon: "lungs.fill",
-                    color: CadenceColor.stressRed,
-                    confidence: min((preResp - baseResp) / (2 * PatternThreshold.flareRespiratoryDeltaThreshold), 1.0),
-                    category: .symptom
-                ))
-            }
+           baseResps.count >= PatternThreshold.minimumLogs,
+           let resp = compareMeans(preResps, baseResps),
+           resp.delta >= PatternThreshold.flareRespiratoryDeltaThreshold {
+            cards.append(InsightCard(
+                key: "flare-respiratory",
+                title: "Breathing rate tends to rise before your flares",
+                detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, your overnight respiratory rate averaged \(String(format: "%.1f", resp.meanA)) breaths/min versus \(String(format: "%.1f", resp.meanB)) on typical days.",
+                icon: "lungs.fill",
+                color: CadenceColor.stressRed,
+                confidence: comparativeConfidence(delta: resp.delta, scale: 2 * PatternThreshold.flareRespiratoryDeltaThreshold, sampleSize: resp.sampleSize),
+                category: .symptom
+            ))
         }
         return cards
     }
@@ -444,16 +476,15 @@ enum PatternEngine {
         let avgDaylight = measured.compactMap(\.hkDaylightMinutes).reduce(0, +) / Double(measured.count)
         let bright = measured.filter { ($0.hkDaylightMinutes ?? 0) > avgDaylight }.map { Double($0.mood) }
         let dim = measured.filter { ($0.hkDaylightMinutes ?? 0) <= avgDaylight }.map { Double($0.mood) }
-        guard !bright.isEmpty, !dim.isEmpty else { return nil }
-        let diff = bright.reduce(0, +) / Double(bright.count) - dim.reduce(0, +) / Double(dim.count)
-        guard diff > PatternThreshold.moodDiffThreshold else { return nil }
+        guard let comparison = compareMeans(bright, dim),
+              comparison.delta > PatternThreshold.moodDiffThreshold else { return nil }
         return InsightCard(
             key: "daylight-mood",
             title: "More daylight correlates with better mood",
-            detail: "On days with above-average time in daylight, your mood is \(String(format: "%.1f", diff)) points higher on average.",
+            detail: "On days with above-average time in daylight, your mood is \(String(format: "%.1f", comparison.delta)) points higher on average.",
             icon: "sun.max.fill",
             color: CadenceColor.energyOrange,
-            confidence: min(diff / PatternThreshold.confidenceScale, 1.0),
+            confidence: comparativeConfidence(delta: comparison.delta, sampleSize: comparison.sampleSize),
             category: .mood
         )
     }
@@ -464,14 +495,13 @@ enum PatternEngine {
         let sleepAvg = pairs.map(\.sleepHours).reduce(0,+) / Double(pairs.count)
         let goodSleepMood = pairs.filter { $0.sleepHours > sleepAvg }.map { Double($0.mood) }
         let poorSleepMood = pairs.filter { $0.sleepHours <= sleepAvg }.map { Double($0.mood) }
-        guard !goodSleepMood.isEmpty, !poorSleepMood.isEmpty else { return nil }
-        let diff = goodSleepMood.reduce(0,+)/Double(goodSleepMood.count) - poorSleepMood.reduce(0,+)/Double(poorSleepMood.count)
-        guard diff > PatternThreshold.moodDiffThreshold else { return nil }
-        let confidence = min(diff / PatternThreshold.confidenceScale, 1.0)
+        guard let comparison = compareMeans(goodSleepMood, poorSleepMood),
+              comparison.delta > PatternThreshold.moodDiffThreshold else { return nil }
+        let confidence = comparativeConfidence(delta: comparison.delta, sampleSize: comparison.sampleSize)
         return InsightCard(
             key: "mood-sleep",
             title: "More sleep correlates with better mood",
-            detail: "On days with above-average sleep your mood is \(String(format: "%.1f", diff)) points higher on average.",
+            detail: "On days with above-average sleep your mood is \(String(format: "%.1f", comparison.delta)) points higher on average.",
             icon: "sparkles",
             color: CadenceColor.moodBlue,
             confidence: confidence,

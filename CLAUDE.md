@@ -121,10 +121,17 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `ModelPersisting` is a seam over `ModelContext` (insert/delete/save) so save
   failure paths can be tested with a throwing stub.
 - **PatternEngine** is a stateless `enum`: takes `[DailyLogSnapshot]`, returns
-  `[InsightCard]`. Confidence for proportion-based patterns uses the **Wilson
-  score lower bound** (`wilsonLowerBound`), not the raw hit/total ratio, so a
-  small sample can't read as 100% certain. The user-facing copy shows the raw
-  observed frequency; the card's `confidence` is the Wilson bound.
+  `[InsightCard]` **sorted strongest-first** (the dashboard headline takes
+  `.first`, so it must be the strongest signal, not detector order).
+  Confidence for proportion-based patterns uses the **Wilson score lower
+  bound** (`wilsonLowerBound`); every mean-comparison detector runs through
+  the shared `compareMeans` + `comparativeConfidence` helpers — confidence =
+  effect × n/(n + `smallSampleShrinkage`) on the comparison's THINNER side, so
+  the same delta over 4 days can't display the same confidence as over 40.
+  Don't hand-roll a two-group comparison or a `min(delta/scale, 1)` confidence
+  in a new detector. The framing is awareness, not diagnosis: the Insights tab
+  and the doctor PDF both carry a "not medical advice" disclaimer next to the
+  pattern cards.
 - **Date-windowed views** (`DashboardView`, `DailyLogView`, `WeeklyReviewView`,
   `InsightsView`) take a `referenceDate` and derive their `@Query` cutoff from
   it. `ContentView` passes `today` (refreshed on `scenePhase == .active`) so a

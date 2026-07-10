@@ -763,15 +763,18 @@ struct EnergyTrendDeclineTests {
         #expect(card?.title == "Energy declining week-over-week")
     }
 
-    @Test("Returns card and confidence is capped at 1.0 for very large drop")
-    func energyDecline_veryLargeDrop_confidenceCappedAtOne() {
-        // older avg=10, newer avg=0 → drop=10, confidence = min(10/5, 1.0) = 1.0
+    @Test("A maximal drop over one week is still sample-damped, never certain")
+    func energyDecline_veryLargeDrop_isSampleDamped() throws {
+        // older avg=10, newer avg=0 → maximal effect (1.0), but the comparison
+        // rests on 7 days per side, so confidence = 1.0 × 7/(7+5) ≈ 0.58 —
+        // a week of data must never display as 100% certainty.
         var logs: [DailyLogSnapshot] = []
         for i in 0..<7 { logs.append(makeSnapshot(daysAgo: 13 - i, energy: 10)) }
         for i in 0..<7 { logs.append(makeSnapshot(daysAgo: 6 - i,  energy: 0))  }
         let insights = PatternEngine.allInsights(from: logs)
-        let card = insights.first { $0.category == .energy }
-        #expect(card?.confidence == 1.0)
+        let confidence = try #require(insights.first { $0.category == .energy }?.confidence)
+        #expect(confidence < 1.0)
+        #expect(abs(confidence - 7.0 / 12.0) < 0.001)
     }
 }
 
@@ -1194,5 +1197,64 @@ struct FlareRespiratoryPrecursorTests {
     @Test("No card without respiratory data")
     func noData() {
         #expect(cards(respLogs(preResp: nil, baseResp: nil)).isEmpty)
+    }
+}
+
+// MARK: - PatternEngine: shared statistics
+
+// The two helpers every mean-based detector runs through: one comparison code
+// path, and a confidence that can't ignore sample size.
+@Suite("PatternEngine – compareMeans & comparativeConfidence")
+struct SharedStatisticsTests {
+
+    @Test("compareMeans reports means, delta, and the thinner side's size")
+    func compareMeansBasics() throws {
+        let comparison = try #require(PatternEngine.compareMeans([4, 6], [1, 2, 3]))
+        #expect(comparison.meanA == 5)
+        #expect(comparison.meanB == 2)
+        #expect(comparison.delta == 3)
+        #expect(comparison.sampleSize == 2)   // the evidence rests on the thinner side
+    }
+
+    @Test("compareMeans is nil when either side is under the minimum")
+    func compareMeansGating() {
+        #expect(PatternEngine.compareMeans([1, 2], [3, 4, 5], minimumPerSide: 3) == nil)
+        #expect(PatternEngine.compareMeans([], [1]) == nil)
+    }
+
+    @Test("The same effect over more days earns more confidence")
+    func confidenceGrowsWithSample() {
+        let thin = PatternEngine.comparativeConfidence(delta: 2.5, sampleSize: 4)
+        let thick = PatternEngine.comparativeConfidence(delta: 2.5, sampleSize: 40)
+        #expect(thin < thick)
+        // 4 days: 0.5 × 4/9 ≈ 0.22 — no longer masquerading as 50%.
+        #expect(thin < 0.3)
+        #expect(thick > 0.4)
+    }
+
+    @Test("Confidence caps at the effect ceiling and never exceeds 1")
+    func confidenceBounds() {
+        let huge = PatternEngine.comparativeConfidence(delta: 100, sampleSize: 10_000)
+        #expect(huge <= 1.0)
+        #expect(PatternEngine.comparativeConfidence(delta: 0, sampleSize: 50) == 0)
+        #expect(PatternEngine.comparativeConfidence(delta: 1, sampleSize: 0) == 0)
+    }
+
+    @Test("allInsights returns cards strongest-first")
+    func cardsAreRanked() {
+        // Fire at least two detectors: a strong sleep-headache pattern (Wilson
+        // ≈ 0.75) and a mild factor correlation with sample-damped confidence.
+        var logs: [DailyLogSnapshot] = []
+        logs.append(makeSnapshot(daysAgo: 6, sleepHours: 5.0))
+        logs.append(makeSnapshot(daysAgo: 5, sleepHours: 7.0, symptoms: [headacheEntry()], factors: ["Travel"]))
+        logs.append(makeSnapshot(daysAgo: 4, sleepHours: 5.0))
+        logs.append(makeSnapshot(daysAgo: 3, sleepHours: 7.0, symptoms: [headacheEntry()], factors: ["Travel"]))
+        logs.append(makeSnapshot(daysAgo: 2, sleepHours: 5.0))
+        logs.append(makeSnapshot(daysAgo: 1, sleepHours: 7.0, symptoms: [headacheEntry()], factors: ["Travel"]))
+        logs.append(makeSnapshot(daysAgo: 0, sleepHours: 7.0))
+
+        let cards = PatternEngine.allInsights(from: logs)
+        #expect(cards.count >= 2)
+        #expect(zip(cards, cards.dropFirst()).allSatisfy { $0.confidence >= $1.confidence })
     }
 }
