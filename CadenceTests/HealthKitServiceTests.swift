@@ -1,6 +1,7 @@
 import Testing
 import HealthKit
 import Foundation
+import SwiftData
 @testable import Cadence
 
 // MARK: - HealthKitService – pure logic tests
@@ -265,5 +266,67 @@ struct IntenseExerciseGateTests {
     @Test("Enough energy alone qualifies (short hard run)")
     func energyAlone() {
         #expect(HealthKitService.isIntenseExercise(totalMinutes: 20, totalKilocalories: HealthThreshold.intenseWorkoutKilocalories))
+    }
+}
+
+// MARK: - HealthDataRefresher
+
+// Background/foreground top-up of today's log: hk* fields only, and NEVER
+// creates a log — a day the user didn't start must not grow a phantom entry.
+@MainActor
+@Suite("HealthDataRefresher – refreshToday")
+struct HealthDataRefresherTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([DailyLog.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    @Test("Updates only objective fields on an existing today log")
+    func updatesExistingLog() throws {
+        let context = try makeContext()
+        let log = DailyLog(date: .now)
+        log.mood = 4
+        log.hkSteps = 1200   // morning value
+        context.insert(log)
+        try context.save()
+
+        let updated = HealthDataRefresher.refreshToday(
+            context: context,
+            snapshot: HealthKitSnapshot(steps: 9800, activeEnergy: 300)
+        )
+
+        #expect(updated)
+        #expect(log.hkSteps == 9800)          // topped up
+        #expect(log.hkActiveEnergy == 300)
+        #expect(log.mood == 4)                // user data untouched
+    }
+
+    @Test("Never creates a log for a day the user didn't start")
+    func neverCreatesLog() throws {
+        let context = try makeContext()
+
+        let updated = HealthDataRefresher.refreshToday(
+            context: context,
+            snapshot: HealthKitSnapshot(steps: 9800)
+        )
+
+        #expect(updated == false)
+        #expect(try context.fetch(FetchDescriptor<DailyLog>()).isEmpty)
+    }
+
+    @Test("A nil snapshot value never blanks an earlier measurement")
+    func nilNeverBlanks() throws {
+        let context = try makeContext()
+        let log = DailyLog(date: .now)
+        log.hkWristTemp = 35.1
+        context.insert(log)
+        try context.save()
+
+        HealthDataRefresher.refreshToday(context: context, snapshot: HealthKitSnapshot(steps: 500))
+
+        #expect(log.hkWristTemp == 35.1)
+        #expect(log.hkSteps == 500)
     }
 }
