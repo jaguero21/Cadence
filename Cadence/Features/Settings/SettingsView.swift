@@ -7,7 +7,6 @@ import OSLog
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(StoreService.self) private var store
-    @Query private var customSymptoms: [SymptomTag]
     @Environment(\.modelContext) private var modelContext
 
     @Environment(\.healthKitService) private var healthKitService
@@ -15,7 +14,6 @@ struct SettingsView: View {
     @AppStorage(UserDefaultsKey.dailyReminderHour)    private var dailyHour: Int = 20
     @AppStorage(UserDefaultsKey.dailyReminderMinute)  private var dailyMinute: Int = 0
     @AppStorage(UserDefaultsKey.weeklyReminderEnabled) private var weeklyEnabled: Bool = true
-    @State private var showingAddSymptom = false
 
     #if DEBUG
     @Query private var existingLogs: [DailyLog]
@@ -147,39 +145,15 @@ struct SettingsView: View {
 
     private var symptomsSection: some View {
         Section {
-            ForEach(customSymptoms.filter { !$0.isDefault }) { tag in
-                HStack {
-                    Text(tag.emoji)
-                    Text(tag.name)
-                }
-            }
-            .onDelete { offsets in
-                let toDelete = customSymptoms.filter { !$0.isDefault }
-                offsets.forEach { modelContext.delete(toDelete[$0]) }
-            }
-
-            if store.isPro {
-                Button("Add custom symptom") {
-                    showingAddSymptom = true
-                }
-                .foregroundStyle(CadenceColor.accent)
-                .sheet(isPresented: $showingAddSymptom) {
-                    AddSymptomSheet(onSave: { _, _ in })
-                }
-            } else {
-                Button {
-                    appState.showingProPaywall = true
-                } label: {
-                    Label("Upgrade to add custom symptoms", systemImage: "lock.fill")
-                }
-                .foregroundStyle(CadenceColor.sleepPurple)
+            NavigationLink {
+                SymptomLibraryView()
+            } label: {
+                Label("Symptoms", systemImage: "tag.fill")
             }
         } header: {
             Label("Symptoms", systemImage: "tag.fill")
         } footer: {
-            if !store.isPro {
-                Text("Custom symptoms beyond 5 defaults require Pro.")
-            }
+            Text("Choose which symptoms appear in the daily log's picker — the full library is free; custom ones require Pro.")
         }
     }
 

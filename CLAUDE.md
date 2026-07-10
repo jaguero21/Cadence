@@ -101,6 +101,14 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   entitlement `com.apple.developer.healthkit.background-delivery`) started in
   `CadenceApp`, with a foreground fallback in `ContentView`'s scenePhase
   handler.
+- **Symptom library:** `SymptomTag.optionalCatalog` (~34 entries) is the
+  toggleable symptom list in Settings → Symptoms (`SymptomLibraryView`, free —
+  only free-text custom symptoms are Pro). A toggle inserts/deletes the
+  `SymptomTag` row itself (name-deduped at save time), not an `isEnabled`
+  flag, so the picker's `@Query` is untouched. Every catalog name must resolve
+  via `HealthKitService.symptomTypeIdentifier` (unit-test-pinned) so enabled
+  symptoms sync two-way with Health; history survives toggling off via the
+  picker's unlisted-chip rendering.
 - **Factor (trigger) logging:** `DailyLog.factors: [String]` holds contextual
   triggers chosen from a fixed list (`LogInputFlow.factorItems`) in the `.factors`
   log step — same hardcoded-list pattern as `basicsCompleted` (no model).

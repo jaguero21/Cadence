@@ -22,6 +22,47 @@ final class SymptomTag {
         SymptomTag(name: "Brain Fog", emoji: "🌫️", isDefault: true, sortOrder: 3),
         SymptomTag(name: "Pain",      emoji: "⚡️", isDefault: true, sortOrder: 4),
     ]
+
+    // The optional symptom library, toggleable in Settings → Symptoms. Every
+    // name here resolves to a HealthKit symptom type (pinned by a unit test),
+    // so an enabled symptom syncs both ways with Health. Kept separate from
+    // `defaults` — these are opt-in, not seeded.
+    static let optionalCatalog: [(name: String, emoji: String)] = [
+        ("Nausea",                  "🤢"),
+        ("Vomiting",                "🤮"),
+        ("Dizziness",               "💫"),
+        ("Fainting",                "😵"),
+        ("Fever",                   "🌡️"),
+        ("Chills",                  "🥶"),
+        ("Coughing",                "😷"),
+        ("Sore throat",             "🗣️"),
+        ("Runny nose",              "🤧"),
+        ("Sinus congestion",        "😤"),
+        ("Shortness of breath",     "🫁"),
+        ("Wheezing",                "💨"),
+        ("Chest tightness or pain", "💔"),
+        ("Racing heartbeat",        "💓"),
+        ("Skipped heartbeat",       "💗"),
+        ("Heartburn",               "🔥"),
+        ("Bloating",                "🎈"),
+        ("Abdominal cramps",        "🌀"),
+        ("Constipation",            "🪨"),
+        ("Diarrhea",                "💧"),
+        ("Lower back pain",         "🦴"),
+        ("Pelvic pain",             "🔻"),
+        ("Breast pain",             "🩷"),
+        ("Hot flashes",             "🥵"),
+        ("Night sweats",            "💦"),
+        ("Mood changes",            "🎭"),
+        ("Memory lapse",            "💭"),
+        ("Dry skin",                "🧴"),
+        ("Acne",                    "🔴"),
+        ("Hair loss",               "💇"),
+        ("Bladder incontinence",    "🚾"),
+        ("Vaginal dryness",         "🌸"),
+        ("Loss of smell",           "👃"),
+        ("Loss of taste",           "👅"),
+    ]
 }
 
 struct Prompt: Codable, Identifiable {
