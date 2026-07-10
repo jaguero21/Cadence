@@ -238,11 +238,17 @@ struct SettingsView: View {
                 Label("HealthKit access granted.", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(CadenceColor.successGreen)
             } else {
-                HStack(spacing: 4) {
-                    Label("HealthKit access denied.", systemImage: "exclamationmark.circle.fill")
+                // Health permissions live in the Health app (Profile → Apps),
+                // NOT on the app's page in Settings — openSettingsURLString
+                // would land the user somewhere with no HealthKit row at all.
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Some HealthKit access is off.", systemImage: "exclamationmark.circle.fill")
                         .foregroundStyle(CadenceColor.stressRed)
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        Link("Open Settings", destination: url)
+                    HStack(spacing: 4) {
+                        Text("Manage it in the Health app under Profile → Apps → Cadence.")
+                        if let url = URL(string: "x-apple-health://") {
+                            Link("Open Health", destination: url)
+                        }
                     }
                 }
             }
