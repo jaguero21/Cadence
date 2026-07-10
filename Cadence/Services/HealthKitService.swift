@@ -51,7 +51,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         let quantity: [HKQuantityTypeIdentifier] = [
             .restingHeartRate, .heartRateVariabilitySDNN, .stepCount, .activeEnergyBurned,
             .appleSleepingWristTemperature, .respiratoryRate, .oxygenSaturation,
-            .timeInDaylight, .dietaryCaffeine, .dietaryWater,
+            .timeInDaylight, .dietaryCaffeine, .dietaryWater, .heartRate,
         ]
         let category: [HKCategoryTypeIdentifier] = [
             .sleepAnalysis, .mindfulSession, .menstrualFlow,
@@ -122,6 +122,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         async let daylight = fetchSum(.timeInDaylight, unit: .minute(), predicate: todayPredicate)
         async let caffeine = fetchSum(.dietaryCaffeine, unit: .gramUnit(with: .milli), predicate: todayPredicate)
         async let water = fetchSum(.dietaryWater, unit: .liter(), predicate: todayPredicate)
+        async let daytimeHR = fetchAverage(.heartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: todayPredicate)
 
         let sleepDetail = await sleep
         return await HealthKitSnapshot(
@@ -141,7 +142,8 @@ final class HealthKitService: HealthKitServiceProtocol {
             bloodOxygen: spo2.map { $0 * 100 },   // HK .percent() is 0–1; store 0–100
             daylightMinutes: daylight,
             caffeineMilligrams: caffeine,
-            waterLiters: water
+            waterLiters: water,
+            daytimeHR: daytimeHR
         )
     }
 
@@ -612,6 +614,7 @@ extension DailyLog {
         if let resp    = snapshot.respiratoryRate  { hkRespiratoryRate = resp }
         if let spo2    = snapshot.bloodOxygen      { hkBloodOxygen    = spo2 }
         if let daylight = snapshot.daylightMinutes { hkDaylightMinutes = daylight }
+        if let hr      = snapshot.daytimeHR        { hkDaytimeHR      = hr }
     }
 }
 
@@ -664,4 +667,5 @@ struct HealthKitSnapshot {
     var daylightMinutes: Double?  // minutes of daylight today
     var caffeineMilligrams: Double?   // mg logged in Health today (drives the "Caffeine" factor)
     var waterLiters: Double?      // litres logged in Health today (drives the "Hydration" basic)
+    var daytimeHR: Double?        // bpm, today's average heart rate
 }

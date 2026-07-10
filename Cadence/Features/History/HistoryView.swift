@@ -381,7 +381,7 @@ struct LogDetailView: View {
                 if log.hkSteps != nil || log.hkHRV != nil || log.hkRestingHR != nil
                     || log.hkSleepHours != nil || log.hkActiveEnergy != nil || log.hkMindfulMinutes != nil
                     || log.hkWristTemp != nil || log.hkRespiratoryRate != nil || log.hkBloodOxygen != nil
-                    || log.hkDaylightMinutes != nil {
+                    || log.hkDaylightMinutes != nil || log.hkDaytimeHR != nil {
                     Section("HealthKit Data") {
                         if let steps = log.hkSteps {
                             Label("\(steps) steps", systemImage: "figure.walk")
@@ -412,6 +412,9 @@ struct LogDetailView: View {
                         }
                         if let daylight = log.hkDaylightMinutes {
                             Label(String(format: "Daylight: %.0f min", daylight), systemImage: "sun.max")
+                        }
+                        if let daytimeHR = log.hkDaytimeHR {
+                            Label(String(format: "Daytime HR: %.0f bpm", daytimeHR), systemImage: "heart.circle")
                         }
                     }
                 }
