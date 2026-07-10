@@ -134,6 +134,10 @@ struct InsightsView: View {
                 ForEach(vm.insights) { insight in
                     CorrelationCardView(insight: insight)
                 }
+                Text("These are observations from your own logs, shown to build awareness of how you feel day to day — not medical advice or a diagnosis.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 4)
             }
         }
     }
