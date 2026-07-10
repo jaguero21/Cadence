@@ -50,7 +50,21 @@ final class CadenceUITests: XCTestCase {
         happyMood.tap()
 
         let next = app.buttons["Next"]
-        for _ in 0..<7 {   // mood → metrics → basics → symptoms → factors → peaksAndValleys → intentions → note
+        for _ in 0..<3 {   // mood → metrics → basics → symptoms
+            XCTAssertTrue(next.waitForExistence(timeout: 15))
+            next.tap()
+        }
+
+        // Symptoms step: hold-to-rate must produce the severity slider (this
+        // regressed silently when the chip was a Button — Buttons cancel touch
+        // tracking during a hold, so the long press never fired on device).
+        let headache = app.buttons["Headache"]
+        XCTAssertTrue(headache.waitForExistence(timeout: 15), "Symptoms step should show the Headache chip")
+        headache.press(forDuration: 0.8)
+        XCTAssertTrue(app.staticTexts["Severity: 5"].waitForExistence(timeout: 5),
+                      "Holding a symptom chip should reveal the severity slider")
+
+        for _ in 0..<4 {   // symptoms → factors → peaksAndValleys → intentions → note
             XCTAssertTrue(next.waitForExistence(timeout: 15))
             next.tap()
         }

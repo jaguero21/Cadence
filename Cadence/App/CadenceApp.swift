@@ -232,7 +232,12 @@ struct ContentView: View {
     }
 
     private func seedSymptomTagsIfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: symptomSeedKey) else { return }
+        // UI tests: the in-memory store starts empty every run, but standard
+        // UserDefaults persist on the simulator — honoring the seeded flag
+        // would skip seeding forever after the first run and leave the picker
+        // with no chips. Always seed under --uitest (name-dedup keeps it
+        // idempotent) and never persist the flag there.
+        guard AppLaunch.isUITesting || !UserDefaults.standard.bool(forKey: symptomSeedKey) else { return }
         // Dedup against tags already in the store (reinstall over an existing
         // CloudKit database, or a sync that landed before first launch). A
         // second device seeding before its first sync completes can still race;
@@ -243,7 +248,9 @@ struct ContentView: View {
         }
         do {
             try modelContext.save()
-            UserDefaults.standard.set(true, forKey: symptomSeedKey)
+            if !AppLaunch.isUITesting {
+                UserDefaults.standard.set(true, forKey: symptomSeedKey)
+            }
         } catch {
             // Leave the flag unset so the next launch retries seeding.
             Self.log.error("Failed to seed SymptomTag defaults: \(error, privacy: .public)")
