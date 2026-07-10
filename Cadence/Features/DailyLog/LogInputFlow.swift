@@ -262,7 +262,7 @@ struct LogInputFlow: View {
 
     private static let basicItems: [(name: String, icon: String)] = [
         ("Medications",      "pill.fill"),
-        ("Hydration",        "drop"),
+        (hydrationBasicName, "drop"),
         ("Movement",         "figure.walk"),
         ("Ate well",         "fork.knife"),
         ("Rest / nap",       "moon.zzz.fill"),
@@ -318,17 +318,25 @@ struct LogInputFlow: View {
 
     // MARK: - Factors Step
 
+    // Shared with the HealthKit auto-tags in applyHealthKitData — one name, so
+    // a factor tagged from Health and one tapped by hand are the same factor
+    // to PatternEngine and the reports.
+    static let menstrualCycleFactorName = "Menstrual cycle"
+    static let intenseExerciseFactorName = "Intense exercise"
+    static let caffeineFactorName = "Caffeine"
+    static let hydrationBasicName = "Hydration"
+
     private static let factorItems: [(name: String, icon: String)] = [
         ("Alcohol",          "wineglass"),
-        ("Caffeine",         "cup.and.saucer.fill"),
+        (caffeineFactorName, "cup.and.saucer.fill"),
         ("Skipped meal",     "takeoutbag.and.cup.and.straw"),
-        ("Intense exercise", "figure.run"),
+        (intenseExerciseFactorName, "figure.run"),
         ("Travel",           "airplane"),
         ("Stressful event",  "exclamationmark.bubble"),
         ("Poor sleep",       "bed.double"),
         ("Late screen time", "iphone"),
         ("Weather change",   "cloud.sun"),
-        ("Menstrual cycle",  "drop.fill"),
+        (menstrualCycleFactorName, "drop.fill"),
     ]
 
     private var factorsStep: some View {
@@ -615,6 +623,7 @@ struct LogInputFlow: View {
                             return
                         }
                         logPersisted = true
+                        publishToHealth(log)
                     }
                     vm.nextStep()
                 } label: {
@@ -682,10 +691,7 @@ struct LogInputFlow: View {
         log.freeNote        = freeNote
         log.didEditMetrics  = didEditMetrics
         if let snapshot = hkSnapshot {
-            if let steps = snapshot.steps      { log.hkSteps     = steps }
-            if let hr    = snapshot.restingHR  { log.hkRestingHR = hr }
-            if let hrv   = snapshot.hrv        { log.hkHRV       = hrv }
-            if let sleep = snapshot.sleepHours { log.hkSleepHours = sleep }
+            log.applyObjectiveHealthData(snapshot)
         }
     }
 
@@ -706,9 +712,57 @@ struct LogInputFlow: View {
         }
         guard let snapshot, !Task.isCancelled else { return }
         hkSnapshot = snapshot
-        if !didEditMetrics, let sleep = snapshot.sleepHours {
-            sleepHours = sleep
+        // Pre-fill the Body Metrics sleep sliders from last night's measured
+        // sleep — but never over a value the user already set. Hours snap to
+        // the slider's half-hour steps; quality only arrives when the night
+        // has real stage data (see HealthKitService.sleepQualityScore).
+        if !didEditMetrics {
+            if let sleep = snapshot.sleepHours {
+                sleepHours = min(max((sleep * 2).rounded() / 2, 0), 12)
+            }
+            if let quality = snapshot.sleepQuality {
+                sleepQuality = quality
+            }
         }
+        // Health has a cycle entry for today → pre-select the factor chip the
+        // user would otherwise tap by hand. Just a pre-selection: the chip
+        // stays fully manual (toggle it off, or on without Health at all).
+        if snapshot.menstrualFlow == true, !selectedFactors.contains(Self.menstrualCycleFactorName) {
+            selectedFactors.append(Self.menstrualCycleFactorName)
+        }
+        // Same for a day whose workouts clear the intensity gate.
+        if snapshot.intenseWorkout == true, !selectedFactors.contains(Self.intenseExerciseFactorName) {
+            selectedFactors.append(Self.intenseExerciseFactorName)
+        }
+        // Dietary entries logged in Health: enough caffeine selects the factor,
+        // enough water checks the Hydration basic. Both stay fully manual.
+        if let caffeine = snapshot.caffeineMilligrams, caffeine >= HealthThreshold.caffeineMilligrams,
+           !selectedFactors.contains(Self.caffeineFactorName) {
+            selectedFactors.append(Self.caffeineFactorName)
+        }
+        if let water = snapshot.waterLiters, water >= HealthThreshold.hydrationLiters,
+           !basicsCompleted.contains(Self.hydrationBasicName) {
+            basicsCompleted.append(Self.hydrationBasicName)
+        }
+        // Symptoms another app already logged in Health today prefill the
+        // picker — only while the user hasn't chosen any themselves.
+        if selectedSymptoms.isEmpty, !snapshot.symptoms.isEmpty {
+            selectedSymptoms = snapshot.symptoms
+        }
+        // A daily mood logged elsewhere (State of Mind) prefills the mood step;
+        // the user's own tap always wins.
+        if !didEditMood, let externalMood = snapshot.mood {
+            mood = externalMood
+        }
+    }
+
+    // Fire-and-forget mirror of the saved day into Health (mapped symptoms +
+    // State of Mind mood). Snapshot on the main actor; the write is
+    // best-effort and can never block or fail the save it follows.
+    private func publishToHealth(_ log: DailyLog) {
+        let snapshot = DailyLogSnapshot(log)
+        let service = healthKitService
+        Task { await service.publish(log: snapshot) }
     }
 
     private func partialSave() {
@@ -726,6 +780,7 @@ struct LogInputFlow: View {
             // the Dashboard tab.
             let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
             DashboardViewModel.publishWidgetSummary(logs: logs)
+            publishToHealth(log)
         } catch {
             Self.log.error("Partial save failed: \(error, privacy: .public)")
             if existingLog == nil, !logPersisted {

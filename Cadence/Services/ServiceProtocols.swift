@@ -25,6 +25,9 @@ protocol HealthKitServiceProtocol: AnyObject {
     var isAuthorized: Bool { get }
     func requestAuthorization() async throws -> Bool
     func fetchLogSnapshot() async -> HealthKitSnapshot
+    // Mirrors a saved day into Health (mapped symptoms + State of Mind mood).
+    // Best-effort; implementations must never let this block or fail a save.
+    func publish(log: DailyLogSnapshot) async
 }
 
 @MainActor
