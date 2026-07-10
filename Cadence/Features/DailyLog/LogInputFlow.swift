@@ -262,7 +262,7 @@ struct LogInputFlow: View {
 
     private static let basicItems: [(name: String, icon: String)] = [
         ("Medications",      "pill.fill"),
-        ("Hydration",        "drop"),
+        (hydrationBasicName, "drop"),
         ("Movement",         "figure.walk"),
         ("Ate well",         "fork.knife"),
         ("Rest / nap",       "moon.zzz.fill"),
@@ -323,10 +323,12 @@ struct LogInputFlow: View {
     // to PatternEngine and the reports.
     static let menstrualCycleFactorName = "Menstrual cycle"
     static let intenseExerciseFactorName = "Intense exercise"
+    static let caffeineFactorName = "Caffeine"
+    static let hydrationBasicName = "Hydration"
 
     private static let factorItems: [(name: String, icon: String)] = [
         ("Alcohol",          "wineglass"),
-        ("Caffeine",         "cup.and.saucer.fill"),
+        (caffeineFactorName, "cup.and.saucer.fill"),
         ("Skipped meal",     "takeoutbag.and.cup.and.straw"),
         (intenseExerciseFactorName, "figure.run"),
         ("Travel",           "airplane"),
@@ -696,6 +698,9 @@ struct LogInputFlow: View {
             if let energy  = snapshot.activeEnergy   { log.hkActiveEnergy   = energy }
             if let mindful = snapshot.mindfulMinutes { log.hkMindfulMinutes = mindful }
             if let temp    = snapshot.wristTemperature { log.hkWristTemp    = temp }
+            if let resp    = snapshot.respiratoryRate  { log.hkRespiratoryRate = resp }
+            if let spo2    = snapshot.bloodOxygen      { log.hkBloodOxygen  = spo2 }
+            if let daylight = snapshot.daylightMinutes { log.hkDaylightMinutes = daylight }
         }
     }
 
@@ -737,6 +742,16 @@ struct LogInputFlow: View {
         // Same for a day whose workouts clear the intensity gate.
         if snapshot.intenseWorkout == true, !selectedFactors.contains(Self.intenseExerciseFactorName) {
             selectedFactors.append(Self.intenseExerciseFactorName)
+        }
+        // Dietary entries logged in Health: enough caffeine selects the factor,
+        // enough water checks the Hydration basic. Both stay fully manual.
+        if let caffeine = snapshot.caffeineMilligrams, caffeine >= HealthThreshold.caffeineMilligrams,
+           !selectedFactors.contains(Self.caffeineFactorName) {
+            selectedFactors.append(Self.caffeineFactorName)
+        }
+        if let water = snapshot.waterLiters, water >= HealthThreshold.hydrationLiters,
+           !basicsCompleted.contains(Self.hydrationBasicName) {
+            basicsCompleted.append(Self.hydrationBasicName)
         }
         // Symptoms another app already logged in Health today prefill the
         // picker — only while the user hasn't chosen any themselves.

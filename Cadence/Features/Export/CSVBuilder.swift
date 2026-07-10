@@ -10,7 +10,7 @@ enum CSVBuilder {
         return f
     }()
 
-    private static let header = "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes,HK Wrist Temp"
+    private static let header = "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes,HK Wrist Temp,HK Respiratory Rate,HK Blood Oxygen,HK Daylight Minutes"
 
     // Pure string form, kept separate from file I/O so it's unit-testable.
     // Every user-entered and HealthKit field gets a column (media binaries and
@@ -48,6 +48,9 @@ enum CSVBuilder {
             fields.append(formatted(log.hkActiveEnergy, "%.0f"))
             fields.append(formatted(log.hkMindfulMinutes, "%.0f"))
             fields.append(formatted(log.hkWristTemp, "%.1f"))
+            fields.append(formatted(log.hkRespiratoryRate, "%.1f"))
+            fields.append(formatted(log.hkBloodOxygen, "%.0f"))
+            fields.append(formatted(log.hkDaylightMinutes, "%.0f"))
             rows.append(fields.map(escape).joined(separator: ","))
         }
         return rows.joined(separator: "\n")

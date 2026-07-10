@@ -424,7 +424,7 @@ struct CSVBuilderTests {
             makeSnapshot(daysAgo: 2),
         ]
         let lines = CSVBuilder.csvString(from: logs).split(separator: "\n", omittingEmptySubsequences: false)
-        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes,HK Wrist Temp")
+        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes,HK Wrist Temp,HK Respiratory Rate,HK Blood Oxygen,HK Daylight Minutes")
         #expect(lines.count == 3) // header + 2 rows
         // Oldest first: the day -2 row precedes the day 0 row.
         #expect(lines[1] < lines[2]) // ISO yyyy-MM-dd sorts chronologically as text
