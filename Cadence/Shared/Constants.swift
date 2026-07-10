@@ -107,6 +107,12 @@ enum PatternThreshold {
     // (the mood delta gate reuses moodDiffThreshold).
     static let minimumDaylightDays: Int = 7
 
+    // Sample-size damping for mean-comparison confidence: with this many days
+    // on the comparison's thinner side, confidence is halved; it approaches the
+    // raw effect size as data accumulates. Keeps a 2-point swing over 4 days
+    // from displaying the same confidence as over 40 days.
+    static let smallSampleShrinkage: Double = 5
+
     // Canonical window for pattern detection. Every surface (Insights tab,
     // foreground notification check, insight history) computes over this window
     // so they can never disagree about which patterns exist.
