@@ -18,25 +18,39 @@ struct SymptomPickerView: View {
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(allTags) { tag in
-                    symptomChip(tag: tag)
+                    symptomChip(name: tag.name, emoji: tag.emoji)
+                }
+                // Selected symptoms with no matching tag — prefilled from a
+                // Health entry, or logged before their tag was deleted. Without
+                // a chip they'd be invisible yet still saved (and re-synced),
+                // which the user couldn't see or undo. Deselecting removes the
+                // chip along with the symptom.
+                ForEach(unlistedSelections, id: \.name) { entry in
+                    symptomChip(name: entry.name, emoji: entry.emoji)
                 }
                 addChip
             }
         }
     }
 
-    private func symptomChip(tag: SymptomTag) -> some View {
-        let isSelected = selectedSymptoms.contains { $0.name.localizedCaseInsensitiveCompare(tag.name) == .orderedSame }
-        let severity = selectedSymptoms.first { $0.name.localizedCaseInsensitiveCompare(tag.name) == .orderedSame }?.severity ?? 5
+    private var unlistedSelections: [SymptomEntry] {
+        selectedSymptoms.filter { entry in
+            !allTags.contains { $0.name.localizedCaseInsensitiveCompare(entry.name) == .orderedSame }
+        }
+    }
+
+    private func symptomChip(name: String, emoji: String) -> some View {
+        let isSelected = selectedSymptoms.contains { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
+        let severity = selectedSymptoms.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }?.severity ?? 5
 
         return VStack(spacing: 8) {
             Button {
-                toggleSymptom(tag: tag)
+                toggleSymptom(name: name, emoji: emoji)
             } label: {
                 VStack(spacing: 6) {
-                    Text(tag.emoji)
+                    Text(emoji)
                         .font(.title2)
-                    Text(tag.name)
+                    Text(name)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(isSelected ? .white : .primary)
                 }
@@ -49,29 +63,29 @@ struct SymptomPickerView: View {
             }
             .buttonStyle(.plain)
             .hapticFeedback(.medium)
-            .accessibilityLabel(tag.name)
+            .accessibilityLabel(name)
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             .accessibilityHint(isSelected ? "Double-tap and hold to adjust severity" : "Double-tap to select, then hold to rate severity")
             .onLongPressGesture {
                 withAnimation(CadenceAnimation.spring) {
-                    expandedTag = expandedTag == tag.name ? nil : tag.name
+                    expandedTag = expandedTag == name ? nil : name
                 }
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
             }
 
-            if isSelected && expandedTag == tag.name {
+            if isSelected && expandedTag == name {
                 VStack(spacing: 4) {
                     Text("Severity: \(severity)")
                         .font(.caption.bold())
                     Slider(
                         value: Binding(
                             get: { Double(severity) },
-                            set: { updateSeverity(tag: tag, value: Int($0.rounded())) }
+                            set: { updateSeverity(name: name, value: Int($0.rounded())) }
                         ),
                         in: 1...10, step: 1
                     )
                     .tint(CadenceColor.stressRed)
-                    .accessibilityLabel("\(tag.name) severity")
+                    .accessibilityLabel("\(name) severity")
                     .accessibilityValue("\(severity) out of 10")
                 }
                 .padding(.horizontal, 4)
@@ -106,17 +120,17 @@ struct SymptomPickerView: View {
         }
     }
 
-    private func toggleSymptom(tag: SymptomTag) {
-        if let idx = selectedSymptoms.firstIndex(where: { $0.name.localizedCaseInsensitiveCompare(tag.name) == .orderedSame }) {
+    private func toggleSymptom(name: String, emoji: String) {
+        if let idx = selectedSymptoms.firstIndex(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
             selectedSymptoms.remove(at: idx)
-            if expandedTag == tag.name { expandedTag = nil }
+            if expandedTag == name { expandedTag = nil }
         } else {
-            selectedSymptoms.append(SymptomEntry(name: tag.name, severity: 5, emoji: tag.emoji))
+            selectedSymptoms.append(SymptomEntry(name: name, severity: 5, emoji: emoji))
         }
     }
 
-    private func updateSeverity(tag: SymptomTag, value: Int) {
-        if let idx = selectedSymptoms.firstIndex(where: { $0.name.localizedCaseInsensitiveCompare(tag.name) == .orderedSame }) {
+    private func updateSeverity(name: String, value: Int) {
+        if let idx = selectedSymptoms.firstIndex(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
             selectedSymptoms[idx].severity = value.clamped(to: 1...10)
         }
     }

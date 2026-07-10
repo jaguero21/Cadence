@@ -1,6 +1,7 @@
 import Testing
 import HealthKit
 import Foundation
+import SwiftData
 @testable import Cadence
 
 // MARK: - HealthKitService – pure logic tests
@@ -78,6 +79,12 @@ struct HealthKitSnapshotDefaultInitTests {
     func snapshot_hrv_defaultsToNil() {
         #expect(HealthKitSnapshot().hrv == nil)
     }
+
+    @Test("Default snapshot has activeEnergy and mindfulMinutes = nil")
+    func snapshot_energyAndMindful_defaultToNil() {
+        #expect(HealthKitSnapshot().activeEnergy == nil)
+        #expect(HealthKitSnapshot().mindfulMinutes == nil)
+    }
 }
 
 @Suite("HealthKitSnapshot – explicit values")
@@ -85,11 +92,14 @@ struct HealthKitSnapshotValueTests {
 
     @Test("Snapshot stores all non-nil values correctly")
     func snapshot_storesNonNilValues() {
-        let snapshot = HealthKitSnapshot(steps: 8432, restingHR: 62.5, hrv: 45.3, sleepHours: 7.25)
+        let snapshot = HealthKitSnapshot(steps: 8432, restingHR: 62.5, hrv: 45.3, sleepHours: 7.25,
+                                         activeEnergy: 420, mindfulMinutes: 12)
         #expect(snapshot.steps == 8432)
         #expect(snapshot.restingHR == 62.5)
         #expect(snapshot.hrv == 45.3)
         #expect(snapshot.sleepHours == 7.25)
+        #expect(snapshot.activeEnergy == 420)
+        #expect(snapshot.mindfulMinutes == 12)
     }
 
     @Test("Snapshot with only steps populated leaves other fields nil")
@@ -109,5 +119,245 @@ struct HealthKitSnapshotValueTests {
         copy.sleepHours = nil
         #expect(original.steps == 100)
         #expect(original.sleepHours == 6.5)
+    }
+}
+
+// MARK: - Sleep quality score
+
+// The 0–10 score that pre-fills the Body Metrics "Sleep quality" slider.
+// Derived only from real stage data: 60% efficiency (asleep vs awake) +
+// 40% restorative share (deep+REM / asleep, normalised against ~45%).
+@Suite("HealthKitService – sleepQualityScore")
+struct SleepQualityScoreTests {
+
+    @Test("No stage data (duration-only source) yields nil, not a fake score")
+    func durationOnly_returnsNil() {
+        // 7h logged as unspecified sleep — no core/REM/deep stages.
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: 7 * 3600, awakeSeconds: 0,
+            deepSeconds: 0, remSeconds: 0, stagedSeconds: 0
+        )
+        #expect(score == nil)
+    }
+
+    @Test("No sleep at all yields nil")
+    func noSleep_returnsNil() {
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: 0, awakeSeconds: 3600,
+            deepSeconds: 0, remSeconds: 0, stagedSeconds: 0
+        )
+        #expect(score == nil)
+    }
+
+    @Test("An efficient, restorative night scores at the top of the scale")
+    func greatNight_scoresHigh() {
+        // 8h asleep, 10 min awake, 45% deep+REM — efficiency ≈ 0.98, restorative = 1.
+        let asleep = 8.0 * 3600
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: asleep, awakeSeconds: 600,
+            deepSeconds: asleep * 0.25, remSeconds: asleep * 0.20, stagedSeconds: asleep
+        )
+        #expect(score == 10)
+    }
+
+    @Test("A fragmented night with little deep/REM scores low")
+    func fragmentedNight_scoresLow() throws {
+        // 4h asleep vs 2h awake (efficiency 0.67), only 10% deep+REM.
+        let asleep = 4.0 * 3600
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: asleep, awakeSeconds: 2 * 3600,
+            deepSeconds: asleep * 0.05, remSeconds: asleep * 0.05, stagedSeconds: asleep
+        )
+        let unwrapped = try #require(score)
+        #expect(unwrapped <= 5)
+    }
+
+    @Test("Score is clamped to the 0...10 slider range")
+    func score_staysInSliderRange() throws {
+        let score = HealthKitService.sleepQualityScore(
+            asleepSeconds: 10 * 3600, awakeSeconds: 0,
+            deepSeconds: 5 * 3600, remSeconds: 5 * 3600, stagedSeconds: 10 * 3600
+        )
+        let unwrapped = try #require(score)
+        #expect((0...10).contains(unwrapped))
+    }
+}
+
+// MARK: - Symptom & mood mapping
+
+// The pure maps behind two-way Health symptom sync and State of Mind mood.
+@Suite("HealthKitService – symptom and mood mapping")
+struct HealthMappingTests {
+
+    @Test("Cadence names map to HK symptom types case-insensitively")
+    func nameToType() {
+        #expect(HealthKitService.symptomTypeIdentifier(for: "Headache") == .headache)
+        #expect(HealthKitService.symptomTypeIdentifier(for: "FATIGUE") == .fatigue)
+        #expect(HealthKitService.symptomTypeIdentifier(for: "Pain") == .generalizedBodyAche)
+        // No honest HK counterpart → no sync, not a stretched mapping.
+        #expect(HealthKitService.symptomTypeIdentifier(for: "Brain Fog") == nil)
+    }
+
+    @Test("Type→name round trip picks the canonical Cadence display name")
+    func typeToName() {
+        #expect(HealthKitService.symptomName(for: .headache) == "Headache")
+        #expect(HealthKitService.symptomName(for: .coughing) == "Coughing")
+        #expect(HealthKitService.symptomName(for: .generalizedBodyAche) == "Pain")
+    }
+
+    @Test("Every mapped name survives a name→type→name round trip")
+    func roundTripAllMappings() {
+        for identifier in Set(HealthKitService.symptomTypeByName.values) {
+            let name = HealthKitService.symptomName(for: identifier)
+            #expect(name != nil)
+            #expect(HealthKitService.symptomTypeIdentifier(for: name ?? "") == identifier)
+        }
+    }
+
+    @Test("Severity buckets: 1–3 mild, 4–7 moderate, 8–10 severe")
+    func severityToHK() {
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 1) == HKCategoryValueSeverity.mild.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 3) == HKCategoryValueSeverity.mild.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 4) == HKCategoryValueSeverity.moderate.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 7) == HKCategoryValueSeverity.moderate.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 8) == HKCategoryValueSeverity.severe.rawValue)
+        #expect(HealthKitService.hkSeverityValue(forSeverity: 10) == HKCategoryValueSeverity.severe.rawValue)
+    }
+
+    @Test("HK severity maps back to a representative Cadence severity")
+    func severityFromHK() {
+        #expect(HealthKitService.cadenceSeverity(fromHKSeverity: HKCategoryValueSeverity.mild.rawValue) == 2)
+        #expect(HealthKitService.cadenceSeverity(fromHKSeverity: HKCategoryValueSeverity.moderate.rawValue) == 5)
+        #expect(HealthKitService.cadenceSeverity(fromHKSeverity: HKCategoryValueSeverity.severe.rawValue) == 9)
+        #expect(HealthKitService.cadenceSeverity(fromHKSeverity: HKCategoryValueSeverity.unspecified.rawValue) == 5)
+    }
+
+    @Test("Mood ↔ valence round trips across the whole 1–5 scale")
+    func moodValenceRoundTrip() {
+        for mood in 1...5 {
+            let valence = HealthKitService.valence(forMood: mood)
+            #expect((-1.0...1.0).contains(valence))
+            #expect(HealthKitService.mood(forValence: valence) == mood)
+        }
+        // Out-of-range inputs clamp instead of wrapping.
+        #expect(HealthKitService.valence(forMood: 99) == 1.0)
+        #expect(HealthKitService.mood(forValence: 3.0) == 5)
+        #expect(HealthKitService.mood(forValence: -3.0) == 1)
+    }
+}
+
+// MARK: - Intense exercise gate
+
+// Pure gate behind the "Intense exercise" auto-factor: enough time OR enough
+// energy — a long easy hike and a short hard run both count.
+@Suite("HealthKitService – isIntenseExercise")
+struct IntenseExerciseGateTests {
+
+    @Test("Below both thresholds is not intense")
+    func belowBoth() {
+        #expect(HealthKitService.isIntenseExercise(totalMinutes: 30, totalKilocalories: 250) == false)
+    }
+
+    @Test("Enough time alone qualifies (long easy hike)")
+    func timeAlone() {
+        #expect(HealthKitService.isIntenseExercise(totalMinutes: HealthThreshold.intenseWorkoutMinutes, totalKilocalories: 0))
+    }
+
+    @Test("Enough energy alone qualifies (short hard run)")
+    func energyAlone() {
+        #expect(HealthKitService.isIntenseExercise(totalMinutes: 20, totalKilocalories: HealthThreshold.intenseWorkoutKilocalories))
+    }
+}
+
+// MARK: - HealthDataRefresher
+
+// Background/foreground top-up of today's log: hk* fields only, and NEVER
+// creates a log — a day the user didn't start must not grow a phantom entry.
+@MainActor
+@Suite("HealthDataRefresher – refreshToday")
+struct HealthDataRefresherTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([DailyLog.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    @Test("Updates only objective fields on an existing today log")
+    func updatesExistingLog() throws {
+        let context = try makeContext()
+        let log = DailyLog(date: .now)
+        log.mood = 4
+        log.hkSteps = 1200   // morning value
+        context.insert(log)
+        try context.save()
+
+        let updated = HealthDataRefresher.refreshToday(
+            context: context,
+            snapshot: HealthKitSnapshot(steps: 9800, activeEnergy: 300)
+        )
+
+        #expect(updated)
+        #expect(log.hkSteps == 9800)          // topped up
+        #expect(log.hkActiveEnergy == 300)
+        #expect(log.mood == 4)                // user data untouched
+    }
+
+    @Test("Never creates a log for a day the user didn't start")
+    func neverCreatesLog() throws {
+        let context = try makeContext()
+
+        let updated = HealthDataRefresher.refreshToday(
+            context: context,
+            snapshot: HealthKitSnapshot(steps: 9800)
+        )
+
+        #expect(updated == false)
+        #expect(try context.fetch(FetchDescriptor<DailyLog>()).isEmpty)
+    }
+
+    @Test("A nil snapshot value never blanks an earlier measurement")
+    func nilNeverBlanks() throws {
+        let context = try makeContext()
+        let log = DailyLog(date: .now)
+        log.hkWristTemp = 35.1
+        context.insert(log)
+        try context.save()
+
+        HealthDataRefresher.refreshToday(context: context, snapshot: HealthKitSnapshot(steps: 500))
+
+        #expect(log.hkWristTemp == 35.1)
+        #expect(log.hkSteps == 500)
+    }
+}
+
+// MARK: - External mood resolution
+
+// The prefill rule for State of Mind reads: an explicit daily-mood entry is
+// the person's own summary and always wins; without one, the day's momentary
+// emotions (what the watch's built-in tracker usually logs) average into an
+// estimate.
+@Suite("HealthKitService – resolveExternalMood")
+struct ExternalMoodResolutionTests {
+
+    @Test("A daily mood wins even when momentary emotions disagree")
+    func dailyWins() {
+        let mood = HealthKitService.resolveExternalMood(
+            latestDailyValence: 1.0,           // "great day"
+            momentaryValences: [-1.0, -1.0]    // two rough moments
+        )
+        #expect(mood == 5)
+    }
+
+    @Test("Without a daily mood, momentary emotions average")
+    func momentaryAverage() {
+        // 1.0 and 0.0 average to 0.5 → mood 4.
+        let mood = HealthKitService.resolveExternalMood(latestDailyValence: nil, momentaryValences: [1.0, 0.0])
+        #expect(mood == 4)
+    }
+
+    @Test("No entries at all → nil, so the mood step stays untouched")
+    func noEntries() {
+        #expect(HealthKitService.resolveExternalMood(latestDailyValence: nil, momentaryValences: []) == nil)
     }
 }

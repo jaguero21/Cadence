@@ -10,7 +10,7 @@ enum CSVBuilder {
         return f
     }()
 
-    private static let header = "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes"
+    private static let header = "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes,HK Wrist Temp,HK Respiratory Rate,HK Blood Oxygen,HK Daylight Minutes,HK Daytime HR"
 
     // Pure string form, kept separate from file I/O so it's unit-testable.
     // Every user-entered and HealthKit field gets a column (media binaries and
@@ -38,14 +38,20 @@ enum CSVBuilder {
                 log.intentionsForTomorrow,
                 log.freeNote,
             ]
-            fields += [
-                log.hkSteps.map { "\($0)" } ?? "",
-                log.hkRestingHR.map { String(format: "%.0f", $0) } ?? "",
-                log.hkHRV.map { String(format: "%.0f", $0) } ?? "",
-                log.hkSleepHours.map { String(format: "%.1f", $0) } ?? "",
-                log.hkActiveEnergy.map { String(format: "%.0f", $0) } ?? "",
-                log.hkMindfulMinutes.map { String(format: "%.0f", $0) } ?? "",
-            ]
+            // Appended one at a time with an explicit helper — a combined array
+            // literal of optional-map + format expressions blows the compiler's
+            // type-checking budget on slower machines (seen on the CI runner).
+            fields.append(log.hkSteps.map(String.init) ?? "")
+            fields.append(formatted(log.hkRestingHR, "%.0f"))
+            fields.append(formatted(log.hkHRV, "%.0f"))
+            fields.append(formatted(log.hkSleepHours, "%.1f"))
+            fields.append(formatted(log.hkActiveEnergy, "%.0f"))
+            fields.append(formatted(log.hkMindfulMinutes, "%.0f"))
+            fields.append(formatted(log.hkWristTemp, "%.1f"))
+            fields.append(formatted(log.hkRespiratoryRate, "%.1f"))
+            fields.append(formatted(log.hkBloodOxygen, "%.0f"))
+            fields.append(formatted(log.hkDaylightMinutes, "%.0f"))
+            fields.append(formatted(log.hkDaytimeHR, "%.0f"))
             rows.append(fields.map(escape).joined(separator: ","))
         }
         return rows.joined(separator: "\n")
@@ -60,6 +66,12 @@ enum CSVBuilder {
         } catch {
             return nil
         }
+    }
+
+    // An optional metric's CSV cell: formatted when present, empty when not.
+    private static func formatted(_ value: Double?, _ format: String) -> String {
+        guard let value else { return "" }
+        return String(format: format, value)
     }
 
     // Quote fields containing a comma, quote, or newline; double embedded quotes.

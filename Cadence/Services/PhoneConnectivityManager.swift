@@ -68,6 +68,14 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
             // just republish the stale App Group data.
             let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
             DashboardViewModel.publishWidgetSummary(logs: logs)
+            // Mirror the mood into Health's State of Mind — a wrist check-in
+            // is still a check-in. Best-effort, fire-and-forget.
+            let recordedAt = (payload["date"] as? TimeInterval).map(Date.init(timeIntervalSinceReferenceDate:)) ?? .now
+            let day = Calendar.current.startOfDay(for: recordedAt)
+            if let log = logs.first(where: { $0.date == day }) {
+                let snapshot = DailyLogSnapshot(log)
+                Task { await HealthKitService.shared.publish(log: snapshot) }
+            }
         }
     }
 

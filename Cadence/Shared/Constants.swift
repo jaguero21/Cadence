@@ -95,6 +95,17 @@ enum PatternThreshold {
     static let flarePrecursorWindowDays: Int = 3
     static let flareStressDeltaThreshold: Double = 1.0
     static let flareSleepDeltaThreshold: Double = 0.75
+    // Smallest average overnight wrist-temperature rise (°C) in the run-up
+    // window worth surfacing as a flare precursor.
+    static let flareTempDeltaThreshold: Double = 0.3
+    // Smallest average overnight respiratory-rate rise (breaths/min) in the
+    // run-up window worth surfacing as a flare precursor.
+    static let flareRespiratoryDeltaThreshold: Double = 1.0
+
+    // Daylight ↔ mood correlation: minimum days carrying a daylight
+    // measurement before comparing above- vs below-average daylight days
+    // (the mood delta gate reuses moodDiffThreshold).
+    static let minimumDaylightDays: Int = 7
 
     // Canonical window for pattern detection. Every surface (Insights tab,
     // foreground notification check, insight history) computes over this window
@@ -105,6 +116,18 @@ enum PatternThreshold {
 enum ChartThreshold {
     // Minimum period-over-period delta before the trend comparison badge shows.
     static let comparisonBadgeMinimumDelta: Double = 0.05
+}
+
+enum HealthThreshold {
+    // A day's HealthKit workouts count as "Intense exercise" (auto-selecting
+    // that factor chip) when they total at least this much time or energy.
+    static let intenseWorkoutMinutes: Double = 45
+    static let intenseWorkoutKilocalories: Double = 400
+    // Logged dietary caffeine (mg) that auto-selects the "Caffeine" factor —
+    // roughly half a cup of coffee; trace amounts don't count.
+    static let caffeineMilligrams: Double = 50
+    // Logged dietary water (litres) that auto-checks the "Hydration" basic.
+    static let hydrationLiters: Double = 1.5
 }
 
 enum AppLaunch {

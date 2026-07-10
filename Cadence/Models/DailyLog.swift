@@ -34,6 +34,11 @@ final class DailyLog {
     var hkSleepHours: Double?
     var hkActiveEnergy: Double?
     var hkMindfulMinutes: Double?
+    var hkWristTemp: Double?   // °C, overnight wrist temperature (Watch Series 8+)
+    var hkRespiratoryRate: Double?   // breaths/min, overnight average
+    var hkBloodOxygen: Double?       // %, overnight average SpO2
+    var hkDaylightMinutes: Double?   // minutes of daylight today (iOS 17 / watchOS 10)
+    var hkDaytimeHR: Double?         // bpm, today's average heart rate (all samples)
 
     init(date: Date = .now) {
         self.date = Calendar.current.startOfDay(for: date)
@@ -81,8 +86,10 @@ struct SymptomEntry: Codable, Identifiable {
 // any isolation context without touching the @Model (which isn't Sendable and
 // would race on its SwiftData-backed fields).
 // Carries EVERY user-entered and HealthKit field (only media binaries and the
-// isComplete/didEdit* bookkeeping flags are deliberately omitted) so reports
-// can never silently drop a logged input.
+// isComplete flag are deliberately omitted) so reports can never silently
+// drop a logged input. The didEdit* flags ride along because consumers need
+// them (PatternEngine gates on didEditMetrics; Health write-back gates the
+// State of Mind entry on didEditMood).
 struct DailyLogSnapshot: Sendable {
     let date: Date
     let mood: Int
@@ -97,6 +104,7 @@ struct DailyLogSnapshot: Sendable {
     let factors: [String]
     let customMetrics: [MetricEntry]
     let didEditMetrics: Bool
+    let didEditMood: Bool
     let peaksAndValleysNote: String
     let hasPeaksAndValleysVoiceMemo: Bool
     let intentionsForTomorrow: String
@@ -107,6 +115,11 @@ struct DailyLogSnapshot: Sendable {
     let hkSleepHours: Double?
     let hkActiveEnergy: Double?
     let hkMindfulMinutes: Double?
+    let hkWristTemp: Double?
+    let hkRespiratoryRate: Double?
+    let hkBloodOxygen: Double?
+    let hkDaylightMinutes: Double?
+    let hkDaytimeHR: Double?
 
     init(_ log: DailyLog) {
         date           = log.date
@@ -122,6 +135,7 @@ struct DailyLogSnapshot: Sendable {
         factors        = log.factors
         customMetrics  = log.customMetrics
         didEditMetrics = log.didEditMetrics
+        didEditMood    = log.didEditMood
         peaksAndValleysNote = log.peaksAndValleysNote
         hasPeaksAndValleysVoiceMemo = log.peaksAndValleysVoiceMemo != nil
         intentionsForTomorrow = log.intentionsForTomorrow
@@ -132,6 +146,11 @@ struct DailyLogSnapshot: Sendable {
         hkSleepHours   = log.hkSleepHours
         hkActiveEnergy = log.hkActiveEnergy
         hkMindfulMinutes = log.hkMindfulMinutes
+        hkWristTemp    = log.hkWristTemp
+        hkRespiratoryRate = log.hkRespiratoryRate
+        hkBloodOxygen  = log.hkBloodOxygen
+        hkDaylightMinutes = log.hkDaylightMinutes
+        hkDaytimeHR    = log.hkDaytimeHR
     }
 
     init(
@@ -148,6 +167,7 @@ struct DailyLogSnapshot: Sendable {
         factors: [String] = [],
         customMetrics: [MetricEntry] = [],
         didEditMetrics: Bool = false,
+        didEditMood: Bool = false,
         peaksAndValleysNote: String = "",
         hasPeaksAndValleysVoiceMemo: Bool = false,
         intentionsForTomorrow: String = "",
@@ -157,7 +177,12 @@ struct DailyLogSnapshot: Sendable {
         hkHRV: Double? = nil,
         hkSleepHours: Double? = nil,
         hkActiveEnergy: Double? = nil,
-        hkMindfulMinutes: Double? = nil
+        hkMindfulMinutes: Double? = nil,
+        hkWristTemp: Double? = nil,
+        hkRespiratoryRate: Double? = nil,
+        hkBloodOxygen: Double? = nil,
+        hkDaylightMinutes: Double? = nil,
+        hkDaytimeHR: Double? = nil
     ) {
         self.date = date
         self.mood = mood
@@ -172,6 +197,7 @@ struct DailyLogSnapshot: Sendable {
         self.factors = factors
         self.customMetrics = customMetrics
         self.didEditMetrics = didEditMetrics
+        self.didEditMood = didEditMood
         self.peaksAndValleysNote = peaksAndValleysNote
         self.hasPeaksAndValleysVoiceMemo = hasPeaksAndValleysVoiceMemo
         self.intentionsForTomorrow = intentionsForTomorrow
@@ -182,6 +208,11 @@ struct DailyLogSnapshot: Sendable {
         self.hkSleepHours = hkSleepHours
         self.hkActiveEnergy = hkActiveEnergy
         self.hkMindfulMinutes = hkMindfulMinutes
+        self.hkWristTemp = hkWristTemp
+        self.hkRespiratoryRate = hkRespiratoryRate
+        self.hkBloodOxygen = hkBloodOxygen
+        self.hkDaylightMinutes = hkDaylightMinutes
+        self.hkDaytimeHR = hkDaytimeHR
     }
 }
 
