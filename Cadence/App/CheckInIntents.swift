@@ -49,6 +49,13 @@ struct LogCheckInIntent: AppIntent {
         }
         let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
         DashboardViewModel.publishWidgetSummary(logs: logs)
+        // Mirror the mood into Health's State of Mind — a Siri check-in is
+        // still a check-in. Best-effort, fire-and-forget.
+        let today = Calendar.current.startOfDay(for: .now)
+        if let todayLog = logs.first(where: { $0.date == today }) {
+            let snapshot = DailyLogSnapshot(todayLog)
+            Task { await HealthKitService.shared.publish(log: snapshot) }
+        }
         return .result(dialog: "Logged \(MoodScale.emoji(for: mood.rawValue)) for today.")
     }
 }
