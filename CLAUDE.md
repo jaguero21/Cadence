@@ -65,10 +65,14 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   the doctor PDF. `PatternEngine.flarePrecursors` compares the
   `flarePrecursorWindowDays` run-up before each flare against baseline days
   (in-flare days excluded from both sides) and surfaces stress-rise
-  (`flare-stress`), sleep-dip (`flare-sleep`), and overnight wrist-temperature
-  rise (`flare-temp`, from HealthKit-fed `hkWristTemp`; only days carrying a
-  measurement participate) early-warning cards; needs
-  `minimumFlaresForPattern` flares with run-up data.
+  (`flare-stress`), sleep-dip (`flare-sleep`), overnight wrist-temperature
+  rise (`flare-temp`), and overnight respiratory-rate rise
+  (`flare-respiratory`) early-warning cards (the HealthKit-fed ones use
+  `hkWristTemp`/`hkRespiratoryRate`; only days carrying a measurement
+  participate); needs `minimumFlaresForPattern` flares with run-up data.
+  `daylightMoodCorrelation` (`daylight-mood`) mirrors mood-sleep for
+  HealthKit's time-in-daylight — only the actionable direction (more daylight
+  → better mood) surfaces.
 - **HealthKit is always optional.** HK values only prefill or supplement —
   the sleep sliders, the "Menstrual cycle" factor chip (auto-selected via
   `LogInputFlow.menstrualCycleFactorName` when Health has a flow entry today),
