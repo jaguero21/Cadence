@@ -263,7 +263,10 @@ final class HealthKitService: HealthKitServiceProtocol {
 
     // Cadence symptom names ↔ HealthKit symptom category types. Only honest
     // mappings — a Cadence symptom with no real HK counterpart (e.g. "Brain
-    // Fog") simply doesn't sync. Keys are lowercased names.
+    // Fog") simply doesn't sync. Keys are lowercased names. Covers every HK
+    // symptom type that takes HKCategoryValueSeverity; .appetiteChanges and
+    // .sleepChanges are deliberately absent — they use their own value enums,
+    // and writing a severity raw value to them would be invalid data.
     nonisolated static let symptomTypeByName: [String: HKCategoryTypeIdentifier] = [
         "headache":            .headache,
         "fatigue":             .fatigue,
@@ -286,6 +289,24 @@ final class HealthKitService: HealthKitServiceProtocol {
         "night sweats":        .nightSweats,
         "pain":                .generalizedBodyAche,
         "body ache":           .generalizedBodyAche,
+        "abdominal cramps":    .abdominalCramps,
+        "acne":                .acne,
+        "bladder incontinence": .bladderIncontinence,
+        "breast pain":         .breastPain,
+        "chest tightness or pain": .chestTightnessOrPain,
+        "dry skin":            .drySkin,
+        "fainting":            .fainting,
+        "hair loss":           .hairLoss,
+        "loss of smell":       .lossOfSmell,
+        "loss of taste":       .lossOfTaste,
+        "memory lapse":        .memoryLapse,
+        "mood changes":        .moodChanges,
+        "racing heartbeat":    .rapidPoundingOrFlutteringHeartbeat,
+        "sinus congestion":    .sinusCongestion,
+        "skipped heartbeat":   .skippedHeartbeat,
+        "vaginal dryness":     .vaginalDryness,
+        "vomiting":            .vomiting,
+        "wheezing":            .wheezing,
     ]
 
     nonisolated static func symptomTypeIdentifier(for name: String) -> HKCategoryTypeIdentifier? {
