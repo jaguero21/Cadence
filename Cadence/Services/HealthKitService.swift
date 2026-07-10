@@ -145,6 +145,55 @@ final class HealthKitService: HealthKitServiceProtocol {
         )
     }
 
+    // MARK: - Change observation (background delivery)
+
+    private var observerQueries: [HKObserverQuery] = []
+    private var refreshDebounce: Task<Void, Never>?
+
+    // Observes the types whose values accumulate through the day (steps,
+    // energy, daylight) or land after the log was created (sleep, wrist temp)
+    // and calls `onChange` — debounced, since HealthKit fires observers in
+    // bursts. Background delivery wakes the app when suspended (entitlement:
+    // com.apple.developer.healthkit.background-delivery); while running, the
+    // observers fire directly. Purely additive freshness — everything still
+    // works without it.
+    func startObservingChanges(onChange: @escaping @Sendable () async -> Void) {
+        guard isAvailable, observerQueries.isEmpty else { return }
+        let quantity: [HKQuantityTypeIdentifier] = [
+            .stepCount, .activeEnergyBurned, .timeInDaylight, .appleSleepingWristTemperature,
+        ]
+        var types: [HKSampleType] = quantity.compactMap { HKObjectType.quantityType(forIdentifier: $0) }
+        if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
+            types.append(sleep)
+        }
+        for type in types {
+            let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completionHandler, error in
+                if let error {
+                    Self.log.error("Observer for \(type.identifier, privacy: .public) failed: \(error, privacy: .public)")
+                } else {
+                    Task { @MainActor in self?.scheduleRefresh(onChange) }
+                }
+                completionHandler()
+            }
+            store.execute(query)
+            observerQueries.append(query)
+            store.enableBackgroundDelivery(for: type, frequency: .hourly) { _, error in
+                if let error {
+                    Self.log.error("enableBackgroundDelivery(\(type.identifier, privacy: .public)) failed: \(error, privacy: .public)")
+                }
+            }
+        }
+    }
+
+    private func scheduleRefresh(_ onChange: @escaping @Sendable () async -> Void) {
+        refreshDebounce?.cancel()
+        refreshDebounce = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            await onChange()
+        }
+    }
+
     // MARK: - Write-back (Health record sync)
 
     // Mirrors a saved day's log into Health: mapped symptoms as severity
@@ -507,6 +556,57 @@ final class HealthKitService: HealthKitServiceProtocol {
             }
             store.execute(query)
         }
+    }
+}
+
+extension DailyLog {
+    // Applies a snapshot's OBJECTIVE measurements to the log — hk* fields
+    // only, each written only when present so a partial fetch can't blank an
+    // earlier value. User-entered fields are never touched: this is safe to
+    // run against an existing log long after the user finished editing it
+    // (log-flow save, foreground refresh, background delivery all share it).
+    func applyObjectiveHealthData(_ snapshot: HealthKitSnapshot) {
+        if let steps   = snapshot.steps            { hkSteps          = steps }
+        if let hr      = snapshot.restingHR        { hkRestingHR      = hr }
+        if let hrv     = snapshot.hrv              { hkHRV            = hrv }
+        if let sleep   = snapshot.sleepHours       { hkSleepHours     = sleep }
+        if let energy  = snapshot.activeEnergy     { hkActiveEnergy   = energy }
+        if let mindful = snapshot.mindfulMinutes   { hkMindfulMinutes = mindful }
+        if let temp    = snapshot.wristTemperature { hkWristTemp      = temp }
+        if let resp    = snapshot.respiratoryRate  { hkRespiratoryRate = resp }
+        if let spo2    = snapshot.bloodOxygen      { hkBloodOxygen    = spo2 }
+        if let daylight = snapshot.daylightMinutes { hkDaylightMinutes = daylight }
+    }
+}
+
+// Tops up TODAY's already-created log with fresh HealthKit data. Never creates
+// a log — a day the user didn't start must not grow a phantom entry from
+// background data alone.
+@MainActor
+enum HealthDataRefresher {
+    private static let log = Logger(subsystem: "com.carpecadence", category: "HealthRefresh")
+
+    // Pure-ish core, snapshot-injected so tests don't need HealthKit.
+    // Returns whether an existing log was updated.
+    @discardableResult
+    static func refreshToday(context: ModelContext, snapshot: HealthKitSnapshot) -> Bool {
+        let today = Calendar.current.startOfDay(for: .now)
+        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == today })
+        guard let todayLog = try? context.fetch(descriptor).first else { return false }
+        todayLog.applyObjectiveHealthData(snapshot)
+        do {
+            try context.save()
+            return true
+        } catch {
+            Self.log.error("Failed to save refreshed health data: \(error, privacy: .public)")
+            return false
+        }
+    }
+
+    static func refreshToday(container: ModelContainer) async {
+        guard !AppLaunch.isUITesting else { return }
+        let snapshot = await HealthKitService.shared.fetchLogSnapshot()
+        refreshToday(context: container.mainContext, snapshot: snapshot)
     }
 }
 

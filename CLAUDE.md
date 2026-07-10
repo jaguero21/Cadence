@@ -88,6 +88,15 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   statics on `HealthKitService` (`symptomTypeByName` etc.), unit-tested; only
   honest mappings — a Cadence symptom with no real HK counterpart (e.g.
   "Brain Fog") simply doesn't sync.
+- **HealthKit freshness:** `HealthDataRefresher.refreshToday` tops up TODAY's
+  existing log's `hk*` fields (via the shared
+  `DailyLog.applyObjectiveHealthData`, which never blanks a value on nil and
+  never touches user-entered fields) — it **never creates a log** (no phantom
+  entries from background data). Driven by `HealthKitService
+  .startObservingChanges` (HKObserverQuery + hourly background delivery;
+  entitlement `com.apple.developer.healthkit.background-delivery`) started in
+  `CadenceApp`, with a foreground fallback in `ContentView`'s scenePhase
+  handler.
 - **Factor (trigger) logging:** `DailyLog.factors: [String]` holds contextual
   triggers chosen from a fixed list (`LogInputFlow.factorItems`) in the `.factors`
   log step — same hardcoded-list pattern as `basicsCompleted` (no model).
