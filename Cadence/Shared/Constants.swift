@@ -98,6 +98,14 @@ enum PatternThreshold {
     // Smallest average overnight wrist-temperature rise (°C) in the run-up
     // window worth surfacing as a flare precursor.
     static let flareTempDeltaThreshold: Double = 0.3
+    // Smallest average overnight respiratory-rate rise (breaths/min) in the
+    // run-up window worth surfacing as a flare precursor.
+    static let flareRespiratoryDeltaThreshold: Double = 1.0
+
+    // Daylight ↔ mood correlation: minimum days carrying a daylight
+    // measurement before comparing above- vs below-average daylight days
+    // (the mood delta gate reuses moodDiffThreshold).
+    static let minimumDaylightDays: Int = 7
 
     // Canonical window for pattern detection. Every surface (Insights tab,
     // foreground notification check, insight history) computes over this window

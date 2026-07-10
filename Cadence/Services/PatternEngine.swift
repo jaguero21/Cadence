@@ -24,6 +24,7 @@ enum PatternEngine {
         if let card = stressFatiguePattern(logs: sorted) { cards.append(card) }
         if let card = energyTrendDecline(logs: sorted) { cards.append(card) }
         if let card = moodSleepCorrelation(logs: sorted) { cards.append(card) }
+        if let card = daylightMoodCorrelation(logs: sorted) { cards.append(card) }
         cards.append(contentsOf: medicationEffects(medications: medications, logs: sorted))
         cards.append(contentsOf: factorCorrelations(logs: sorted))
         cards.append(contentsOf: trackerCorrelations(trackers: trackers, logs: sorted))
@@ -408,7 +409,53 @@ enum PatternEngine {
                 ))
             }
         }
+
+        // Overnight respiratory rate: same gating and measured-days-only rule
+        // as wrist temperature — breathing rate drifts up before illness.
+        let preResps = preFlareLogs.compactMap(\.hkRespiratoryRate)
+        let baseResps = baselineLogs.compactMap(\.hkRespiratoryRate)
+        if preResps.count >= PatternThreshold.minimumFlaresForPattern,
+           baseResps.count >= PatternThreshold.minimumLogs {
+            let preResp = preResps.reduce(0, +) / Double(preResps.count)
+            let baseResp = baseResps.reduce(0, +) / Double(baseResps.count)
+            if preResp - baseResp >= PatternThreshold.flareRespiratoryDeltaThreshold {
+                cards.append(InsightCard(
+                    key: "flare-respiratory",
+                    title: "Breathing rate tends to rise before your flares",
+                    detail: "In the \(PatternThreshold.flarePrecursorWindowDays) days before a flare, your overnight respiratory rate averaged \(String(format: "%.1f", preResp)) breaths/min versus \(String(format: "%.1f", baseResp)) on typical days.",
+                    icon: "lungs.fill",
+                    color: CadenceColor.stressRed,
+                    confidence: min((preResp - baseResp) / (2 * PatternThreshold.flareRespiratoryDeltaThreshold), 1.0),
+                    category: .symptom
+                ))
+            }
+        }
         return cards
+    }
+
+    // Mirrors moodSleepCorrelation for HealthKit's time-in-daylight: split the
+    // days carrying a measurement at their average daylight and compare mood.
+    // Only the actionable direction surfaces (more daylight → better mood —
+    // "get outside" is advice a user can act on tomorrow). Days without a
+    // daylight measurement are ignored, never treated as zero.
+    private static func daylightMoodCorrelation(logs: [DailyLogSnapshot]) -> InsightCard? {
+        let measured = logs.filter { $0.hkDaylightMinutes != nil }
+        guard measured.count >= PatternThreshold.minimumDaylightDays else { return nil }
+        let avgDaylight = measured.compactMap(\.hkDaylightMinutes).reduce(0, +) / Double(measured.count)
+        let bright = measured.filter { ($0.hkDaylightMinutes ?? 0) > avgDaylight }.map { Double($0.mood) }
+        let dim = measured.filter { ($0.hkDaylightMinutes ?? 0) <= avgDaylight }.map { Double($0.mood) }
+        guard !bright.isEmpty, !dim.isEmpty else { return nil }
+        let diff = bright.reduce(0, +) / Double(bright.count) - dim.reduce(0, +) / Double(dim.count)
+        guard diff > PatternThreshold.moodDiffThreshold else { return nil }
+        return InsightCard(
+            key: "daylight-mood",
+            title: "More daylight correlates with better mood",
+            detail: "On days with above-average time in daylight, your mood is \(String(format: "%.1f", diff)) points higher on average.",
+            icon: "sun.max.fill",
+            color: CadenceColor.energyOrange,
+            confidence: min(diff / PatternThreshold.confidenceScale, 1.0),
+            category: .mood
+        )
     }
 
     private static func moodSleepCorrelation(logs: [DailyLogSnapshot]) -> InsightCard? {
