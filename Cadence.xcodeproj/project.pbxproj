@@ -234,6 +234,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		25762D2B2FEDDF5500A132C8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 25762D642FEDDF5200A132C8 /* CadenceWidget Watch App */;
+		};
 		25762D2A2FEDD6A100A132C8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -246,7 +253,7 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2523F5F22FFEEB0F00F3F0A5 /* CadenceUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CadenceUITests; sourceTree = "<group>"; };
 		25762D1A2FEDD6A000A132C8 /* CadenceWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (25762D2A2FEDD6A100A132C8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = CadenceWidget; sourceTree = "<group>"; };
-		25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "CadenceWidget Watch App"; sourceTree = "<group>"; };
+		25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (25762D2B2FEDDF5500A132C8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "CadenceWidget Watch App"; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1009,6 +1016,7 @@
 				ENABLE_PREVIEWS = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "CadenceWidget Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = CadenceWidget;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.carpecadence.app;
@@ -1048,6 +1056,7 @@
 				ENABLE_PREVIEWS = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "CadenceWidget Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = CadenceWidget;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.carpecadence.app;
