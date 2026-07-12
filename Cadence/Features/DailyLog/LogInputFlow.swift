@@ -205,6 +205,10 @@ struct LogInputFlow: View {
                     } label: {
                         Text(moodEmoji(value))
                             .font(.system(size: 34))
+                            // The chosen face leans in; scaleEffect doesn't
+                            // affect layout, so the row never reflows.
+                            .scaleEffect(mood == value ? 1.22 : 1.0)
+                            .animation(CadenceAnimation.spring, value: mood)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .background(
@@ -315,6 +319,7 @@ struct LogInputFlow: View {
                             Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
                                 .foregroundStyle(selected ? CadenceColor.successGreen : .secondary)
                                 .frame(width: 20)
+                                .contentTransition(.symbolEffect(.replace))
                             Text(item.name)
                                 .font(.subheadline)
                                 .foregroundStyle(selected ? CadenceColor.successGreen : .primary)
@@ -385,6 +390,7 @@ struct LogInputFlow: View {
                             Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
                                 .foregroundStyle(selected ? CadenceColor.stressRed : .secondary)
                                 .frame(width: 20)
+                                .contentTransition(.symbolEffect(.replace))
                             Text(item.name)
                                 .font(.subheadline)
                                 .foregroundStyle(selected ? CadenceColor.stressRed : .primary)
