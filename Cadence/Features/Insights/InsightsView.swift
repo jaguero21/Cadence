@@ -93,19 +93,45 @@ struct InsightsView: View {
         }
     }
 
+    @ViewBuilder
     private var chartsSection: some View {
         let filtered = filteredLogs
         let previous = previousLogs
-        return VStack(spacing: 16) {
-            ForEach(ChartMetric.allCases, id: \.self) { metric in
-                TrendChartView(logs: filtered, series: metric.series, range: vm.chartRange, previousLogs: previous)
-            }
-            // Custom trackers chart with the same average/comparison treatment;
-            // days without an entry are skipped, not drawn as zero.
-            ForEach(customTrackers) { tracker in
-                TrendChartView(logs: filtered, series: .custom(tracker), range: vm.chartRange, previousLogs: previous)
+        if filtered.isEmpty {
+            // One friendly card instead of a wall of per-chart "No entries"
+            // cards when the selected range has no logs at all. The per-chart
+            // message still handles the mixed case (logs exist, but a custom
+            // tracker wasn't recorded).
+            chartsEmptyState
+        } else {
+            VStack(spacing: 16) {
+                ForEach(ChartMetric.allCases, id: \.self) { metric in
+                    TrendChartView(logs: filtered, series: metric.series, range: vm.chartRange, previousLogs: previous)
+                }
+                // Custom trackers chart with the same average/comparison treatment;
+                // days without an entry are skipped, not drawn as zero.
+                ForEach(customTrackers) { tracker in
+                    TrendChartView(logs: filtered, series: .custom(tracker), range: vm.chartRange, previousLogs: previous)
+                }
             }
         }
+    }
+
+    private var chartsEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(size: 40))
+                .foregroundStyle(.tertiary)
+            Text("Nothing logged in the last \(vm.chartRange.days) days")
+                .font(.subheadline.weight(.medium))
+            Text("Complete a few daily logs and your trends will appear here — mood, energy, sleep, and more.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .cadenceCard()
     }
 
     private var filteredLogs: [DailyLog] {
