@@ -64,13 +64,13 @@ final class CadenceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Severity: 5"].waitForExistence(timeout: 5),
                       "Holding a symptom chip should reveal the severity slider")
 
-        for _ in 0..<4 {   // symptoms → factors → peaksAndValleys → intentions → note
+        for _ in 0..<2 {   // symptoms → factors → reflection
             XCTAssertTrue(next.waitForExistence(timeout: 15))
             next.tap()
         }
 
         let finish = app.buttons["Finish"]
-        XCTAssertTrue(finish.waitForExistence(timeout: 15), "Note step should offer Finish")
+        XCTAssertTrue(finish.waitForExistence(timeout: 15), "Reflection step should offer Finish")
         finish.tap()
 
         // Done step confirms the save, then close the sheet.

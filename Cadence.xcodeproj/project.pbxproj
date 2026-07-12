@@ -70,7 +70,6 @@
 		AABBCCDD0000000000000215 /* CheckInIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000115 /* CheckInIntents.swift */; };
 		AABBCCDD0000000000000216 /* QuickLogIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000116 /* QuickLogIntent.swift */; };
 		AABBCCDD0000000000000217 /* MoodScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000111 /* MoodScale.swift */; };
-		AABBCCDD0000000000000218 /* VoiceMemoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000117 /* VoiceMemoRow.swift */; };
 		AABBCCDD0000000000000219 /* SymptomLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000118 /* SymptomLibraryView.swift */; };
 		B52AE232D80E6360C8C86490 /* SymptomPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5792500A97EE8C382CEFDD9 /* SymptomPickerView.swift */; };
 		B6B76E4EF6D92F7B5179ADC8 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680C40C33549B696DF6BA3A5 /* WeeklyReviewView.swift */; };
@@ -211,7 +210,6 @@
 		AABBCCDD0000000000000114 /* SyncBackupSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyncBackupSection.swift; path = ./Cadence/Features/Settings/SyncBackupSection.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000115 /* CheckInIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CheckInIntents.swift; path = ./Cadence/App/CheckInIntents.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000116 /* QuickLogIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = QuickLogIntent.swift; path = ./CadenceWidget/QuickLogIntent.swift; sourceTree = "<absolute>"; };
-		AABBCCDD0000000000000117 /* VoiceMemoRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VoiceMemoRow.swift; path = ./Cadence/Shared/Components/VoiceMemoRow.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000118 /* SymptomLibraryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SymptomLibraryView.swift; path = ./Cadence/Features/Settings/SymptomLibraryView.swift; sourceTree = "<absolute>"; };
 		ABD3C5951CAE74F5C1693742 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ADCC6B77E8E1D5DB3D6A5BDA /* HealthKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
@@ -479,7 +477,6 @@
 				E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */,
 				AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */,
 				AABBCCDD0000000000000111 /* MoodScale.swift */,
-				AABBCCDD0000000000000117 /* VoiceMemoRow.swift */,
 				0D51242137B1F8597625745E /* View+Extensions.swift */,
 			);
 			name = Shared;
@@ -788,7 +785,6 @@
 				3A33703C608D9B41673CD755 /* MetricSlider.swift in Sources */,
 				AABBCCDD0000000000000210 /* AttachmentPhotoStrip.swift in Sources */,
 				AABBCCDD0000000000000211 /* MoodScale.swift in Sources */,
-				AABBCCDD0000000000000218 /* VoiceMemoRow.swift in Sources */,
 				AABBCCDD0000000000000219 /* SymptomLibraryView.swift in Sources */,
 				20230AD97F5885D21E64CA05 /* View+Extensions.swift in Sources */,
 				F5A197BE0882ED0B9566160F /* DashboardView.swift in Sources */,
