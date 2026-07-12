@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 import WidgetKit
+import TipKit
 import OSLog
 
 
@@ -85,6 +86,10 @@ struct CadenceApp: App {
                 .task {
                     PhoneConnectivityManager.shared.start(container: container)
                     guard !AppLaunch.isUITesting else { return }
+                    // Discoverability tips (hold-to-rate, step jumping). Not
+                    // configured under UI tests — an unexpected tip popover
+                    // could block the smoke test's taps.
+                    try? Tips.configure()
                     // Keep today's log's HealthKit numbers fresh (end-of-day
                     // steps, morning sleep) even when the log flow isn't
                     // opened again; wakes the app when suspended via HK
