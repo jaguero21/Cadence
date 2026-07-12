@@ -25,17 +25,22 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   same insight) and into trend charts via `ChartSeries.custom` (days without an
   entry are skipped, never drawn as zero; the comparison badge is neutral
   because a custom tracker's desirable direction is unknowable).
-- **Peaks & Valleys / Intentions for Tomorrow:** closing reflection steps
-  positioned right before each flow's final step. The **daily log** has both:
+- **Peaks & Valleys / Intentions for Tomorrow:** closing reflections. In the
+  **daily log** they live (with the one-line note + attachments) on a single
+  combined `.reflection` step — three consecutive text pages made the daily
+  flow feel long; the fields stayed separate:
   `peaksAndValleysNote: String` + `peaksAndValleysVoiceMemo: Attachment?` +
   `intentionsForTomorrow: String` on `DailyLog`. The **weekly review** has
   only Intentions (`intentionsForTomorrow` on `WeeklyReview`) — a weekly
   Peaks & Valleys step shipped briefly and was removed after real use; don't
   reintroduce it. These are dedicated fields, not the generic `PromptResponse`
-  system (text-only, and Peaks & Valleys needs voice-memo support). The single
-  optional voice memo is recorded via the shared `VoiceMemoRow` component
-  (`Cadence/Shared/Components/VoiceMemoRow.swift`), distinct from the note
-  step's multi-attachment list — exactly one memo, replaced/deleted in place.
+  system (text-only). Every reflection card carries the same photo/voice
+  controls (`AttachmentControls` in `LogInputFlow`): attachments live in the
+  one `DailyLog.attachments` array, tagged with `Attachment.section`
+  (`peaksAndValleys` / `intentions` / nil = the note card, which also shows
+  pre-tagging attachments). The legacy single-slot `peaksAndValleysVoiceMemo`
+  field migrates into the pool on hydrate and is cleared on the next save;
+  `DailyLogSnapshot.hasPeaksAndValleysVoiceMemo` checks both.
   `LogInputFlow` stages these like every other field (local `@State`, applied
   to the model at save time); `ReviewFlowView` binds directly to the `@Model`
   (`$review.intentionsForTomorrow`, matching how `overallRating` is already
