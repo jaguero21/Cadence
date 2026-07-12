@@ -23,7 +23,27 @@ struct OnboardingView: View {
                 removal:   .move(edge: .leading).combined(with: .opacity)
             ))
             .id(step)
+
+            VStack {
+                Spacer()
+                pageDots
+                    .padding(.bottom, 12)
+            }
         }
+    }
+
+    // Four dots so the length of onboarding is never a mystery.
+    private var pageDots: some View {
+        HStack(spacing: 8) {
+            ForEach(Array(OnboardingStep.allCases.enumerated()), id: \.offset) { index, page in
+                Capsule()
+                    .fill(page == step ? CadenceColor.accent : Color(.systemFill))
+                    .frame(width: page == step ? 22 : 8, height: 8)
+                    .animation(CadenceAnimation.spring, value: step)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \((OnboardingStep.allCases.firstIndex(of: step) ?? 0) + 1) of \(OnboardingStep.allCases.count)")
     }
 
     private func advance() {
@@ -49,6 +69,7 @@ struct OnboardingView: View {
             iconColor: CadenceColor.moodBlue,
             title: "Stay consistent",
             message: "A gentle reminder at the right time keeps your streak alive. You choose when — and you can always change it in Settings.",
+            isBusy: isRequestingPermission,
             primaryLabel: "Enable Reminders",
             primaryAction: {
                 isRequestingPermission = true
@@ -77,7 +98,8 @@ struct OnboardingView: View {
             icon: "heart.text.square.fill",
             iconColor: CadenceColor.stressRed,
             title: "Less typing, more insight",
-            message: "Connect Apple Health to auto-fill your sleep, heart rate, and step count — so logging is faster and patterns emerge sooner.",
+            message: "Connect Apple Health to auto-fill sleep, activity, cycle data and more — and keep your logged symptoms and mood in your health record. You'll choose exactly what to share, and everything still works without it.",
+            isBusy: isRequestingPermission,
             primaryLabel: "Connect Apple Health",
             primaryAction: {
                 isRequestingPermission = true
@@ -123,9 +145,12 @@ private struct OnboardingPage: View {
     let iconColor: Color
     let title: String
     let message: String
+    var isBusy: Bool = false
     let primaryLabel: String
     let primaryAction: () -> Void
     var skipAction: (() -> Void)? = nil
+
+    @State private var iconAppeared = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -135,6 +160,8 @@ private struct OnboardingPage: View {
                 Image(systemName: icon)
                     .font(.system(size: 80))
                     .foregroundStyle(iconColor)
+                    .symbolEffect(.bounce, value: iconAppeared)
+                    .onAppear { iconAppeared = true }
 
                 VStack(spacing: 12) {
                     Text(title)
@@ -152,11 +179,21 @@ private struct OnboardingPage: View {
             Spacer()
 
             VStack(spacing: 14) {
-                Button(primaryLabel, action: primaryAction)
-                    .buttonStyle(.borderedProminent)
-                    .tint(CadenceColor.accent)
-                    .controlSize(.large)
+                Button {
+                    primaryAction()
+                } label: {
+                    HStack(spacing: 8) {
+                        if isBusy {
+                            ProgressView()
+                                .tint(.white)
+                        }
+                        Text(primaryLabel)
+                    }
                     .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(CadenceColor.accent)
+                .controlSize(.large)
 
                 if let skipAction {
                     Button("Skip", action: skipAction)
