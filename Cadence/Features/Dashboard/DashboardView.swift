@@ -86,9 +86,21 @@ struct DashboardView: View {
                     Circle()
                         .fill(vm.todayLog?.isComplete == true ? CadenceColor.successGreen : CadenceColor.moodBlue)
                         .frame(width: 52, height: 52)
-                    Image(systemName: vm.todayLog?.isComplete == true ? "checkmark" : "pencil")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white)
+                    // An in-progress log with a chosen mood shows that mood —
+                    // a glanceable "here's how today feels so far" instead of
+                    // a generic pencil.
+                    if vm.todayLog?.isComplete == true {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white)
+                    } else if let log = vm.todayLog, log.didEditMood {
+                        Text(MoodScale.emoji(for: log.mood))
+                            .font(.system(size: 26))
+                    } else {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
                 }
                 .accessibilityHidden(true)
 
@@ -133,6 +145,7 @@ struct DashboardView: View {
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white)
                 }
+                .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Weekly Review")
@@ -145,10 +158,14 @@ struct DashboardView: View {
                 Spacer()
                 Image(systemName: "chevron.right")
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
             .cadenceCard()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(vm.thisWeekReview?.isComplete == true
+            ? "Weekly Review, completed this week"
+            : "Weekly Review, ready to review")
         .sheet(isPresented: $showingWeeklyReview) {
             ReviewFlowView(existingReview: vm.thisWeekReview, logs: logs)
         }
@@ -163,7 +180,10 @@ struct DashboardView: View {
                     .font(.title2)
                     .foregroundStyle(.yellow)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("New Insight")
+                    // "Top Pattern", not "New Insight" — cards are ranked by
+                    // confidence, and this one may be weeks old. Don't claim
+                    // novelty the data doesn't have.
+                    Text("Top Pattern")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Text(insight.title)
@@ -186,26 +206,31 @@ struct DashboardView: View {
         if count > 0 {
             let avgMood   = Int((Double(recent.map(\.mood).reduce(0, +)) / count).rounded())
             let avgEnergy = Int((Double(recent.map(\.energy).reduce(0, +)) / count).rounded())
+            let avgSleep  = recent.map(\.sleepHours).reduce(0, +) / count
             VStack(alignment: .leading, spacing: 12) {
                 Text("7-Day Snapshot")
                     .font(.headline)
-                HStack(spacing: 12) {
-                    statPill(label: "Mood", value: avgMood, color: CadenceColor.moodBlue)
-                    statPill(label: "Energy", value: avgEnergy, color: CadenceColor.energyOrange)
-                    statPill(label: "Logs", value: recent.count, color: CadenceColor.successGreen, suffix: "/ 7")
+                HStack(spacing: 10) {
+                    statPill(label: "Mood", value: "\(avgMood)", color: CadenceColor.moodBlue, suffix: "/ 5")
+                    statPill(label: "Energy", value: "\(avgEnergy)", color: CadenceColor.energyOrange)
+                    statPill(label: "Sleep", value: String(format: "%.1f", avgSleep), color: CadenceColor.sleepPurple, suffix: "hrs")
+                    statPill(label: "Logs", value: "\(recent.count)", color: CadenceColor.successGreen, suffix: "/ 7")
                 }
             }
         }
     }
 
-    private func statPill(label: String, value: Int, color: Color, suffix: String = "/ 10") -> some View {
+    private func statPill(label: String, value: String, color: Color, suffix: String = "/ 10") -> some View {
         VStack(spacing: 6) {
-            Text("\(value)")
-                .font(.title2.bold())
-                .foregroundStyle(color)
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title2.bold())
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxHeight: .infinity)
             Text(suffix)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
@@ -213,6 +238,8 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(CadenceColor.cardBG, in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label): \(value) \(suffix)")
     }
 
     private var emptyState: some View {
