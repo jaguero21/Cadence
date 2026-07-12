@@ -1,5 +1,14 @@
 import SwiftUI
 import SwiftData
+import TipKit
+
+// One-time discoverability for the hidden hold gesture; invalidated the
+// first time a severity slider is actually opened.
+private struct RateSeverityTip: Tip {
+    var title: Text { Text("Rate how bad it is") }
+    var message: Text? { Text("Touch and hold a selected symptom to rate its severity from 1\u{2013}10.") }
+    var image: Image? { Image(systemName: "hand.tap.fill") }
+}
 
 struct SymptomPickerView: View {
     @Binding var selectedSymptoms: [SymptomEntry]
@@ -16,6 +25,8 @@ struct SymptomPickerView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
+            TipView(RateSeverityTip())
+
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(allTags) { tag in
                     symptomChip(name: tag.name, emoji: tag.emoji)
@@ -31,6 +42,8 @@ struct SymptomPickerView: View {
                 addChip
             }
         }
+        .sensoryFeedback(.impact(weight: .medium), trigger: selectedSymptoms.count)
+        .sensoryFeedback(.impact(weight: .heavy), trigger: expandedTag)
     }
 
     private var unlistedSelections: [SymptomEntry] {
@@ -66,7 +79,6 @@ struct SymptomPickerView: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
             .onTapGesture {
                 toggleSymptom(name: name, emoji: emoji)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             }
             .onLongPressGesture(minimumDuration: 0.4) {
                 expandSeverity(name: name, emoji: emoji)
@@ -135,7 +147,7 @@ struct SymptomPickerView: View {
         withAnimation(CadenceAnimation.spring) {
             expandedTag = expandedTag == name ? nil : name
         }
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        RateSeverityTip().invalidate(reason: .actionPerformed)
     }
 
     private func toggleSymptom(name: String, emoji: String) {
