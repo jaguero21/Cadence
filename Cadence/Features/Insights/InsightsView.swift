@@ -130,19 +130,13 @@ struct InsightsView: View {
     }
 
     private var chartsEmptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 40))
-                .foregroundStyle(.tertiary)
-            Text("Nothing logged in the last \(vm.chartRange.days) days")
-                .font(.subheadline.weight(.medium))
+        // System empty-state component (matches History, Flares, Medications…)
+        // rather than a hand-rolled card.
+        ContentUnavailableView {
+            Label("Nothing logged in the last \(vm.chartRange.days) days", systemImage: "chart.line.uptrend.xyaxis")
+        } description: {
             Text("Complete a few daily logs and your trends will appear here — mood, energy, sleep, and more.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
         .cadenceCard()
     }
 

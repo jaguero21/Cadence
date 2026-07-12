@@ -18,7 +18,11 @@ struct ReviewFlowView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                CadenceColor.background.ignoresSafeArea()
+                if vm.isComplete {
+                    AmbientMeshBackground()
+                } else {
+                    CadenceColor.background.ignoresSafeArea()
+                }
 
                 if vm.isComplete {
                     completionView
@@ -164,7 +168,7 @@ struct ReviewFlowView: View {
                 .background(CadenceColor.sleepPurple, in: Capsule())
                 .foregroundStyle(.white)
             }
-            .hapticFeedback(.medium)
+            .sensoryFeedback(.impact(weight: .medium), trigger: vm.currentFlatIndex)
         }
         .padding()
         .background(.bar)

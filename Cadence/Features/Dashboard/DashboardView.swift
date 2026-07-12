@@ -39,7 +39,7 @@ struct DashboardView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 32)
             }
-            .background(CadenceColor.background)
+            .background(AmbientMeshBackground())
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
