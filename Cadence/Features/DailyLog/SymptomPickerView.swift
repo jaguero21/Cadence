@@ -51,6 +51,8 @@ struct SymptomPickerView: View {
             VStack(spacing: 6) {
                 Text(emoji)
                     .font(.title2)
+                    .scaleEffect(isSelected ? 1.18 : 1.0)
+                    .animation(CadenceAnimation.spring, value: isSelected)
                 Text(name)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(isSelected ? .white : .primary)
