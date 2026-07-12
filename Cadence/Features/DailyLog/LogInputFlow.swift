@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import TipKit
 import OSLog
 
 struct LogInputFlow: View {
@@ -75,13 +76,27 @@ struct LogInputFlow: View {
                     }
                     .padding()
                 }
-                .background(CadenceColor.background)
+                .background {
+                    // The completion screen earns the ambient celebration
+                    // backdrop; input steps keep the calm flat background.
+                    if vm.currentStep == .done {
+                        AmbientMeshBackground()
+                    } else {
+                        CadenceColor.background
+                    }
+                }
                 .transition(.asymmetric(
                     insertion: .move(edge: .trailing).combined(with: .opacity),
                     removal:   .move(edge: .leading).combined(with: .opacity)
                 ))
                 .id(vm.currentStep)
                 .safeAreaInset(edge: .bottom) { navigationButtons }
+                // Declarative haptics: one tick per meaningful state change,
+                // regardless of which control caused it (chip, button, jump).
+                .sensoryFeedback(.impact(weight: .light), trigger: vm.currentStep)
+                .sensoryFeedback(.impact(weight: .medium), trigger: mood)
+                .sensoryFeedback(.impact(weight: .light), trigger: basicsCompleted)
+                .sensoryFeedback(.impact(weight: .light), trigger: selectedFactors)
             }
             .background(CadenceColor.background.ignoresSafeArea())
             .navigationTitle(vm.currentStep.title)
@@ -161,7 +176,7 @@ struct LogInputFlow: View {
                 let isCurrent = step == vm.currentStep
                 Button {
                     vm.goTo(step)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    JumpStepsTip().invalidate(reason: .actionPerformed)
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: step.icon)
@@ -189,6 +204,7 @@ struct LogInputFlow: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
         .background(.bar)
+        .popoverTip(JumpStepsTip())
     }
 
     // MARK: - Mood Step
@@ -201,7 +217,6 @@ struct LogInputFlow: View {
                     Button {
                         withAnimation(CadenceAnimation.spring) { mood = value }
                         didEditMood = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         Text(moodEmoji(value))
                             .font(.system(size: 34))
@@ -313,7 +328,6 @@ struct LogInputFlow: View {
                                 basicsCompleted.append(item.name)
                             }
                         }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
@@ -384,7 +398,6 @@ struct LogInputFlow: View {
                                 selectedFactors.append(item.name)
                             }
                         }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
@@ -772,6 +785,14 @@ struct LogInputFlow: View {
     }
 }
 
+// One-time discoverability for the step bar (TipKit handles show-once
+// persistence; invalidated the first time the user actually jumps).
+private struct JumpStepsTip: Tip {
+    var title: Text { Text("Jump to any step") }
+    var message: Text? { Text("Tap an icon to go straight to that part of the log.") }
+    var image: Image? { Image(systemName: "hand.tap.fill") }
+}
+
 // MARK: - Subviews
 
 // One attachment row per reflection card: add a photo or record a voice memo,
@@ -894,16 +915,14 @@ private struct SleepHoursRow: View {
                     get: { hours },
                     set: { newVal in
                         let snapped = (newVal * 2).rounded() / 2
-                        if snapped != hours {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            hours = snapped
-                        }
+                        if snapped != hours { hours = snapped }
                     }
                 ),
                 in: 0...12,
                 step: 0.5
             )
             .tint(CadenceColor.sleepPurple)
+            .sensoryFeedback(.impact(weight: .light), trigger: hours)
             .accessibilityLabel("Sleep hours")
             .accessibilityValue(String(format: "%.1f hours", hours))
             Text(String(format: "%.1f", hours))
@@ -932,16 +951,14 @@ private struct CustomMetricRow: View {
                     get: { Double(value) },
                     set: { newVal in
                         let rounded = Int(newVal.rounded())
-                        if rounded != value {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            value = rounded
-                        }
+                        if rounded != value { value = rounded }
                     }
                 ),
                 in: Double(range.lowerBound)...Double(range.upperBound),
                 step: 1
             )
             .tint(Color(.systemGray3))
+            .sensoryFeedback(.impact(weight: .light), trigger: value)
             .accessibilityLabel(label)
             .accessibilityValue(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
             Text(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
@@ -967,16 +984,14 @@ private struct BodyMetricRow: View {
                     get: { Double(value) },
                     set: { newVal in
                         let rounded = Int(newVal.rounded())
-                        if rounded != value {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            value = rounded
-                        }
+                        if rounded != value { value = rounded }
                     }
                 ),
                 in: 0...10,
                 step: 1
             )
             .tint(Color(.systemGray3))
+            .sensoryFeedback(.impact(weight: .light), trigger: value)
             .accessibilityLabel(label)
             .accessibilityValue("\(value) out of 10")
             Text("\(value)")
