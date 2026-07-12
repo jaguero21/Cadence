@@ -298,6 +298,23 @@ struct AttachmentStoreTests {
 @Suite("TrendChart – comparison helpers")
 struct ChartComparisonTests {
 
+    @Test("nearestPoint snaps a scrub position to the closest plotted day")
+    func nearestPoint_snapsToClosest() {
+        let cal = Calendar.current
+        let d0 = cal.startOfDay(for: .now)
+        let d3 = cal.date(byAdding: .day, value: -3, to: d0)!
+        let d7 = cal.date(byAdding: .day, value: -7, to: d0)!
+        let points = [(date: d7, value: 2.0), (date: d3, value: 5.0), (date: d0, value: 8.0)]
+
+        // A position between d3 and d0 but nearer d3 picks d3.
+        let nearD3 = cal.date(byAdding: .day, value: -2, to: d0)!
+        #expect(TrendChartView.nearestPoint(to: nearD3, in: points)?.value == 5.0)
+        // Exact hit.
+        #expect(TrendChartView.nearestPoint(to: d7, in: points)?.value == 2.0)
+        // Empty points -> nil.
+        #expect(TrendChartView.nearestPoint(to: d0, in: []) == nil)
+    }
+
     @Test("mean returns nil for empty and the average otherwise")
     func mean_emptyAndNonEmpty() {
         #expect(TrendChartView.mean([]) == nil)

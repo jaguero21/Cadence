@@ -7,6 +7,8 @@ struct InsightsView: View {
     @Query(sort: \Flare.startDate, order: .reverse) private var flares: [Flare]
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
     @State private var vm = InsightsViewModel()
+    // Day opened by scrubbing a chart and tapping "View day".
+    @State private var detailLog: DailyLog?
 
     // referenceDate anchors the query window so it refreshes in place at a
     // midnight rollover rather than via a full view rebuild. The cutoff is 2×
@@ -51,6 +53,9 @@ struct InsightsView: View {
                     }
                 }
             }
+            .sheet(item: $detailLog) { log in
+                LogDetailView(log: log)
+            }
             .onAppear { refreshAndRecord() }
             .onChange(of: logs) { _, _ in refreshAndRecord() }
             .onChange(of: medications) { _, _ in refreshAndRecord() }
@@ -65,6 +70,11 @@ struct InsightsView: View {
     private var insightLogs: [DailyLog] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -PatternThreshold.insightWindowDays, to: .now) ?? .distantPast
         return logs.filter { $0.date >= cutoff }
+    }
+
+    private func openDay(_ date: Date) {
+        let day = Calendar.current.startOfDay(for: date)
+        detailLog = logs.first { Calendar.current.startOfDay(for: $0.date) == day }
     }
 
     private func refreshAndRecord() {
@@ -106,12 +116,14 @@ struct InsightsView: View {
         } else {
             VStack(spacing: 16) {
                 ForEach(ChartMetric.allCases, id: \.self) { metric in
-                    TrendChartView(logs: filtered, series: metric.series, range: vm.chartRange, previousLogs: previous)
+                    TrendChartView(logs: filtered, series: metric.series, range: vm.chartRange,
+                                   previousLogs: previous, onOpenDay: openDay)
                 }
                 // Custom trackers chart with the same average/comparison treatment;
                 // days without an entry are skipped, not drawn as zero.
                 ForEach(customTrackers) { tracker in
-                    TrendChartView(logs: filtered, series: .custom(tracker), range: vm.chartRange, previousLogs: previous)
+                    TrendChartView(logs: filtered, series: .custom(tracker), range: vm.chartRange,
+                                   previousLogs: previous, onOpenDay: openDay)
                 }
             }
         }
