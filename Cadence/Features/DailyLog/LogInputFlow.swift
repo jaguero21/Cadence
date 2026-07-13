@@ -76,21 +76,18 @@ struct LogInputFlow: View {
                     }
                     .padding()
                 }
-                .background {
-                    // The completion screen earns the ambient celebration
-                    // backdrop; input steps keep the calm flat background.
-                    if vm.currentStep == .done {
-                        AmbientMeshBackground()
-                    } else {
-                        CadenceColor.background
-                    }
-                }
                 .transition(.asymmetric(
                     insertion: .move(edge: .trailing).combined(with: .opacity),
                     removal:   .move(edge: .leading).combined(with: .opacity)
                 ))
                 .id(vm.currentStep)
-                .safeAreaInset(edge: .bottom) { navigationButtons }
+                .safeAreaInset(edge: .bottom) {
+                    // No bar at all on the completion screen — an empty glass
+                    // strip reads as a stray box.
+                    if vm.currentStep != .done {
+                        navigationButtons
+                    }
+                }
                 // Declarative haptics: one tick per meaningful state change,
                 // regardless of which control caused it (chip, button, jump).
                 .sensoryFeedback(.impact(weight: .light), trigger: vm.currentStep)
@@ -98,7 +95,6 @@ struct LogInputFlow: View {
                 .sensoryFeedback(.impact(weight: .light), trigger: basicsCompleted)
                 .sensoryFeedback(.impact(weight: .light), trigger: selectedFactors)
             }
-            .background(CadenceColor.background.ignoresSafeArea())
             .navigationTitle(vm.currentStep.title)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
@@ -162,6 +158,16 @@ struct LogInputFlow: View {
                 }
             }
         }
+        // Paint the SHEET surface, not the content: on iOS 26 sheet content is
+        // inset from the sheet edges, so a content .background leaves side
+        // strips — presentationBackground is the layer that actually fills.
+        .presentationBackground {
+            if vm.currentStep == .done {
+                AmbientMeshBackground()
+            } else {
+                CadenceColor.background
+            }
+        }
     }
 
     // MARK: - Step Indicator
@@ -203,7 +209,7 @@ struct LogInputFlow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .background(.bar)
+        .glassBarBackground()
         .popoverTip(JumpStepsTip())
     }
 
@@ -633,7 +639,6 @@ struct LogInputFlow: View {
             }
         }
         .padding()
-        .background(.bar)
     }
 
     // MARK: - Helpers
