@@ -275,9 +275,17 @@ enum PDFBuilder {
         }
 
         y += 16
-        breakIfNeeded(y: &y, needing: 44, ctx: ctx)
+        breakIfNeeded(y: &y, needing: 64, ctx: ctx)
         "Pattern Insights".draw(in: CGRect(x: 40, y: y, width: 515, height: 20), withAttributes: sectionAttrs)
-        y += 24
+        y += 22
+        let captionAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 10),
+            .foregroundColor: UIColor.gray,
+        ]
+        let disclaimer = "Observations from the patient's own daily logs, for awareness — not a diagnosis."
+        let disclaimerH = textHeight(disclaimer, attrs: captionAttrs, width: 515)
+        disclaimer.draw(in: CGRect(x: 40, y: y, width: 515, height: disclaimerH), withAttributes: captionAttrs)
+        y += disclaimerH + 8
         if insights.isEmpty {
             let line = "No patterns detected from the current log set."
             let h = textHeight(line, attrs: bodyAttrs, width: 505)

@@ -137,7 +137,10 @@ struct DailyLogSnapshot: Sendable {
         didEditMetrics = log.didEditMetrics
         didEditMood    = log.didEditMood
         peaksAndValleysNote = log.peaksAndValleysNote
+        // Voice memos live in the sectioned attachments pool now; the legacy
+        // single-slot field still counts for logs saved before the migration.
         hasPeaksAndValleysVoiceMemo = log.peaksAndValleysVoiceMemo != nil
+            || log.attachments.contains { $0.section == Attachment.peaksAndValleysSection && $0.kind == .audio }
         intentionsForTomorrow = log.intentionsForTomorrow
         freeNote       = log.freeNote
         hkSteps        = log.hkSteps

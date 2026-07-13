@@ -7,6 +7,8 @@ struct InsightsView: View {
     @Query(sort: \Flare.startDate, order: .reverse) private var flares: [Flare]
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
     @State private var vm = InsightsViewModel()
+    // Day opened by scrubbing a chart and tapping "View day".
+    @State private var detailLog: DailyLog?
 
     // referenceDate anchors the query window so it refreshes in place at a
     // midnight rollover rather than via a full view rebuild. The cutoff is 2×
@@ -51,6 +53,9 @@ struct InsightsView: View {
                     }
                 }
             }
+            .sheet(item: $detailLog) { log in
+                LogDetailView(log: log)
+            }
             .onAppear { refreshAndRecord() }
             .onChange(of: logs) { _, _ in refreshAndRecord() }
             .onChange(of: medications) { _, _ in refreshAndRecord() }
@@ -65,6 +70,11 @@ struct InsightsView: View {
     private var insightLogs: [DailyLog] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -PatternThreshold.insightWindowDays, to: .now) ?? .distantPast
         return logs.filter { $0.date >= cutoff }
+    }
+
+    private func openDay(_ date: Date) {
+        let day = Calendar.current.startOfDay(for: date)
+        detailLog = logs.first { Calendar.current.startOfDay(for: $0.date) == day }
     }
 
     private func refreshAndRecord() {
@@ -93,19 +103,41 @@ struct InsightsView: View {
         }
     }
 
+    @ViewBuilder
     private var chartsSection: some View {
         let filtered = filteredLogs
         let previous = previousLogs
-        return VStack(spacing: 16) {
-            ForEach(ChartMetric.allCases, id: \.self) { metric in
-                TrendChartView(logs: filtered, series: metric.series, range: vm.chartRange, previousLogs: previous)
-            }
-            // Custom trackers chart with the same average/comparison treatment;
-            // days without an entry are skipped, not drawn as zero.
-            ForEach(customTrackers) { tracker in
-                TrendChartView(logs: filtered, series: .custom(tracker), range: vm.chartRange, previousLogs: previous)
+        if filtered.isEmpty {
+            // One friendly card instead of a wall of per-chart "No entries"
+            // cards when the selected range has no logs at all. The per-chart
+            // message still handles the mixed case (logs exist, but a custom
+            // tracker wasn't recorded).
+            chartsEmptyState
+        } else {
+            VStack(spacing: 16) {
+                ForEach(ChartMetric.allCases, id: \.self) { metric in
+                    TrendChartView(logs: filtered, series: metric.series, range: vm.chartRange,
+                                   previousLogs: previous, onOpenDay: openDay)
+                }
+                // Custom trackers chart with the same average/comparison treatment;
+                // days without an entry are skipped, not drawn as zero.
+                ForEach(customTrackers) { tracker in
+                    TrendChartView(logs: filtered, series: .custom(tracker), range: vm.chartRange,
+                                   previousLogs: previous, onOpenDay: openDay)
+                }
             }
         }
+    }
+
+    private var chartsEmptyState: some View {
+        // System empty-state component (matches History, Flares, Medications…)
+        // rather than a hand-rolled card.
+        ContentUnavailableView {
+            Label("Nothing logged in the last \(vm.chartRange.days) days", systemImage: "chart.line.uptrend.xyaxis")
+        } description: {
+            Text("Complete a few daily logs and your trends will appear here — mood, energy, sleep, and more.")
+        }
+        .cadenceCard()
     }
 
     private var filteredLogs: [DailyLog] {
@@ -134,6 +166,10 @@ struct InsightsView: View {
                 ForEach(vm.insights) { insight in
                     CorrelationCardView(insight: insight)
                 }
+                Text("These are observations from your own logs, shown to build awareness of how you feel day to day — not medical advice or a diagnosis.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 4)
             }
         }
     }

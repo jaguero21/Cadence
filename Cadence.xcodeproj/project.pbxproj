@@ -70,7 +70,9 @@
 		AABBCCDD0000000000000215 /* CheckInIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000115 /* CheckInIntents.swift */; };
 		AABBCCDD0000000000000216 /* QuickLogIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000116 /* QuickLogIntent.swift */; };
 		AABBCCDD0000000000000217 /* MoodScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000111 /* MoodScale.swift */; };
-		AABBCCDD0000000000000218 /* VoiceMemoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000117 /* VoiceMemoRow.swift */; };
+		AABBCCDD0000000000000219 /* SymptomLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000118 /* SymptomLibraryView.swift */; };
+		AABBCCDD000000000000021A /* AmbientMeshBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000119 /* AmbientMeshBackground.swift */; };
+		AABBCCDD000000000000021B /* WeekReflectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000011A /* WeekReflectionService.swift */; };
 		B52AE232D80E6360C8C86490 /* SymptomPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5792500A97EE8C382CEFDD9 /* SymptomPickerView.swift */; };
 		B6B76E4EF6D92F7B5179ADC8 /* WeeklyReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680C40C33549B696DF6BA3A5 /* WeeklyReviewView.swift */; };
 		B6EB3F0F0BE48CBDC5D5BA4A /* SwiftUI in Frameworks */ = {isa = PBXBuildFile; fileRef = A0D01DD5A2B033204335261E /* SwiftUI */; };
@@ -210,7 +212,9 @@
 		AABBCCDD0000000000000114 /* SyncBackupSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyncBackupSection.swift; path = ./Cadence/Features/Settings/SyncBackupSection.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000115 /* CheckInIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CheckInIntents.swift; path = ./Cadence/App/CheckInIntents.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000116 /* QuickLogIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = QuickLogIntent.swift; path = ./CadenceWidget/QuickLogIntent.swift; sourceTree = "<absolute>"; };
-		AABBCCDD0000000000000117 /* VoiceMemoRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VoiceMemoRow.swift; path = ./Cadence/Shared/Components/VoiceMemoRow.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000118 /* SymptomLibraryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SymptomLibraryView.swift; path = ./Cadence/Features/Settings/SymptomLibraryView.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000119 /* AmbientMeshBackground.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AmbientMeshBackground.swift; path = ./Cadence/Shared/Components/AmbientMeshBackground.swift; sourceTree = "<absolute>"; };
+		AABBCCDD000000000000011A /* WeekReflectionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WeekReflectionService.swift; path = ./Cadence/Services/WeekReflectionService.swift; sourceTree = "<absolute>"; };
 		ABD3C5951CAE74F5C1693742 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ADCC6B77E8E1D5DB3D6A5BDA /* HealthKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogInputFlow.swift; path = ./Cadence/Features/DailyLog/LogInputFlow.swift; sourceTree = "<absolute>"; };
@@ -239,12 +243,19 @@
 			);
 			target = 25762D142FEDD6A000A132C8 /* CadenceWidgetExtension */;
 		};
+		25762D2B2FEDDF5500A132C8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 25762D642FEDDF5200A132C8 /* CadenceWidget Watch App */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2523F5F22FFEEB0F00F3F0A5 /* CadenceUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CadenceUITests; sourceTree = "<group>"; };
 		25762D1A2FEDD6A000A132C8 /* CadenceWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (25762D2A2FEDD6A100A132C8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = CadenceWidget; sourceTree = "<group>"; };
-		25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "CadenceWidget Watch App"; sourceTree = "<group>"; };
+		25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (25762D2B2FEDDF5500A132C8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "CadenceWidget Watch App"; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -372,6 +383,7 @@
 				AABBCCDD0000000000000104 /* FlaresView.swift */,
 				AABBCCDD0000000000000106 /* CustomTrackersView.swift */,
 				AABBCCDD0000000000000114 /* SyncBackupSection.swift */,
+				AABBCCDD0000000000000118 /* SymptomLibraryView.swift */,
 			);
 			name = Settings;
 			path = ./Cadence/Features/Settings;
@@ -469,7 +481,7 @@
 				E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */,
 				AABBCCDD0000000000000110 /* AttachmentPhotoStrip.swift */,
 				AABBCCDD0000000000000111 /* MoodScale.swift */,
-				AABBCCDD0000000000000117 /* VoiceMemoRow.swift */,
+				AABBCCDD0000000000000119 /* AmbientMeshBackground.swift */,
 				0D51242137B1F8597625745E /* View+Extensions.swift */,
 			);
 			name = Shared;
@@ -524,6 +536,7 @@
 				AABBCCDD0000000000000109 /* InsightRecorder.swift */,
 				AABBCCDD0000000000000112 /* CloudSyncMonitor.swift */,
 				AABBCCDD0000000000000113 /* BackupService.swift */,
+				AABBCCDD000000000000011A /* WeekReflectionService.swift */,
 				AABBCCDD000000000000010C /* AttachmentStore.swift */,
 				493F590706A348D0857DA49A /* ServiceProtocols.swift */,
 				7F51B62D7D39FC0309276D9D /* StoreService.swift */,
@@ -778,7 +791,9 @@
 				3A33703C608D9B41673CD755 /* MetricSlider.swift in Sources */,
 				AABBCCDD0000000000000210 /* AttachmentPhotoStrip.swift in Sources */,
 				AABBCCDD0000000000000211 /* MoodScale.swift in Sources */,
-				AABBCCDD0000000000000218 /* VoiceMemoRow.swift in Sources */,
+				AABBCCDD0000000000000219 /* SymptomLibraryView.swift in Sources */,
+				AABBCCDD000000000000021A /* AmbientMeshBackground.swift in Sources */,
+				AABBCCDD000000000000021B /* WeekReflectionService.swift in Sources */,
 				20230AD97F5885D21E64CA05 /* View+Extensions.swift in Sources */,
 				F5A197BE0882ED0B9566160F /* DashboardView.swift in Sources */,
 				8002299E6F1762F96BCC2BCD /* DashboardViewModel.swift in Sources */,
@@ -1005,6 +1020,7 @@
 				ENABLE_PREVIEWS = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "CadenceWidget Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = CadenceWidget;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.carpecadence.app;
@@ -1044,6 +1060,7 @@
 				ENABLE_PREVIEWS = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "CadenceWidget Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = CadenceWidget;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.carpecadence.app;
