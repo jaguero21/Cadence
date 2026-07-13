@@ -93,4 +93,23 @@ enum WidgetData {
         guard let data = store?.data(forKey: pendingKey) else { return [] }
         return (try? JSONDecoder().decode([PendingQuickLog].self, from: data)) ?? []
     }
+
+    // MARK: - Check-in open request (Control Center → app)
+
+    // The Control Center button can't run a mood picker, so it opens the app
+    // instead; this flag tells the app "go straight to today's log" on the
+    // foreground that follows.
+    private static let checkInRequestKey = "pendingCheckInOpen"
+
+    static func requestCheckInOpen(defaults: UserDefaults? = nil) {
+        (defaults ?? store)?.set(true, forKey: checkInRequestKey)
+    }
+
+    // Read-and-clear.
+    static func consumeCheckInOpenRequest(defaults: UserDefaults? = nil) -> Bool {
+        let store = defaults ?? self.store
+        let requested = store?.bool(forKey: checkInRequestKey) ?? false
+        if requested { store?.removeObject(forKey: checkInRequestKey) }
+        return requested
+    }
 }
