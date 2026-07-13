@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import TipKit
 import OSLog
 
 struct LogInputFlow: View {
@@ -39,12 +40,8 @@ struct LogInputFlow: View {
     // used to tell "safe to delete from disk immediately" (added this session)
     // from "defer deletion until the save that drops the reference succeeds".
     @State private var hydratedAttachmentIDs: Set<UUID> = []
-    @State private var photoItem: PhotosPickerItem?
-    @State private var audioRecorder = AudioRecorder()
     private let attachmentStore = AttachmentStore()
     @State private var peaksAndValleysNote: String = ""
-    @State private var peaksAndValleysVoiceMemo: Attachment?
-    @State private var peaksAndValleysRecorder = AudioRecorder()
     @State private var intentionsForTomorrow: String = ""
     @State private var freeNote: String = ""
     @State private var hkSnapshot: HealthKitSnapshot?
@@ -62,7 +59,9 @@ struct LogInputFlow: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                progressBar
+                if vm.currentStep != .done {
+                    stepIndicator
+                }
                 ScrollView {
                     VStack(spacing: 20) {
                         switch vm.currentStep {
@@ -71,23 +70,31 @@ struct LogInputFlow: View {
                         case .basics:      basicsStep
                         case .symptoms:    symptomStep
                         case .factors:     factorsStep
-                        case .peaksAndValleys: peaksAndValleysStep
-                        case .intentions:  intentionsStep
-                        case .note:        noteStep
+                        case .reflection:  reflectionStep
                         case .done:        doneStep
                         }
                     }
                     .padding()
                 }
-                .background(CadenceColor.background)
                 .transition(.asymmetric(
                     insertion: .move(edge: .trailing).combined(with: .opacity),
                     removal:   .move(edge: .leading).combined(with: .opacity)
                 ))
                 .id(vm.currentStep)
-                .safeAreaInset(edge: .bottom) { navigationButtons }
+                .safeAreaInset(edge: .bottom) {
+                    // No bar at all on the completion screen — an empty glass
+                    // strip reads as a stray box.
+                    if vm.currentStep != .done {
+                        navigationButtons
+                    }
+                }
+                // Declarative haptics: one tick per meaningful state change,
+                // regardless of which control caused it (chip, button, jump).
+                .sensoryFeedback(.impact(weight: .light), trigger: vm.currentStep)
+                .sensoryFeedback(.impact(weight: .medium), trigger: mood)
+                .sensoryFeedback(.impact(weight: .light), trigger: basicsCompleted)
+                .sensoryFeedback(.impact(weight: .light), trigger: selectedFactors)
             }
-            .background(CadenceColor.background.ignoresSafeArea())
             .navigationTitle(vm.currentStep.title)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
@@ -108,9 +115,16 @@ struct LogInputFlow: View {
                     selectedFactors  = log.factors
                     customValues     = Dictionary(log.customMetrics.map { ($0.trackerID, $0.value) }, uniquingKeysWith: { a, _ in a })
                     attachments      = log.attachments
-                    hydratedAttachmentIDs = Set(log.attachments.map(\.id) + [log.peaksAndValleysVoiceMemo?.id].compactMap { $0 })
+                    // Migrate the legacy single-slot Peaks & Valleys memo into
+                    // the sectioned pool; the next save clears the old field.
+                    if let legacyMemo = log.peaksAndValleysVoiceMemo,
+                       !attachments.contains(where: { $0.id == legacyMemo.id }) {
+                        var memo = legacyMemo
+                        memo.section = Attachment.peaksAndValleysSection
+                        attachments.append(memo)
+                    }
+                    hydratedAttachmentIDs = Set(attachments.map(\.id))
                     peaksAndValleysNote     = log.peaksAndValleysNote
-                    peaksAndValleysVoiceMemo = log.peaksAndValleysVoiceMemo
                     intentionsForTomorrow   = log.intentionsForTomorrow
                     freeNote         = log.freeNote
                 } else {
@@ -123,7 +137,7 @@ struct LogInputFlow: View {
                 // swipe-away) but only when a log is already in progress, to
                 // avoid phantom entries. Attachments count as progress — their
                 // binaries are already on disk and would be orphaned otherwise.
-                if existingLog != nil || createdLog != nil || !attachments.isEmpty || peaksAndValleysVoiceMemo != nil {
+                if existingLog != nil || createdLog != nil || !attachments.isEmpty {
                     partialSave()
                 }
             }
@@ -144,25 +158,59 @@ struct LogInputFlow: View {
                 }
             }
         }
-    }
-
-    // MARK: - Progress Bar
-
-    private var progressBar: some View {
-        let steps = LogStep.allCases.filter { $0 != .done }
-        let progress = Double(vm.currentStep.rawValue) / Double(steps.count)
-        return GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(Color(.systemFill))
-                    .frame(height: 3)
-                Rectangle()
-                    .fill(CadenceColor.accent)
-                    .frame(width: geo.size.width * min(progress, 1), height: 3)
-                    .animation(CadenceAnimation.smooth, value: vm.currentStep)
+        // Paint the SHEET surface, not the content: on iOS 26 sheet content is
+        // inset from the sheet edges, so a content .background leaves side
+        // strips — presentationBackground is the layer that actually fills.
+        .presentationBackground {
+            if vm.currentStep == .done {
+                AmbientMeshBackground()
+            } else {
+                CadenceColor.background
             }
         }
-        .frame(height: 3)
+    }
+
+    // MARK: - Step Indicator
+
+    // Tappable replacement for the old anonymous progress bar: shows where you
+    // are AND jumps straight to any step — editing one field of an existing
+    // log used to mean walking every page with Next.
+    private var stepIndicator: some View {
+        let steps = LogStep.allCases.filter { $0 != .done }
+        return HStack(spacing: 0) {
+            ForEach(steps, id: \.self) { step in
+                let isCurrent = step == vm.currentStep
+                Button {
+                    vm.goTo(step)
+                    JumpStepsTip().invalidate(reason: .actionPerformed)
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: step.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 30, height: 30)
+                            .background(
+                                isCurrent ? CadenceColor.accent : Color(.systemFill),
+                                in: Circle()
+                            )
+                            .foregroundStyle(isCurrent ? .white : .secondary)
+                        // A hairline under the current step anchors the eye
+                        // without needing per-step labels at this size.
+                        Capsule()
+                            .fill(isCurrent ? CadenceColor.accent : .clear)
+                            .frame(width: 18, height: 3)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(step.title)
+                .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
+                .accessibilityHint(isCurrent ? "Current step" : "Jump to this step")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .glassBarBackground()
+        .popoverTip(JumpStepsTip())
     }
 
     // MARK: - Mood Step
@@ -175,10 +223,13 @@ struct LogInputFlow: View {
                     Button {
                         withAnimation(CadenceAnimation.spring) { mood = value }
                         didEditMood = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         Text(moodEmoji(value))
                             .font(.system(size: 34))
+                            // The chosen face leans in; scaleEffect doesn't
+                            // affect layout, so the row never reflows.
+                            .scaleEffect(mood == value ? 1.22 : 1.0)
+                            .animation(CadenceAnimation.spring, value: mood)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .background(
@@ -283,12 +334,12 @@ struct LogInputFlow: View {
                                 basicsCompleted.append(item.name)
                             }
                         }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
                                 .foregroundStyle(selected ? CadenceColor.successGreen : .secondary)
                                 .frame(width: 20)
+                                .contentTransition(.symbolEffect(.replace))
                             Text(item.name)
                                 .font(.subheadline)
                                 .foregroundStyle(selected ? CadenceColor.successGreen : .primary)
@@ -353,12 +404,12 @@ struct LogInputFlow: View {
                                 selectedFactors.append(item.name)
                             }
                         }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
                                 .foregroundStyle(selected ? CadenceColor.stressRed : .secondary)
                                 .frame(width: 20)
+                                .contentTransition(.symbolEffect(.replace))
                             Text(item.name)
                                 .font(.subheadline)
                                 .foregroundStyle(selected ? CadenceColor.stressRed : .primary)
@@ -396,6 +447,19 @@ struct LogInputFlow: View {
         .cadenceCard()
     }
 
+    // MARK: - Reflection Step
+
+    // The three closing reflections as one scrollable page of cards — the
+    // fields stay independent (separate model fields, separate report
+    // sections); only the pagination merged.
+    private var reflectionStep: some View {
+        VStack(spacing: 20) {
+            peaksAndValleysStep
+            intentionsStep
+            noteStep
+        }
+    }
+
     // MARK: - Peaks & Valleys Step
 
     private var peaksAndValleysStep: some View {
@@ -413,26 +477,14 @@ struct LogInputFlow: View {
             .padding(12)
             .background(Color(.systemFill), in: RoundedRectangle(cornerRadius: 10))
 
-            VoiceMemoRow(
-                attachment: $peaksAndValleysVoiceMemo,
-                recorder: peaksAndValleysRecorder,
+            AttachmentControls(
+                attachments: $attachments,
+                section: Attachment.peaksAndValleysSection,
                 store: attachmentStore,
-                onReplace: { old, _ in if let old { deleteVoiceMemoFile(old) } },
-                onDelete: { deleteVoiceMemoFile($0) }
+                onRemove: removeAttachment
             )
         }
         .cadenceCard()
-    }
-
-    // Mirrors removeAttachment's hydrated-vs-session deletion bookkeeping: a
-    // memo added this session can go immediately, but a persisted one keeps
-    // its binary until the save that drops the reference succeeds.
-    private func deleteVoiceMemoFile(_ attachment: Attachment) {
-        if hydratedAttachmentIDs.contains(attachment.id) {
-            pendingFileDeletions.append(attachment.filename)
-        } else {
-            attachmentStore.delete(attachment.filename)
-        }
     }
 
     // MARK: - Intentions Step
@@ -451,6 +503,13 @@ struct LogInputFlow: View {
             .lineLimit(4...8)
             .padding(12)
             .background(Color(.systemFill), in: RoundedRectangle(cornerRadius: 10))
+
+            AttachmentControls(
+                attachments: $attachments,
+                section: Attachment.intentionsSection,
+                store: attachmentStore,
+                onRemove: removeAttachment
+            )
         }
         .cadenceCard()
     }
@@ -469,76 +528,14 @@ struct LogInputFlow: View {
             .padding(12)
             .background(Color(.systemFill), in: RoundedRectangle(cornerRadius: 10))
 
-            photosSection
+            AttachmentControls(
+                attachments: $attachments,
+                section: nil,
+                store: attachmentStore,
+                onRemove: removeAttachment
+            )
         }
         .cadenceCard()
-        .onChange(of: photoItem) { _, item in
-            guard let item else { return }
-            Task { await addPhoto(item) }
-        }
-    }
-
-    private var photosSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 20) {
-                PhotosPicker(selection: $photoItem, matching: .images, photoLibrary: .shared()) {
-                    Label("Add photo", systemImage: "photo.badge.plus")
-                        .font(.subheadline)
-                        .foregroundStyle(CadenceColor.accent)
-                }
-                Button {
-                    toggleRecording()
-                } label: {
-                    Label(audioRecorder.isRecording ? "Stop recording" : "Voice note",
-                          systemImage: audioRecorder.isRecording ? "stop.circle.fill" : "mic.badge.plus")
-                        .font(.subheadline)
-                        .foregroundStyle(audioRecorder.isRecording ? CadenceColor.stressRed : CadenceColor.accent)
-                }
-            }
-
-            ForEach(attachments.filter { $0.kind == .audio }) { note in
-                HStack(spacing: 10) {
-                    AudioPlaybackButton(url: attachmentStore.url(for: note.filename))
-                    Text("Voice note").font(.subheadline)
-                    Spacer()
-                    Button {
-                        removeAttachment(note)
-                    } label: {
-                        Image(systemName: "trash").foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            let photos = attachments.filter { $0.kind == .photo }
-            if !photos.isEmpty {
-                AttachmentPhotoStrip(photos: photos, store: attachmentStore, tileSize: 64) { photo in
-                    removeAttachment(photo)
-                }
-            }
-        }
-    }
-
-    private func addPhoto(_ item: PhotosPickerItem) async {
-        guard let data = try? await item.loadTransferable(type: Data.self),
-              let filename = attachmentStore.save(data, fileExtension: "jpg") else { return }
-        attachments.append(Attachment(kind: .photo, filename: filename))
-        photoItem = nil
-    }
-
-    private func toggleRecording() {
-        if audioRecorder.isRecording {
-            guard let url = audioRecorder.stop(),
-                  let data = try? Data(contentsOf: url),
-                  let filename = attachmentStore.save(data, fileExtension: "m4a") else { return }
-            attachments.append(Attachment(kind: .audio, filename: filename))
-            try? FileManager.default.removeItem(at: url)
-        } else {
-            Task {
-                guard await audioRecorder.requestPermission() else { return }
-                audioRecorder.start()
-            }
-        }
     }
 
     private func removeAttachment(_ attachment: Attachment) {
@@ -611,7 +608,7 @@ struct LogInputFlow: View {
 
             if vm.currentStep != .done {
                 Button {
-                    if vm.currentStep == .note {
+                    if vm.currentStep == .reflection {
                         let log = ensureLog()
                         apply(to: log)
                         if existingLog == nil { modelContext.insert(log) }
@@ -628,9 +625,9 @@ struct LogInputFlow: View {
                     vm.nextStep()
                 } label: {
                     HStack {
-                        Text(vm.currentStep == .note ? "Finish" : "Next")
+                        Text(vm.currentStep == .reflection ? "Finish" : "Next")
                             .font(.body.bold())
-                        if vm.currentStep != .note {
+                        if vm.currentStep != .reflection {
                             Image(systemName: "chevron.right")
                         }
                     }
@@ -642,7 +639,6 @@ struct LogInputFlow: View {
             }
         }
         .padding()
-        .background(.bar)
     }
 
     // MARK: - Helpers
@@ -686,7 +682,9 @@ struct LogInputFlow: View {
         log.customMetrics   = customValues.map { MetricEntry(trackerID: $0.key, value: $0.value) }
         log.attachments     = attachments
         log.peaksAndValleysNote     = peaksAndValleysNote
-        log.peaksAndValleysVoiceMemo = peaksAndValleysVoiceMemo
+        // Legacy single-slot memo was merged into `attachments` on hydrate
+        // (section-tagged); clearing the field completes the migration.
+        log.peaksAndValleysVoiceMemo = nil
         log.intentionsForTomorrow   = intentionsForTomorrow
         log.freeNote        = freeNote
         log.didEditMetrics  = didEditMetrics
@@ -792,7 +790,101 @@ struct LogInputFlow: View {
     }
 }
 
+// One-time discoverability for the step bar (TipKit handles show-once
+// persistence; invalidated the first time the user actually jumps).
+private struct JumpStepsTip: Tip {
+    var title: Text { Text("Jump to any step") }
+    var message: Text? { Text("Tap an icon to go straight to that part of the log.") }
+    var image: Image? { Image(systemName: "hand.tap.fill") }
+}
+
 // MARK: - Subviews
+
+// One attachment row per reflection card: add a photo or record a voice memo,
+// with that card's own attachments listed beneath. Each instance owns its
+// recorder and picker state; the `section` tag keeps the cards' pools separate
+// while everything persists in the one DailyLog.attachments array (nil =
+// the general one-line-note card, which also shows pre-tagging attachments).
+private struct AttachmentControls: View {
+    @Binding var attachments: [Attachment]
+    let section: String?
+    let store: AttachmentStore
+    let onRemove: (Attachment) -> Void
+
+    @State private var recorder = AudioRecorder()
+    @State private var photoItem: PhotosPickerItem?
+
+    private var sectionAttachments: [Attachment] {
+        attachments.filter { $0.section == section }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 20) {
+                PhotosPicker(selection: $photoItem, matching: .images, photoLibrary: .shared()) {
+                    Label("Add photo", systemImage: "photo.badge.plus")
+                        .font(.subheadline)
+                        .foregroundStyle(CadenceColor.accent)
+                }
+                Button {
+                    toggleRecording()
+                } label: {
+                    Label(recorder.isRecording ? "Stop recording" : "Voice memo",
+                          systemImage: recorder.isRecording ? "stop.circle.fill" : "mic.badge.plus")
+                        .font(.subheadline)
+                        .foregroundStyle(recorder.isRecording ? CadenceColor.stressRed : CadenceColor.accent)
+                }
+            }
+
+            ForEach(sectionAttachments.filter { $0.kind == .audio }) { memo in
+                HStack(spacing: 10) {
+                    AudioPlaybackButton(url: store.url(for: memo.filename))
+                    Text("Voice memo").font(.subheadline)
+                    Spacer()
+                    Button {
+                        onRemove(memo)
+                    } label: {
+                        Image(systemName: "trash").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            let photos = sectionAttachments.filter { $0.kind == .photo }
+            if !photos.isEmpty {
+                AttachmentPhotoStrip(photos: photos, store: store, tileSize: 64) { photo in
+                    onRemove(photo)
+                }
+            }
+        }
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            Task { await addPhoto(item) }
+        }
+    }
+
+    private func addPhoto(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let filename = store.save(data, fileExtension: "jpg") else { return }
+        attachments.append(Attachment(kind: .photo, filename: filename, section: section))
+        photoItem = nil
+    }
+
+    private func toggleRecording() {
+        if recorder.isRecording {
+            guard let url = recorder.stop(),
+                  let data = try? Data(contentsOf: url),
+                  let filename = store.save(data, fileExtension: "m4a") else { return }
+            attachments.append(Attachment(kind: .audio, filename: filename, section: section))
+            try? FileManager.default.removeItem(at: url)
+        } else {
+            Task {
+                guard await recorder.requestPermission() else { return }
+                recorder.start()
+            }
+        }
+    }
+}
 
 private struct LogSectionHeader: View {
     let icon: String
@@ -828,16 +920,14 @@ private struct SleepHoursRow: View {
                     get: { hours },
                     set: { newVal in
                         let snapped = (newVal * 2).rounded() / 2
-                        if snapped != hours {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            hours = snapped
-                        }
+                        if snapped != hours { hours = snapped }
                     }
                 ),
                 in: 0...12,
                 step: 0.5
             )
             .tint(CadenceColor.sleepPurple)
+            .sensoryFeedback(.impact(weight: .light), trigger: hours)
             .accessibilityLabel("Sleep hours")
             .accessibilityValue(String(format: "%.1f hours", hours))
             Text(String(format: "%.1f", hours))
@@ -866,16 +956,14 @@ private struct CustomMetricRow: View {
                     get: { Double(value) },
                     set: { newVal in
                         let rounded = Int(newVal.rounded())
-                        if rounded != value {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            value = rounded
-                        }
+                        if rounded != value { value = rounded }
                     }
                 ),
                 in: Double(range.lowerBound)...Double(range.upperBound),
                 step: 1
             )
             .tint(Color(.systemGray3))
+            .sensoryFeedback(.impact(weight: .light), trigger: value)
             .accessibilityLabel(label)
             .accessibilityValue(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
             Text(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
@@ -901,16 +989,14 @@ private struct BodyMetricRow: View {
                     get: { Double(value) },
                     set: { newVal in
                         let rounded = Int(newVal.rounded())
-                        if rounded != value {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            value = rounded
-                        }
+                        if rounded != value { value = rounded }
                     }
                 ),
                 in: 0...10,
                 step: 1
             )
             .tint(Color(.systemGray3))
+            .sensoryFeedback(.impact(weight: .light), trigger: value)
             .accessibilityLabel(label)
             .accessibilityValue("\(value) out of 10")
             Text("\(value)")
