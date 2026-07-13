@@ -206,6 +206,12 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   the timeline (the summary is usually unchanged, since a quick log doesn't
   complete the day, and the skip-if-unchanged guard would strand the interim
   state). Widget kind string lives in `WidgetData.widgetKind`.
+- **Control Center button** (`CheckInControl`, iOS 18): one tap opens the app
+  straight into today's log — deliberately NOT a "log a default mood" button
+  (unchosen data is fake awareness). The control stashes an open request via
+  `WidgetData.requestCheckInOpen` (controls run in the extension process);
+  `ContentView.openCheckInIfRequested` consumes it on foreground and presents
+  `LogInputFlow` directly.
 
 ## App Intents (Siri / Shortcuts)
 

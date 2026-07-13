@@ -114,6 +114,11 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .dashboard
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
+    // Control Center "Log Check-In" button: the control stashes an open
+    // request (it runs in the widget extension); we consume it on foreground
+    // and present today's log directly.
+    @State private var showingControlCheckIn = false
+    @State private var controlCheckInLog: DailyLog?
     // The current day, refreshed when the app returns to foreground. Passed into
     // each date-windowed tab so a midnight rollover updates their @Query in place
     // rather than rebuilding the subtree (which dropped open sheets / scroll
@@ -147,6 +152,8 @@ struct ContentView: View {
                 .tag(Tab.history)
         }
         .tint(CadenceColor.accent)
+        // iOS 26: the tab bar tucks away while scrolling charts/history.
+        .minimizableTabBar()
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             let startOfToday = Calendar.current.startOfDay(for: .now)
@@ -154,9 +161,14 @@ struct ContentView: View {
             applyPendingQuickLogs()
             checkForNewInsights()
             refreshTodayHealthData()
+            openCheckInIfRequested()
         }
         .task { seedSymptomTagsIfNeeded() }
         .task { applyPendingQuickLogs() }
+        .task { openCheckInIfRequested() }
+        .sheet(isPresented: $showingControlCheckIn) {
+            LogInputFlow(existingLog: controlCheckInLog)
+        }
         .sheet(isPresented: $appState.showingProPaywall) {
             ProPaywallView()
         }
@@ -185,6 +197,20 @@ struct ContentView: View {
             .max(by: { $0.confidence < $1.confidence }) {
             notificationService.sendInsightNotification(title: top.title)
         }
+    }
+
+    // Consume a Control Center "Log Check-In" tap: fetch today's log (if any)
+    // and present the flow, exactly as tapping the dashboard card would.
+    private func openCheckInIfRequested() {
+        guard !AppLaunch.isUITesting,
+              WidgetData.consumeCheckInOpenRequest(),
+              !showingControlCheckIn else { return }
+        let today = Calendar.current.startOfDay(for: .now)
+        controlCheckInLog = try? modelContext.fetch(
+            FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == today })
+        ).first
+        selectedTab = .dashboard
+        showingControlCheckIn = true
     }
 
     // Foreground fallback for the HK observer path: top up today's log's
