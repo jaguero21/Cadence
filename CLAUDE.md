@@ -25,17 +25,22 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   same insight) and into trend charts via `ChartSeries.custom` (days without an
   entry are skipped, never drawn as zero; the comparison badge is neutral
   because a custom tracker's desirable direction is unknowable).
-- **Peaks & Valleys / Intentions for Tomorrow:** closing reflection steps
-  positioned right before each flow's final step. The **daily log** has both:
+- **Peaks & Valleys / Intentions for Tomorrow:** closing reflections. In the
+  **daily log** they live (with the one-line note + attachments) on a single
+  combined `.reflection` step — three consecutive text pages made the daily
+  flow feel long; the fields stayed separate:
   `peaksAndValleysNote: String` + `peaksAndValleysVoiceMemo: Attachment?` +
   `intentionsForTomorrow: String` on `DailyLog`. The **weekly review** has
   only Intentions (`intentionsForTomorrow` on `WeeklyReview`) — a weekly
   Peaks & Valleys step shipped briefly and was removed after real use; don't
   reintroduce it. These are dedicated fields, not the generic `PromptResponse`
-  system (text-only, and Peaks & Valleys needs voice-memo support). The single
-  optional voice memo is recorded via the shared `VoiceMemoRow` component
-  (`Cadence/Shared/Components/VoiceMemoRow.swift`), distinct from the note
-  step's multi-attachment list — exactly one memo, replaced/deleted in place.
+  system (text-only). Every reflection card carries the same photo/voice
+  controls (`AttachmentControls` in `LogInputFlow`): attachments live in the
+  one `DailyLog.attachments` array, tagged with `Attachment.section`
+  (`peaksAndValleys` / `intentions` / nil = the note card, which also shows
+  pre-tagging attachments). The legacy single-slot `peaksAndValleysVoiceMemo`
+  field migrates into the pool on hydrate and is cleared on the next save;
+  `DailyLogSnapshot.hasPeaksAndValleysVoiceMemo` checks both.
   `LogInputFlow` stages these like every other field (local `@State`, applied
   to the model at save time); `ReviewFlowView` binds directly to the `@Model`
   (`$review.intentionsForTomorrow`, matching how `overallRating` is already
@@ -101,6 +106,14 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   entitlement `com.apple.developer.healthkit.background-delivery`) started in
   `CadenceApp`, with a foreground fallback in `ContentView`'s scenePhase
   handler.
+- **Symptom library:** `SymptomTag.optionalCatalog` (~34 entries) is the
+  toggleable symptom list in Settings → Symptoms (`SymptomLibraryView`, free —
+  only free-text custom symptoms are Pro). A toggle inserts/deletes the
+  `SymptomTag` row itself (name-deduped at save time), not an `isEnabled`
+  flag, so the picker's `@Query` is untouched. Every catalog name must resolve
+  via `HealthKitService.symptomTypeIdentifier` (unit-test-pinned) so enabled
+  symptoms sync two-way with Health; history survives toggling off via the
+  picker's unlisted-chip rendering.
 - **Factor (trigger) logging:** `DailyLog.factors: [String]` holds contextual
   triggers chosen from a fixed list (`LogInputFlow.factorItems`) in the `.factors`
   log step — same hardcoded-list pattern as `basicsCompleted` (no model).
@@ -121,10 +134,17 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `ModelPersisting` is a seam over `ModelContext` (insert/delete/save) so save
   failure paths can be tested with a throwing stub.
 - **PatternEngine** is a stateless `enum`: takes `[DailyLogSnapshot]`, returns
-  `[InsightCard]`. Confidence for proportion-based patterns uses the **Wilson
-  score lower bound** (`wilsonLowerBound`), not the raw hit/total ratio, so a
-  small sample can't read as 100% certain. The user-facing copy shows the raw
-  observed frequency; the card's `confidence` is the Wilson bound.
+  `[InsightCard]` **sorted strongest-first** (the dashboard headline takes
+  `.first`, so it must be the strongest signal, not detector order).
+  Confidence for proportion-based patterns uses the **Wilson score lower
+  bound** (`wilsonLowerBound`); every mean-comparison detector runs through
+  the shared `compareMeans` + `comparativeConfidence` helpers — confidence =
+  effect × n/(n + `smallSampleShrinkage`) on the comparison's THINNER side, so
+  the same delta over 4 days can't display the same confidence as over 40.
+  Don't hand-roll a two-group comparison or a `min(delta/scale, 1)` confidence
+  in a new detector. The framing is awareness, not diagnosis: the Insights tab
+  and the doctor PDF both carry a "not medical advice" disclaimer next to the
+  pattern cards.
 - **Date-windowed views** (`DashboardView`, `DailyLogView`, `WeeklyReviewView`,
   `InsightsView`) take a `referenceDate` and derive their `@Query` cutoff from
   it. `ContentView` passes `today` (refreshed on `scenePhase == .active`) so a
@@ -186,6 +206,12 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   the timeline (the summary is usually unchanged, since a quick log doesn't
   complete the day, and the skip-if-unchanged guard would strand the interim
   state). Widget kind string lives in `WidgetData.widgetKind`.
+- **Control Center button** (`CheckInControl`, iOS 18): one tap opens the app
+  straight into today's log — deliberately NOT a "log a default mood" button
+  (unchosen data is fake awareness). The control stashes an open request via
+  `WidgetData.requestCheckInOpen` (controls run in the extension process);
+  `ContentView.openCheckInIfRequested` consumes it on foreground and presents
+  `LogInputFlow` directly.
 
 ## App Intents (Siri / Shortcuts)
 

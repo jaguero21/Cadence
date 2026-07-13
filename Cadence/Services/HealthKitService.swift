@@ -34,15 +34,21 @@ final class HealthKitService: HealthKitServiceProtocol {
     nonisolated var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
     // HealthKit does not reveal granted read status (.notDetermined covers both "not asked" and
-    // "granted"). We return false only when the user has explicitly denied at least one type
-    // (.sharingDenied), which is the strongest signal HealthKit exposes for read-only requests.
-    // Cached because this iterates all readTypes on every call; invalidated after requestAuthorization
-    // and on app foreground (the user may have toggled permissions in Settings).
+    // "granted"). We return false only when the user has explicitly denied at least one
+    // READ-ONLY type (.sharingDenied), which is the strongest signal HealthKit exposes for
+    // read-only requests. Types we also request SHARE for (symptoms, State of Mind) are
+    // excluded: authorizationStatus(for:) reports WRITE permission, so a user who declines
+    // to let Cadence write (say) one symptom type would otherwise read as "HealthKit denied"
+    // even though reading works fine.
+    // Cached because this iterates the types on every call; invalidated after
+    // requestAuthorization and on app foreground (the user may have toggled permissions).
     private var cachedIsAuthorized: Bool?
     var isAuthorized: Bool {
         if let cached = cachedIsAuthorized { return cached }
         guard isAvailable else { cachedIsAuthorized = false; return false }
-        let result = !readTypes.contains { store.authorizationStatus(for: $0) == .sharingDenied }
+        let shareSet = Set(shareTypes.map { $0 as HKObjectType })
+        let readOnlyTypes = readTypes.filter { !shareSet.contains($0) }
+        let result = !readOnlyTypes.contains { store.authorizationStatus(for: $0) == .sharingDenied }
         cachedIsAuthorized = result
         return result
     }

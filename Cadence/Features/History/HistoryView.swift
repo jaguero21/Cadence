@@ -13,6 +13,7 @@ struct HistoryView: View {
     @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
     @State private var selectedMonth: Date = Calendar.current.startOfDay(for: .now)
     @State private var selectedLog: DailyLog?
+    @Namespace private var detailZoom
     @State private var searchText = ""
     @State private var filter: HistoryFilter = .all
 
@@ -86,6 +87,7 @@ struct HistoryView: View {
             }
             .sheet(item: $selectedLog) { log in
                 LogDetailView(log: log)
+                    .zoomTransition(sourceID: Calendar.current.startOfDay(for: log.date), in: detailZoom)
             }
         }
     }
@@ -116,6 +118,7 @@ struct HistoryView: View {
                 ForEach(filteredLogs) { log in
                     Button { selectedLog = log } label: { resultRow(log) }
                         .buttonStyle(.plain)
+                        .zoomTransitionSource(id: Calendar.current.startOfDay(for: log.date), in: detailZoom)
                 }
             }
         }
@@ -228,6 +231,7 @@ struct HistoryView: View {
             }
         }
         .buttonStyle(.plain)
+        .zoomTransitionSource(id: day, in: detailZoom)
         .disabled(isFuture || log == nil)
         .accessibilityLabel(dayCellLabel(day: day, log: log, isToday: isToday))
         .accessibilityHint(log != nil && !isFuture ? "Double-tap to view details" : "")

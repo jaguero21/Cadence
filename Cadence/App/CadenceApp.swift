@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 import WidgetKit
+import TipKit
 import OSLog
 
 
@@ -85,6 +86,10 @@ struct CadenceApp: App {
                 .task {
                     PhoneConnectivityManager.shared.start(container: container)
                     guard !AppLaunch.isUITesting else { return }
+                    // Discoverability tips (hold-to-rate, step jumping). Not
+                    // configured under UI tests — an unexpected tip popover
+                    // could block the smoke test's taps.
+                    try? Tips.configure()
                     // Keep today's log's HealthKit numbers fresh (end-of-day
                     // steps, morning sleep) even when the log flow isn't
                     // opened again; wakes the app when suspended via HK
@@ -109,6 +114,11 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .dashboard
     @State private var showStorageWarning = CadenceApp.usingFallbackStorage
+    // Control Center "Log Check-In" button: the control stashes an open
+    // request (it runs in the widget extension); we consume it on foreground
+    // and present today's log directly.
+    @State private var showingControlCheckIn = false
+    @State private var controlCheckInLog: DailyLog?
     // The current day, refreshed when the app returns to foreground. Passed into
     // each date-windowed tab so a midnight rollover updates their @Query in place
     // rather than rebuilding the subtree (which dropped open sheets / scroll
@@ -142,6 +152,8 @@ struct ContentView: View {
                 .tag(Tab.history)
         }
         .tint(CadenceColor.accent)
+        // iOS 26: the tab bar tucks away while scrolling charts/history.
+        .minimizableTabBar()
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             let startOfToday = Calendar.current.startOfDay(for: .now)
@@ -149,9 +161,14 @@ struct ContentView: View {
             applyPendingQuickLogs()
             checkForNewInsights()
             refreshTodayHealthData()
+            openCheckInIfRequested()
         }
         .task { seedSymptomTagsIfNeeded() }
         .task { applyPendingQuickLogs() }
+        .task { openCheckInIfRequested() }
+        .sheet(isPresented: $showingControlCheckIn) {
+            LogInputFlow(existingLog: controlCheckInLog)
+        }
         .sheet(isPresented: $appState.showingProPaywall) {
             ProPaywallView()
         }
@@ -180,6 +197,20 @@ struct ContentView: View {
             .max(by: { $0.confidence < $1.confidence }) {
             notificationService.sendInsightNotification(title: top.title)
         }
+    }
+
+    // Consume a Control Center "Log Check-In" tap: fetch today's log (if any)
+    // and present the flow, exactly as tapping the dashboard card would.
+    private func openCheckInIfRequested() {
+        guard !AppLaunch.isUITesting,
+              WidgetData.consumeCheckInOpenRequest(),
+              !showingControlCheckIn else { return }
+        let today = Calendar.current.startOfDay(for: .now)
+        controlCheckInLog = try? modelContext.fetch(
+            FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == today })
+        ).first
+        selectedTab = .dashboard
+        showingControlCheckIn = true
     }
 
     // Foreground fallback for the HK observer path: top up today's log's
@@ -232,7 +263,12 @@ struct ContentView: View {
     }
 
     private func seedSymptomTagsIfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: symptomSeedKey) else { return }
+        // UI tests: the in-memory store starts empty every run, but standard
+        // UserDefaults persist on the simulator — honoring the seeded flag
+        // would skip seeding forever after the first run and leave the picker
+        // with no chips. Always seed under --uitest (name-dedup keeps it
+        // idempotent) and never persist the flag there.
+        guard AppLaunch.isUITesting || !UserDefaults.standard.bool(forKey: symptomSeedKey) else { return }
         // Dedup against tags already in the store (reinstall over an existing
         // CloudKit database, or a sync that landed before first launch). A
         // second device seeding before its first sync completes can still race;
@@ -243,7 +279,9 @@ struct ContentView: View {
         }
         do {
             try modelContext.save()
-            UserDefaults.standard.set(true, forKey: symptomSeedKey)
+            if !AppLaunch.isUITesting {
+                UserDefaults.standard.set(true, forKey: symptomSeedKey)
+            }
         } catch {
             // Leave the flag unset so the next launch retries seeding.
             Self.log.error("Failed to seed SymptomTag defaults: \(error, privacy: .public)")

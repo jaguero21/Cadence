@@ -361,3 +361,81 @@ struct ExternalMoodResolutionTests {
         #expect(HealthKitService.resolveExternalMood(latestDailyValence: nil, momentaryValences: []) == nil)
     }
 }
+
+// MARK: - Symptom library
+
+// The Settings toggle list. Every library name must resolve to a HealthKit
+// symptom type (that's the promise the footer makes about Health sync), and
+// no entry may collide with a seeded default.
+@Suite("SymptomTag – optional catalog")
+struct SymptomCatalogTests {
+
+    @Test("Every catalog entry maps to a HealthKit symptom type")
+    func catalogNamesAllMapToHealth() {
+        for entry in SymptomTag.optionalCatalog {
+            #expect(HealthKitService.symptomTypeIdentifier(for: entry.name) != nil, "\(entry.name) has no HK mapping")
+        }
+    }
+
+    @Test("No duplicates within the catalog or against the defaults")
+    func catalogHasNoDuplicates() {
+        let names = SymptomTag.optionalCatalog.map { $0.name.lowercased() }
+        #expect(Set(names).count == names.count)
+        let defaultNames = Set(SymptomTag.defaults.map { $0.name.lowercased() })
+        #expect(defaultNames.isDisjoint(with: names))
+    }
+}
+
+// MARK: - Week reflection prompt
+
+// The pure prompt builder behind the on-device weekly summary. The model call
+// itself needs Apple Intelligence hardware; these pin what we feed it and the
+// guardrails in the instructions.
+@Suite("WeekReflectionService – prompt building")
+struct WeekReflectionPromptTests {
+
+    @Test("A thin week (fewer than 2 logged days) yields no prompt")
+    func thinWeekYieldsNil() {
+        let logs = [DailyLogSnapshot(date: .now, mood: 4)]
+        #expect(WeekReflectionService.promptText(from: logs) == nil)
+    }
+
+    @Test("The prompt carries metrics, symptoms, and the user's own words")
+    func promptCarriesEntries() throws {
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -2, to: .now)!, mood: 2, energy: 3,
+                             symptoms: [SymptomEntry(name: "Headache", severity: 7, emoji: "🤕")],
+                             factors: ["Travel"],
+                             peaksAndValleysNote: "rough flight home"),
+            DailyLogSnapshot(date: .now, mood: 4, energy: 7, freeNote: "felt like myself again"),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs))
+        #expect(prompt.contains("mood 2/5"))
+        #expect(prompt.contains("Headache 7/10"))
+        #expect(prompt.contains("Travel"))
+        #expect(prompt.contains("rough flight home"))
+        #expect(prompt.contains("felt like myself again"))
+    }
+
+    @Test("Long notes are truncated to keep the prompt bounded")
+    func longNotesTruncate() throws {
+        let cal = Calendar.current
+        let longNote = String(repeating: "a", count: 1000)
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -1, to: .now)!, freeNote: longNote),
+            DailyLogSnapshot(date: .now),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs))
+        #expect(!prompt.contains(longNote))
+        #expect(prompt.contains(String(repeating: "a", count: WeekReflectionService.noteCharacterLimit) + "…"))
+    }
+
+    @Test("The instructions pin the no-advice, no-diagnosis guardrails")
+    func instructionsCarryGuardrails() {
+        let instructions = WeekReflectionService.instructions
+        #expect(instructions.contains("never give advice"))
+        #expect(instructions.contains("never diagnose"))
+        #expect(instructions.contains("never invent facts"))
+    }
+}

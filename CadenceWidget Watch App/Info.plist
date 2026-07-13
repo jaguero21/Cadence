@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Watch-app-specific Info.plist. Without this file the target inherits the
+     iOS app's plist, which drags in iOS-only keys — including
+     UIRequiredDeviceCapabilities, which App Store Connect rejects on watchOS
+     bundles (ITMS error 90595). GENERATE_INFOPLIST_FILE stays on, so bundle
+     basics and the INFOPLIST_KEY_* build settings merge in on top. -->
+<dict>
+	<!-- actool only emits the nested CFBundleIcons form for watchOS; App Store
+	     validation (ITMS 90713) requires the top-level key as well. -->
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>WKApplication</key>
+	<true/>
+</dict>
+</plist>

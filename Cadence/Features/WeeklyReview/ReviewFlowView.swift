@@ -18,8 +18,6 @@ struct ReviewFlowView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                CadenceColor.background.ignoresSafeArea()
-
                 if vm.isComplete {
                     completionView
                 } else {
@@ -29,6 +27,7 @@ struct ReviewFlowView: View {
                             VStack(spacing: 20) {
                                 if vm.currentStep == .prompt(0) {
                                     WeekSummaryView(review: review)
+                                    WeekReflectionCard(logs: weekLogs)
                                 }
                                 stepContent
                             }
@@ -69,6 +68,25 @@ struct ReviewFlowView: View {
                 }
             }
         }
+        // Paint the SHEET surface (see LogInputFlow): on iOS 26 sheet content
+        // is inset, so a content background leaves side strips.
+        .presentationBackground {
+            if vm.isComplete {
+                AmbientMeshBackground()
+            } else {
+                CadenceColor.background
+            }
+        }
+    }
+
+    // The review's week, snapshotted for the on-device reflection.
+    private var weekLogs: [DailyLogSnapshot] {
+        let cal = Calendar.current
+        let weekStart = review.weekStartDate
+        let weekEnd = cal.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+        return logs
+            .filter { $0.date >= weekStart && $0.date < weekEnd }
+            .map(DailyLogSnapshot.init)
     }
 
     private var progressBar: some View {
@@ -164,10 +182,9 @@ struct ReviewFlowView: View {
                 .background(CadenceColor.sleepPurple, in: Capsule())
                 .foregroundStyle(.white)
             }
-            .hapticFeedback(.medium)
+            .sensoryFeedback(.impact(weight: .medium), trigger: vm.currentFlatIndex)
         }
         .padding()
-        .background(.bar)
     }
 
     private var completionView: some View {
@@ -197,5 +214,79 @@ struct ReviewFlowView: View {
             Spacer()
         }
         .padding()
+    }
+}
+
+// On-device weekly reflection (iOS 26 Apple Intelligence). Explicit button —
+// nothing generates behind the user's back; the card only exists at all when
+// the model is available, and it states plainly that nothing leaves the phone.
+private struct WeekReflectionCard: View {
+    let logs: [DailyLogSnapshot]
+
+    private enum Phase: Equatable {
+        case idle, generating, done(String), failed
+    }
+    @State private var phase: Phase = .idle
+
+    var body: some View {
+        if WeekReflectionService.isSupported && !AppLaunch.isUITesting,
+           WeekReflectionService.promptText(from: logs) != nil {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(CadenceColor.accent)
+                    Text("Week Reflection")
+                        .font(.headline)
+                    Spacer()
+                }
+
+                switch phase {
+                case .idle:
+                    Button {
+                        generate()
+                    } label: {
+                        Label("Summarize my week", systemImage: "text.badge.star")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(CadenceColor.accent)
+                case .generating:
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("Reading your week…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                case .done(let text):
+                    Text(text)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Regenerate") { generate() }
+                        .font(.caption)
+                        .foregroundStyle(CadenceColor.accent)
+                case .failed:
+                    Text("Couldn't summarize this week. You can still review as usual.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("Written on this iPhone from your own entries — nothing leaves your device. An observation, not advice.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .cadenceCard()
+        }
+    }
+
+    private func generate() {
+        phase = .generating
+        let snapshot = logs
+        Task {
+            if let text = await WeekReflectionService.generate(from: snapshot) {
+                phase = .done(text)
+            } else {
+                phase = .failed
+            }
+        }
     }
 }

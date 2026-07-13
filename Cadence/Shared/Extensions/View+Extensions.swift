@@ -7,20 +7,55 @@ extension View {
             .background(CadenceColor.cardBG, in: RoundedRectangle(cornerRadius: CadenceLayout.cardCornerRadius))
     }
 
+    // Liquid Glass on iOS 26, the classic bar material before it. Used for the
+    // floating control bars (step indicator, flow nav) so they pick up the
+    // system's current-year chrome without forking layouts.
+    @ViewBuilder
+    func glassBarBackground() -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: .rect)
+        } else {
+            self.background(.bar)
+        }
+    }
+
+    // Tab bar tucks away while scrolling content (iOS 26); no-op earlier.
+    @ViewBuilder
+    func minimizableTabBar() -> some View {
+        if #available(iOS 26.0, *) {
+            self.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            self
+        }
+    }
+
+    // Zoom transition pair (iOS 18): mark the tapped cell as the source and
+    // the presented detail as the destination; earlier systems keep the
+    // standard sheet slide.
+    @ViewBuilder
+    func zoomTransitionSource<ID: Hashable>(id: ID, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            self.matchedTransitionSource(id: id, in: namespace)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func zoomTransition<ID: Hashable>(sourceID: ID, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            self.navigationTransition(.zoom(sourceID: sourceID, in: namespace))
+        } else {
+            self
+        }
+    }
+
     func sectionHeader(_ title: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.title2.bold())
             self
         }
-    }
-
-    func hapticFeedback(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) -> some View {
-        self.simultaneousGesture(
-            TapGesture().onEnded {
-                UIImpactFeedbackGenerator(style: style).impactOccurred()
-            }
-        )
     }
 }
 

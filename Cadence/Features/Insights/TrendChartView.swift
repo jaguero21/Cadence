@@ -44,9 +44,24 @@ struct TrendChartView: View {
     let series: ChartSeries
     let range: InsightsViewModel.ChartRange
     var previousLogs: [DailyLog] = []   // same-length window immediately before, for comparison
+    // Lets the parent open the scrubbed day (e.g. LogDetailView). nil = chart
+    // still scrubs, just without the drill-in button.
+    var onOpenDay: ((Date) -> Void)? = nil
+
+    // Live scrub position (non-nil only while the finger is down) and the last
+    // day it landed on, which persists after release so the footer can offer
+    // the drill-in.
+    @State private var selection: Date?
+    @State private var pinned: (date: Date, value: Double)?
 
     private var points: [(date: Date, value: Double)] {
         logs.compactMap { log in series.value(log).map { (log.date, $0) } }
+    }
+
+    // Snap a scrub position to the nearest plotted day — custom trackers skip
+    // unlogged days, so the raw x-position rarely hits a point exactly.
+    static func nearestPoint(to target: Date, in points: [(date: Date, value: Double)]) -> (date: Date, value: Double)? {
+        points.min { abs($0.date.timeIntervalSince(target)) < abs($1.date.timeIntervalSince(target)) }
     }
 
     var body: some View {
@@ -101,6 +116,27 @@ struct TrendChartView: View {
                                     .foregroundStyle(.secondary)
                             }
                     }
+
+                    // Scrub lollipop: vertical rule + enlarged point + value
+                    // bubble on the day nearest the finger.
+                    if let selection, let picked = Self.nearestPoint(to: selection, in: points) {
+                        RuleMark(x: .value("Selected", picked.date))
+                            .lineStyle(StrokeStyle(lineWidth: 1))
+                            .foregroundStyle(.secondary.opacity(0.5))
+                        PointMark(
+                            x: .value("Date", picked.date),
+                            y: .value(series.label, picked.value)
+                        )
+                        .foregroundStyle(series.color)
+                        .symbolSize(90)
+                        .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
+                            Text(String(format: "%.1f", picked.value))
+                                .font(.caption.bold())
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(series.color.opacity(0.15), in: Capsule())
+                        }
+                    }
                 }
                 .chartYScale(domain: series.yDomain)
                 .chartXAxis {
@@ -109,7 +145,50 @@ struct TrendChartView: View {
                         AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                     }
                 }
+                .chartXSelection(value: $selection)
                 .frame(height: 160)
+                .onChange(of: selection) { _, newValue in
+                    // Remember the last scrubbed day so the drill-in footer
+                    // survives the finger lifting (selection resets to nil).
+                    if let newValue, let picked = Self.nearestPoint(to: newValue, in: points) {
+                        pinned = picked
+                    }
+                }
+                .onChange(of: range) { _, _ in
+                    pinned = nil
+                    selection = nil
+                }
+
+                if let pinned {
+                    HStack(spacing: 8) {
+                        Text("\(pinned.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) — \(String(format: "%.1f", pinned.value))")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if let onOpenDay {
+                            Button {
+                                onOpenDay(pinned.date)
+                            } label: {
+                                HStack(spacing: 2) {
+                                    Text("View day")
+                                    Image(systemName: "chevron.right")
+                                }
+                                .font(.caption.weight(.semibold))
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(series.color)
+                        }
+                        Button {
+                            self.pinned = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear selection")
+                    }
+                    .transition(.opacity)
+                }
             }
         }
         .cadenceCard()

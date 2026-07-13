@@ -9,8 +9,6 @@ struct MetricSlider: View {
     var labelLow: String = "Low"
     var labelHigh: String = "High"
 
-    private let haptic = UIImpactFeedbackGenerator(style: .light)
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -33,16 +31,14 @@ struct MetricSlider: View {
                         get: { Double(value) },
                         set: { newVal in
                             let rounded = Int(newVal.rounded())
-                            if rounded != value {
-                                haptic.impactOccurred()
-                                value = rounded
-                            }
+                            if rounded != value { value = rounded }
                         }
                     ),
                     in: Double(range.lowerBound)...Double(range.upperBound),
                     step: 1
                 )
                 .tint(color)
+                .sensoryFeedback(.impact(weight: .light), trigger: value)
 
                 HStack {
                     Text(labelLow).font(.caption).foregroundStyle(.secondary)
@@ -79,18 +75,33 @@ struct ScoreBadge: View {
 struct StreakBadge: View {
     let count: Int
 
+    // Streak milestones worth celebrating. On these days the flame goes gold,
+    // bounces, and the badge says so — a streak feature should notice.
+    static let milestones: Set<Int> = [7, 14, 30, 50, 100, 200, 365]
+
+    private var isMilestone: Bool { Self.milestones.contains(count) }
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "flame.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(isMilestone ? .yellow : .orange)
+                .symbolEffect(.bounce, options: .repeat(2), value: isMilestone)
             Text("\(count)")
                 .font(.subheadline.bold())
-            Text(count == 1 ? "day" : "days")
+                .contentTransition(.numericText())
+            Text(isMilestone ? "day streak!" : (count == 1 ? "day" : "days"))
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isMilestone ? .primary : .secondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(.orange.opacity(0.12), in: Capsule())
+        .background(
+            isMilestone ? AnyShapeStyle(.yellow.opacity(0.18)) : AnyShapeStyle(.orange.opacity(0.12)),
+            in: Capsule()
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isMilestone
+            ? "Milestone: \(count) day logging streak"
+            : "\(count) day logging streak")
     }
 }

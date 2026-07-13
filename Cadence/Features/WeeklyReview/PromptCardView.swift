@@ -114,11 +114,11 @@ struct StarRatingView: View {
                             .foregroundStyle(star <= rating ? Color.yellow : Color(.quaternaryLabel))
                     }
                     .buttonStyle(.plain)
-                    .hapticFeedback(.medium)
                     .accessibilityLabel("\(star) \(star == 1 ? "star" : "stars") out of 5")
                     .accessibilityAddTraits(star == rating ? [.isSelected] : [])
                 }
             }
+            .sensoryFeedback(.impact(weight: .medium), trigger: rating)
         }
         .cadenceCard()
     }
