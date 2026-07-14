@@ -25,6 +25,8 @@ enum PatternEngine {
         if let card = energyTrendDecline(logs: sorted) { cards.append(card) }
         if let card = moodSleepCorrelation(logs: sorted) { cards.append(card) }
         if let card = daylightMoodCorrelation(logs: sorted) { cards.append(card) }
+        if let card = workoutMoodCorrelation(logs: sorted) { cards.append(card) }
+        if let card = workoutRecoveryPattern(logs: sorted) { cards.append(card) }
         cards.append(contentsOf: medicationEffects(medications: medications, logs: sorted))
         cards.append(contentsOf: factorCorrelations(logs: sorted))
         cards.append(contentsOf: trackerCorrelations(trackers: trackers, logs: sorted))
@@ -463,6 +465,63 @@ enum PatternEngine {
             ))
         }
         return cards
+    }
+
+    // HealthKit-fed workout patterns. A "workout day" is any day Health
+    // recorded a workout (hkWorkoutMinutes is nil when there were none, so
+    // users without Health access simply never grow a workout side and the
+    // detectors stay silent — never a guess from missing data).
+    //
+    // Same-day: workout days vs rest days, compared on mood. Only the
+    // actionable direction surfaces (workouts → better mood).
+    private static func workoutMoodCorrelation(logs: [DailyLogSnapshot]) -> InsightCard? {
+        let workoutDays = logs.filter { ($0.hkWorkoutMinutes ?? 0) > 0 }
+        let restDays = logs.filter { ($0.hkWorkoutMinutes ?? 0) <= 0 }
+        guard let comparison = compareMeans(
+            workoutDays.map { Double($0.mood) },
+            restDays.map { Double($0.mood) },
+            minimumPerSide: PatternThreshold.minimumWorkoutDays
+        ), comparison.delta > PatternThreshold.moodDiffThreshold else { return nil }
+        return InsightCard(
+            key: "workout-mood",
+            title: "Workout days tend to come with better mood",
+            detail: "On days with a workout, your mood is \(String(format: "%.1f", comparison.delta)) points higher on average than on rest days.",
+            icon: "figure.run",
+            color: CadenceColor.successGreen,
+            confidence: comparativeConfidence(delta: comparison.delta, sampleSize: comparison.sampleSize),
+            category: .mood
+        )
+    }
+
+    // Next-day: symptom count the day AFTER a workout vs after a rest day —
+    // a pacing/recovery observation for users whose symptoms flare after
+    // exertion. Only consecutive-day pairs participate (a gap says nothing
+    // about recovery), and only the rise direction surfaces: "workouts →
+    // fewer symptoms tomorrow" is too easily read as exercise advice.
+    private static func workoutRecoveryPattern(logs: [DailyLogSnapshot]) -> InsightCard? {
+        var afterWorkout: [Double] = []
+        var afterRest: [Double] = []
+        for i in 1..<max(logs.count, 1) where isNextCalendarDay(logs[i].date, after: logs[i - 1].date) {
+            let nextDaySymptoms = Double(logs[i].symptoms.count)
+            if (logs[i - 1].hkWorkoutMinutes ?? 0) > 0 {
+                afterWorkout.append(nextDaySymptoms)
+            } else {
+                afterRest.append(nextDaySymptoms)
+            }
+        }
+        guard let comparison = compareMeans(
+            afterWorkout, afterRest,
+            minimumPerSide: PatternThreshold.minimumWorkoutDays
+        ), comparison.delta >= PatternThreshold.workoutSymptomDeltaThreshold else { return nil }
+        return InsightCard(
+            key: "workout-recovery",
+            title: "Symptoms tend to rise the day after a workout",
+            detail: "The day after a workout you average \(String(format: "%.1f", comparison.meanA)) symptoms, versus \(String(format: "%.1f", comparison.meanB)) after rest days — how your body responds to activity may be worth noticing.",
+            icon: "figure.run.circle",
+            color: CadenceColor.energyOrange,
+            confidence: comparativeConfidence(delta: comparison.delta, sampleSize: comparison.sampleSize),
+            category: .symptom
+        )
     }
 
     // Mirrors moodSleepCorrelation for HealthKit's time-in-daylight: split the

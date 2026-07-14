@@ -174,6 +174,7 @@ enum PDFBuilder {
         hkAverage("Blood oxygen", logs.compactMap(\.hkBloodOxygen)) { String(format: "%.0f%%", $0) }
         hkAverage("Time in daylight", logs.compactMap(\.hkDaylightMinutes)) { String(format: "%.0f min", $0) }
         hkAverage("Daytime heart rate", logs.compactMap(\.hkDaytimeHR)) { String(format: "%.0f bpm", $0) }
+        hkAverage("Workout time", logs.compactMap(\.hkWorkoutMinutes)) { String(format: "%.0f min", $0) }
         if !hkLines.isEmpty {
             y += 16
             breakIfNeeded(y: &y, needing: 44, ctx: ctx)

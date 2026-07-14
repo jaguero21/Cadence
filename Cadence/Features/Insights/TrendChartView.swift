@@ -21,6 +21,21 @@ struct ChartSeries {
         higherIsBetter.map { (delta > 0) == $0 }
     }
 
+    // HealthKit workout minutes. Days without a workout are skipped, never
+    // drawn as zero — nil can't distinguish "rest day" from "no Health
+    // access". The badge is neutral: more exercise isn't unconditionally
+    // better for someone pacing around symptoms.
+    static func workoutMinutes(longestSession: Double) -> ChartSeries {
+        ChartSeries(
+            label: String(localized: "Workout Minutes"),
+            icon: "figure.run",
+            color: CadenceColor.successGreen,
+            yDomain: 0...max(60, longestSession),
+            higherIsBetter: nil,
+            value: { $0.hkWorkoutMinutes }
+        )
+    }
+
     static func custom(_ tracker: CustomTracker) -> ChartSeries {
         // Capture plain values, not the @Model, so the closure can't touch a
         // deleted tracker's backing data.
