@@ -5,6 +5,9 @@ enum NotificationID {
     static let weeklyReview = "weekly-review"
     static let streakRisk   = "streak-risk"
     static let insight      = "insight-notification"
+    // Per-medication reminders: prefix + name + minute, so the sync sweep can
+    // find every medication request without tracking ids anywhere.
+    static let medicationPrefix = "med-reminder-"
 }
 
 @MainActor
@@ -96,6 +99,47 @@ final class NotificationService: NotificationServiceProtocol {
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: NotificationID.insight, content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request)
+    }
+
+    // Reconciles pending medication reminders with the store: sweep away every
+    // request carrying the medication prefix, then reschedule the active
+    // medications' times. Delete-then-write keeps edits, deletions, renames,
+    // and ended courses all handled by the same idempotent pass — no per-change
+    // bookkeeping to get wrong.
+    func syncMedicationReminders(_ medications: [MedicationSnapshot]) async {
+        let center = UNUserNotificationCenter.current()
+        let stale = await center.pendingNotificationRequests()
+            .map(\.identifier)
+            .filter { $0.hasPrefix(NotificationID.medicationPrefix) }
+        center.removePendingNotificationRequests(withIdentifiers: stale)
+
+        for med in medications where med.isActive {
+            for minute in Set(med.reminderMinutes) where (0..<1440).contains(minute) {
+                var components = DateComponents()
+                components.hour = minute / 60
+                components.minute = minute % 60
+                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+                let content = UNMutableNotificationContent()
+                content.title = "Medication reminder"
+                content.body = "Time for \(med.displayLabel)."
+                content.sound = .default
+                let request = UNNotificationRequest(
+                    identifier: Self.medicationReminderID(name: med.name, minute: minute),
+                    content: content,
+                    trigger: trigger
+                )
+                // In an async context add() resolves to the throwing overload;
+                // a failed add (e.g. permission revoked) is fine to drop —
+                // the next sync pass rebuilds everything anyway.
+                try? await center.add(request)
+            }
+        }
+    }
+
+    // Pure and unit-tested. Two active medications with the SAME name collapse
+    // to one request per time — matching the app's name-keyed dedup rule.
+    nonisolated static func medicationReminderID(name: String, minute: Int) -> String {
+        "\(NotificationID.medicationPrefix)\(name)-\(minute)"
     }
 
     func removeNotification(id: String) {

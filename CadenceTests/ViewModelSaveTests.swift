@@ -32,6 +32,7 @@ private final class FakeNotificationService: NotificationServiceProtocol {
     func scheduleWeeklyReviewReminder(weekday: Int, hour: Int) {}
     func scheduleStreakAtRisk() {}
     func sendInsightNotification(title: String) {}
+    func syncMedicationReminders(_ medications: [MedicationSnapshot]) async {}
     func removeNotification(id: String) { removedIDs.append(id) }
     func removeAll() {}
 }

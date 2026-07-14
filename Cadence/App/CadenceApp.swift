@@ -164,8 +164,10 @@ struct ContentView: View {
             checkForNewInsights()
             refreshTodayHealthData()
             openCheckInIfRequested()
+            syncMedicationReminders()
         }
         .task { seedSymptomTagsIfNeeded() }
+        .task { syncMedicationReminders() }
         .task { applyPendingQuickLogs() }
         .task { openCheckInIfRequested() }
         .sheet(isPresented: $showingControlCheckIn) {
@@ -178,6 +180,18 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Cadence couldn't open its database (a migration may be needed). Your data is safe, but changes made this session won't be saved. Try deleting and reinstalling the app if this persists.")
+        }
+    }
+
+    // On foreground, reconcile scheduled medication reminders with the store —
+    // this is what silences reminders for a course whose end date has passed
+    // (or one deleted on another device via CloudKit) without the user
+    // touching the medication screen.
+    private func syncMedicationReminders() {
+        guard !AppLaunch.isUITesting else { return }
+        let snapshots = ((try? modelContext.fetch(FetchDescriptor<Medication>())) ?? []).map(MedicationSnapshot.init)
+        Task { [notificationService] in
+            await notificationService.syncMedicationReminders(snapshots)
         }
     }
 
