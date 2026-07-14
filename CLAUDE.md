@@ -312,8 +312,21 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 
 - The doctor/personal PDF is built by `PDFBuilder`; a spreadsheet export is built
   by `CSVBuilder` (`csvString(from:)` is the pure, testable core; `build(logs:)`
-  writes the temp file). Both are driven from `ExportView` and shared via
-  `ShareSheet`.
+  writes the temp file). Both are driven from `ExportView`; PDFs open in
+  `ReportPreviewSheet` (PDFKit) with sharing in its toolbar — never straight
+  into a blind share sheet — while the CSV still uses `ShareSheet`.
+- `PDFBuilder` layout goes through the private `Cursor` class (page breaks,
+  per-page footer with page number + disclaimer, `section`/`line`/`bar`
+  primitives) — don't hand-place `y` offsets in renderers. Both report types
+  open with a shared header (date range, "N of M days logged", generated
+  date) and a **Trends** grid of Swift Charts images rendered via
+  `ImageRenderer` on the MainActor *before* the PDF context opens (mood,
+  energy, sleep quality, anxiety; skipped under 2 logs). Print inks come from
+  `printColor(_:fallback:)`, which resolves catalog colors for LIGHT mode —
+  a report generated on a dark-mode phone must not use dark-variant colors.
+  Symptom frequency renders as proportional bars carrying avg severity.
+  The Export screen's "Includes" list must stay truthful to what the PDFs
+  actually contain.
 - "Appointment" flow: `UserDefaultsKey.lastVisitDate` stores a visit anchor
   (`timeIntervalSinceReferenceDate`, 0 = unset) so a report can be scoped to
   everything since the last visit.
