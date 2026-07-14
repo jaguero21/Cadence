@@ -385,6 +385,16 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   localizes; then `Text(thatString)` displays the already-localized value.
 - Not yet migrated: debug-only copy behind the simulated-data tooling in
   `SettingsView` (the `seedResultMessage` interpolations) — intentionally left.
+- **Spanish (`es`) ships.** All catalog keys carry `es` translations
+  (`knownRegions` includes `es`). When a new key appears in the catalog after
+  a build, add its `es` value — an untranslated key silently falls back to
+  English. Test with the scheme's App Language = Spanish, or
+  `-AppleLanguages (es)`.
+- **Known English-only surfaces** (plain `String` literals that never reach
+  the catalog, each a deliberate follow-up, not an accident): `PDFBuilder`
+  report copy, `PatternEngine` insight titles/details, `NotificationService`
+  notification bodies, and the widget/watch targets (which would need their
+  own `Localizable.xcstrings` in their synchronized folders).
 
 ## Testing
 
