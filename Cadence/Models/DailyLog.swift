@@ -39,6 +39,7 @@ final class DailyLog {
     var hkBloodOxygen: Double?       // %, overnight average SpO2
     var hkDaylightMinutes: Double?   // minutes of daylight today (iOS 17 / watchOS 10)
     var hkDaytimeHR: Double?         // bpm, today's average heart rate (all samples)
+    var hkWorkoutMinutes: Double?    // total workout duration today; nil = no workouts
 
     init(date: Date = .now) {
         self.date = Calendar.current.startOfDay(for: date)
@@ -120,6 +121,7 @@ struct DailyLogSnapshot: Sendable {
     let hkBloodOxygen: Double?
     let hkDaylightMinutes: Double?
     let hkDaytimeHR: Double?
+    let hkWorkoutMinutes: Double?
 
     init(_ log: DailyLog) {
         date           = log.date
@@ -154,6 +156,7 @@ struct DailyLogSnapshot: Sendable {
         hkBloodOxygen  = log.hkBloodOxygen
         hkDaylightMinutes = log.hkDaylightMinutes
         hkDaytimeHR    = log.hkDaytimeHR
+        hkWorkoutMinutes = log.hkWorkoutMinutes
     }
 
     init(
@@ -185,7 +188,8 @@ struct DailyLogSnapshot: Sendable {
         hkRespiratoryRate: Double? = nil,
         hkBloodOxygen: Double? = nil,
         hkDaylightMinutes: Double? = nil,
-        hkDaytimeHR: Double? = nil
+        hkDaytimeHR: Double? = nil,
+        hkWorkoutMinutes: Double? = nil
     ) {
         self.date = date
         self.mood = mood
@@ -216,6 +220,7 @@ struct DailyLogSnapshot: Sendable {
         self.hkBloodOxygen = hkBloodOxygen
         self.hkDaylightMinutes = hkDaylightMinutes
         self.hkDaytimeHR = hkDaytimeHR
+        self.hkWorkoutMinutes = hkWorkoutMinutes
     }
 }
 

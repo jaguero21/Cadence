@@ -29,6 +29,7 @@ import SwiftData
         log.freeNote = "rough morning"
         log.isComplete = true
         log.hkSteps = 8200
+        log.hkWorkoutMinutes = 52
         log.peaksAndValleysNote = "Best: a walk. Worst: a headache."
         log.intentionsForTomorrow = "Sleep earlier"
 
@@ -62,6 +63,7 @@ import SwiftData
         #expect(log.factors == ["Alcohol"])
         #expect(log.customMetrics.first?.trackerID == trackerID)
         #expect(log.hkSteps == 8200)
+        #expect(log.hkWorkoutMinutes == 52)
         #expect(log.peaksAndValleysNote == "Best: a walk. Worst: a headache.")
         #expect(log.intentionsForTomorrow == "Sleep earlier")
         let review = try #require(decoded.weeklyReviews.first)

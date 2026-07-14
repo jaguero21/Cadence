@@ -78,6 +78,17 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `daylightMoodCorrelation` (`daylight-mood`) mirrors mood-sleep for
   HealthKit's time-in-daylight — only the actionable direction (more daylight
   → better mood) surfaces.
+- **Workout detail:** `DailyLog.hkWorkoutMinutes` (total workout duration; nil
+  = no workouts, so a "workout day" is inferable but missing-data never is) is
+  fetched by `fetchWorkoutDetail` alongside the `intenseWorkout` gate that
+  auto-selects the "Intense exercise" factor chip. Two one-direction-only
+  detectors: `workoutMoodCorrelation` (`workout-mood`, workout days → better
+  mood) and `workoutRecoveryPattern` (`workout-recovery`, MORE symptoms the
+  day after a workout, consecutive-day pairs only — the "fewer symptoms"
+  direction is suppressed because it reads as exercise advice). Charted via
+  `ChartSeries.workoutMinutes(longestSession:)` (neutral badge, shown only
+  when the window has a workout); in LogDetailView, doctor PDF, CSV, backup
+  like every `hk*` field.
 - **HealthKit is always optional.** HK values only prefill or supplement —
   the sleep sliders, the "Menstrual cycle" factor chip (auto-selected via
   `LogInputFlow.menstrualCycleFactorName` when Health has a flow entry today),

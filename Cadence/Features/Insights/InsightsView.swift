@@ -125,6 +125,13 @@ struct InsightsView: View {
                     TrendChartView(logs: filtered, series: .custom(tracker), range: vm.chartRange,
                                    previousLogs: previous, onOpenDay: openDay)
                 }
+                // Workout minutes from HealthKit — only once any day in the
+                // window actually carries one (no empty chart for users
+                // without Health access or workouts).
+                if let longest = filtered.compactMap(\.hkWorkoutMinutes).max() {
+                    TrendChartView(logs: filtered, series: .workoutMinutes(longestSession: longest),
+                                   range: vm.chartRange, previousLogs: previous, onOpenDay: openDay)
+                }
             }
         }
     }
