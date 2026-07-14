@@ -187,6 +187,24 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - **Haptics:** `UINotificationFeedbackGenerator().notificationOccurred(...)` on
   successful saves.
 
+## iPad
+
+- The app + unit-test targets are `TARGETED_DEVICE_FAMILY = "1,2"`; iPhone is
+  portrait-only, iPad supports all four orientations
+  (`UISupportedInterfaceOrientations~ipad`) — required, since
+  `UIApplicationSupportsMultipleScenes` is on (Stage Manager resizing).
+- **One layout, adapted — no forked iPad views.** Scrolling card columns get
+  `.readableColumn()` (caps at `CadenceLayout.readableColumnWidth`, centered)
+  on the padded VStack inside the ScrollView; the TabView gets
+  `.adaptableTabBar()` (iOS 18 `.sidebarAdaptable` — top bar/sidebar on iPad,
+  classic bottom bar on iPhone). Apply `.readableColumn()` to any NEW
+  scrolling card screen.
+- `InsightsView` is the exception: its column caps at `insightsColumnWidth`
+  and charts + insight cards flow through `gridColumns` (2-up when
+  `horizontalSizeClass == .regular`, single column otherwise). Lists/Forms
+  (Weekly Review, Settings) stay native full-width; sheets are system form
+  sheets on iPad and need no width handling.
+
 ## Widget
 
 - `CadenceWidgetExtension` (folder `CadenceWidget/`, a synchronized file-system

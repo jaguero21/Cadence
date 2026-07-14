@@ -78,6 +78,7 @@ struct HistoryView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, isFiltering ? 8 : 0)
+                .readableColumn()
             }
             .background(CadenceColor.background)
             .navigationTitle("History")

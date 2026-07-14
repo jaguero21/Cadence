@@ -152,6 +152,8 @@ struct ContentView: View {
                 .tag(Tab.history)
         }
         .tint(CadenceColor.accent)
+        // iPad: top tab bar with a switchable sidebar (iOS 18); iPhone unchanged.
+        .adaptableTabBar()
         // iOS 26: the tab bar tucks away while scrolling charts/history.
         .minimizableTabBar()
         .onChange(of: scenePhase) { _, phase in
