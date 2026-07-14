@@ -35,6 +35,7 @@ struct DailyLogView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 32)
+                .readableColumn()
             }
             .background(CadenceColor.background)
             .navigationTitle("Daily Log")
