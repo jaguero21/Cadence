@@ -3,6 +3,7 @@ import SwiftData
 
 struct MedicationsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.notificationService) private var notificationService
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
     @State private var editing: Medication?
     @State private var showingAdd = false
@@ -26,6 +27,14 @@ struct MedicationsView: View {
                 }
                 .onDelete { offsets in
                     offsets.forEach { modelContext.delete(medications[$0]) }
+                    // Deleted meds must not keep firing reminders.
+                    let snapshots = medications
+                        .enumerated()
+                        .filter { !offsets.contains($0.offset) }
+                        .map { MedicationSnapshot($0.element) }
+                    Task { [notificationService] in
+                        await notificationService.syncMedicationReminders(snapshots)
+                    }
                 }
             }
         }
@@ -75,6 +84,7 @@ struct MedicationsView: View {
 private struct MedicationEditSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.notificationService) private var notificationService
 
     let medication: Medication?
 
@@ -84,6 +94,7 @@ private struct MedicationEditSheet: View {
     @State private var hasEnded: Bool = false
     @State private var endDate: Date = .now
     @State private var notes: String = ""
+    @State private var reminderTimes: [Date] = []
 
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
@@ -103,6 +114,26 @@ private struct MedicationEditSheet: View {
                         DatePicker("Stopped", selection: $endDate, in: startDate..., displayedComponents: .date)
                     }
                 }
+                Section {
+                    ForEach(reminderTimes.indices, id: \.self) { index in
+                        DatePicker("Reminder \(index + 1)",
+                                   selection: $reminderTimes[index],
+                                   displayedComponents: .hourAndMinute)
+                    }
+                    .onDelete { reminderTimes.remove(atOffsets: $0) }
+                    Button {
+                        // Next new slot defaults to 9:00 am — a common dose time.
+                        let nine = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: .now) ?? .now
+                        reminderTimes.append(nine)
+                    } label: {
+                        Label("Add reminder time", systemImage: "plus.circle.fill")
+                    }
+                } header: {
+                    Text("Reminders")
+                } footer: {
+                    Text("A daily notification for each time, while this medication is active. Swipe a time to remove it.")
+                }
+
                 Section("Notes") {
                     TextField("Optional", text: $notes, axis: .vertical)
                         .lineLimit(1...4)
@@ -132,19 +163,34 @@ private struct MedicationEditSheet: View {
             endDate = end
         }
         notes = medication.notes
+        reminderTimes = medication.reminderMinutes.sorted().map(Medication.timeToday(fromMinute:))
     }
 
     private func save() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let resolvedEnd = hasEnded ? endDate : nil
+        let minutes = Array(Set(reminderTimes.map(Medication.minuteOfDay(from:)))).sorted()
         if let medication {
             medication.name = trimmedName
             medication.dosage = dosage
             medication.startDate = Calendar.current.startOfDay(for: startDate)
             medication.endDate = resolvedEnd.map { Calendar.current.startOfDay(for: $0) }
             medication.notes = notes
+            medication.reminderMinutes = minutes
         } else {
-            modelContext.insert(Medication(name: trimmedName, dosage: dosage, startDate: startDate, endDate: resolvedEnd, notes: notes))
+            modelContext.insert(Medication(name: trimmedName, dosage: dosage, startDate: startDate, endDate: resolvedEnd, notes: notes, reminderMinutes: minutes))
+        }
+        // Reconcile scheduled notifications with the whole store (this med's
+        // times may have changed, another's course may have ended). Asking for
+        // permission only when a reminder actually exists keeps the prompt
+        // honest; the fetch runs before dismiss so the context is still live.
+        let snapshots = ((try? modelContext.fetch(FetchDescriptor<Medication>())) ?? []).map(MedicationSnapshot.init)
+        let needsPermission = !minutes.isEmpty
+        Task { [notificationService] in
+            if needsPermission {
+                await notificationService.requestAuthorization()
+            }
+            await notificationService.syncMedicationReminders(snapshots)
         }
         dismiss()
     }

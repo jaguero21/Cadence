@@ -15,6 +15,18 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `PatternEngine.medicationEffects` compares average daily symptom count before
   vs after the start date and surfaces an `.symptom` `InsightCard`. Medications
   flow into both the in-app Insights tab and the doctor PDF.
+- **Medication reminders:** `Medication.reminderMinutes: [Int]` (minutes since
+  midnight; `[]` = off) drives daily local notifications.
+  `NotificationService.syncMedicationReminders(_:)` is a **reconcile sweep**:
+  remove every pending request with `NotificationID.medicationPrefix`, then
+  reschedule active meds — edits, deletions, renames, and ended courses all
+  ride the same idempotent pass (no per-change bookkeeping). Called from the
+  medication editor's save, the list's delete, and `ContentView` on foreground
+  (which is what silences a course whose end date passed, or one removed on
+  another device). The permission prompt only fires when a reminder actually
+  exists. `medicationReminderID(name:minute:)` and the
+  `Medication.minuteOfDay`/`timeToday` picker conversions are pure and
+  unit-tested; reminders round-trip through `BackupService`.
 - **Custom trackers:** `CustomTracker` (`@Attribute(.unique) id: UUID`, name,
   min/max, unit) defines user metrics; per-day values live on
   `DailyLog.customMetrics: [MetricEntry]` keyed by the tracker's stable `id` (so
@@ -241,6 +253,14 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `WidgetData.requestCheckInOpen` (controls run in the extension process);
   `ContentView.openCheckInIfRequested` consumes it on foreground and presents
   `LogInputFlow` directly.
+- **Lock Screen / StandBy**: the same widget also serves `accessoryCircular`
+  / `accessoryRectangular` / `accessoryInline` (per-family switch in
+  `CadenceWidgetEntryView`). Circular/rectangular are wrapped in
+  `Button(intent: OpenCheckInIntent())` — tap goes straight into today's log
+  via the Control Center stash; they never log by themselves. Key content is
+  `.widgetAccentable()` for tinted/vibrant rendering. StandBy just shows the
+  `systemSmall` family. The widget extension's deployment target is 26.4
+  (the app's is 17.0), so iOS 18 APIs need no gating inside `CadenceWidget/`.
 
 ## App Intents (Siri / Shortcuts)
 
