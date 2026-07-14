@@ -87,6 +87,7 @@ enum BackupService {
         var startDate: Date
         var endDate: Date?
         var notes: String = ""
+        var reminderMinutes: [Int] = []
     }
 
     struct FlareBackup: Codable {
@@ -151,7 +152,7 @@ enum BackupService {
             },
             medications: medications.map {
                 MedicationBackup(name: $0.name, dosage: $0.dosage, startDate: $0.startDate,
-                                 endDate: $0.endDate, notes: $0.notes)
+                                 endDate: $0.endDate, notes: $0.notes, reminderMinutes: $0.reminderMinutes)
             },
             flares: flares.map {
                 FlareBackup(startDate: $0.startDate, endDate: $0.endDate,
@@ -292,7 +293,7 @@ enum BackupService {
             existingMeds.insert(identity)
             context.insert(Medication(name: backup.name, dosage: backup.dosage,
                                       startDate: backup.startDate, endDate: backup.endDate,
-                                      notes: backup.notes))
+                                      notes: backup.notes, reminderMinutes: backup.reminderMinutes))
             summary.insertedMedications += 1
         }
 
