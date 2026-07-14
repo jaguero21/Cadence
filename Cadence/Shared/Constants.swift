@@ -107,6 +107,13 @@ enum PatternThreshold {
     // (the mood delta gate reuses moodDiffThreshold).
     static let minimumDaylightDays: Int = 7
 
+    // Workout patterns (HealthKit-fed): minimum days on each side before
+    // comparing workout days against rest days (the mood delta gate reuses
+    // moodDiffThreshold), and the smallest next-day symptom-count rise after
+    // a workout worth surfacing as a recovery/pacing observation.
+    static let minimumWorkoutDays: Int = 3
+    static let workoutSymptomDeltaThreshold: Double = 0.5
+
     // Sample-size damping for mean-comparison confidence: with this many days
     // on the comparison's thinner side, confidence is halved; it approaches the
     // raw effect size as data accumulates. Keeps a 2-point swing over 4 days
