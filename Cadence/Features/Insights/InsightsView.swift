@@ -23,6 +23,14 @@ struct InsightsView: View {
     @Environment(StoreService.self) private var store
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    // Charts and insight cards flow two-up on regular width (iPad, wide
+    // Stage Manager windows); a single column everywhere else.
+    private var gridColumns: [GridItem] {
+        let count = horizontalSizeClass == .regular ? 2 : 1
+        return Array(repeating: GridItem(.flexible(), spacing: 16, alignment: .top), count: count)
+    }
 
     var body: some View {
         NavigationStack {
@@ -38,6 +46,7 @@ struct InsightsView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 32)
+                .readableColumn(maxWidth: CadenceLayout.insightsColumnWidth)
             }
             .background(CadenceColor.background)
             .navigationTitle("Insights")
@@ -96,6 +105,9 @@ struct InsightsView: View {
             }
         }
         .pickerStyle(.segmented)
+        // Don't let the segmented control stretch across the whole
+        // two-chart-wide iPad column.
+        .frame(maxWidth: CadenceLayout.readableColumnWidth)
         .onChange(of: store.isPro) { _, isPro in
             if !isPro && vm.chartRange == .ninetyDay {
                 vm.chartRange = .thirtyDay
@@ -114,7 +126,7 @@ struct InsightsView: View {
             // tracker wasn't recorded).
             chartsEmptyState
         } else {
-            VStack(spacing: 16) {
+            LazyVGrid(columns: gridColumns, spacing: 16) {
                 ForEach(ChartMetric.allCases, id: \.self) { metric in
                     TrendChartView(logs: filtered, series: metric.series, range: vm.chartRange,
                                    previousLogs: previous, onOpenDay: openDay)
@@ -170,8 +182,10 @@ struct InsightsView: View {
                     .foregroundStyle(.secondary)
                     .cadenceCard()
             } else {
-                ForEach(vm.insights) { insight in
-                    CorrelationCardView(insight: insight)
+                LazyVGrid(columns: gridColumns, spacing: 12) {
+                    ForEach(vm.insights) { insight in
+                        CorrelationCardView(insight: insight)
+                    }
                 }
                 Text("These are observations from your own logs, shown to build awareness of how you feel day to day — not medical advice or a diagnosis.")
                     .font(.caption2)

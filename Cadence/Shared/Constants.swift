@@ -19,6 +19,10 @@ enum CadenceLayout {
     static let cardCornerRadius: CGFloat = 16
     static let cardPadding: CGFloat = 20
     static let sectionSpacing: CGFloat = 24
+    // Widest a single card column may grow (iPad / landscape); see
+    // View.readableColumn(). Insights runs wider to fit charts two-up.
+    static let readableColumnWidth: CGFloat = 640
+    static let insightsColumnWidth: CGFloat = 1000
 }
 
 enum CadenceAnimation {

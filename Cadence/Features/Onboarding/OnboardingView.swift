@@ -23,6 +23,7 @@ struct OnboardingView: View {
                 removal:   .move(edge: .leading).combined(with: .opacity)
             ))
             .id(step)
+            .readableColumn()
 
             VStack {
                 Spacer()
