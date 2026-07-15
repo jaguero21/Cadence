@@ -38,6 +38,7 @@ struct DashboardView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 32)
+                .readableColumn()
             }
             .background(AmbientMeshBackground())
             .navigationTitle("")

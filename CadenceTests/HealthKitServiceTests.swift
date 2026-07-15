@@ -294,12 +294,13 @@ struct HealthDataRefresherTests {
 
         let updated = HealthDataRefresher.refreshToday(
             context: context,
-            snapshot: HealthKitSnapshot(steps: 9800, activeEnergy: 300)
+            snapshot: HealthKitSnapshot(steps: 9800, activeEnergy: 300, workoutMinutes: 52)
         )
 
         #expect(updated)
         #expect(log.hkSteps == 9800)          // topped up
         #expect(log.hkActiveEnergy == 300)
+        #expect(log.hkWorkoutMinutes == 52)   // evening workout lands on the morning log
         #expect(log.mood == 4)                // user data untouched
     }
 
