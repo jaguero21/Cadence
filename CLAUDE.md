@@ -15,6 +15,18 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `PatternEngine.medicationEffects` compares average daily symptom count before
   vs after the start date and surfaces an `.symptom` `InsightCard`. Medications
   flow into both the in-app Insights tab and the doctor PDF.
+- **Medication reminders:** `Medication.reminderMinutes: [Int]` (minutes since
+  midnight; `[]` = off) drives daily local notifications.
+  `NotificationService.syncMedicationReminders(_:)` is a **reconcile sweep**:
+  remove every pending request with `NotificationID.medicationPrefix`, then
+  reschedule active meds — edits, deletions, renames, and ended courses all
+  ride the same idempotent pass (no per-change bookkeeping). Called from the
+  medication editor's save, the list's delete, and `ContentView` on foreground
+  (which is what silences a course whose end date passed, or one removed on
+  another device). The permission prompt only fires when a reminder actually
+  exists. `medicationReminderID(name:minute:)` and the
+  `Medication.minuteOfDay`/`timeToday` picker conversions are pure and
+  unit-tested; reminders round-trip through `BackupService`.
 - **Custom trackers:** `CustomTracker` (`@Attribute(.unique) id: UUID`, name,
   min/max, unit) defines user metrics; per-day values live on
   `DailyLog.customMetrics: [MetricEntry]` keyed by the tracker's stable `id` (so
@@ -78,6 +90,17 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `daylightMoodCorrelation` (`daylight-mood`) mirrors mood-sleep for
   HealthKit's time-in-daylight — only the actionable direction (more daylight
   → better mood) surfaces.
+- **Workout detail:** `DailyLog.hkWorkoutMinutes` (total workout duration; nil
+  = no workouts, so a "workout day" is inferable but missing-data never is) is
+  fetched by `fetchWorkoutDetail` alongside the `intenseWorkout` gate that
+  auto-selects the "Intense exercise" factor chip. Two one-direction-only
+  detectors: `workoutMoodCorrelation` (`workout-mood`, workout days → better
+  mood) and `workoutRecoveryPattern` (`workout-recovery`, MORE symptoms the
+  day after a workout, consecutive-day pairs only — the "fewer symptoms"
+  direction is suppressed because it reads as exercise advice). Charted via
+  `ChartSeries.workoutMinutes(longestSession:)` (neutral badge, shown only
+  when the window has a workout); in LogDetailView, doctor PDF, CSV, backup
+  like every `hk*` field.
 - **HealthKit is always optional.** HK values only prefill or supplement —
   the sleep sliders, the "Menstrual cycle" factor chip (auto-selected via
   `LogInputFlow.menstrualCycleFactorName` when Health has a flow entry today),
@@ -176,6 +199,24 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - **Haptics:** `UINotificationFeedbackGenerator().notificationOccurred(...)` on
   successful saves.
 
+## iPad
+
+- The app + unit-test targets are `TARGETED_DEVICE_FAMILY = "1,2"`; iPhone is
+  portrait-only, iPad supports all four orientations
+  (`UISupportedInterfaceOrientations~ipad`) — required, since
+  `UIApplicationSupportsMultipleScenes` is on (Stage Manager resizing).
+- **One layout, adapted — no forked iPad views.** Scrolling card columns get
+  `.readableColumn()` (caps at `CadenceLayout.readableColumnWidth`, centered)
+  on the padded VStack inside the ScrollView; the TabView gets
+  `.adaptableTabBar()` (iOS 18 `.sidebarAdaptable` — top bar/sidebar on iPad,
+  classic bottom bar on iPhone). Apply `.readableColumn()` to any NEW
+  scrolling card screen.
+- `InsightsView` is the exception: its column caps at `insightsColumnWidth`
+  and charts + insight cards flow through `gridColumns` (2-up when
+  `horizontalSizeClass == .regular`, single column otherwise). Lists/Forms
+  (Weekly Review, Settings) stay native full-width; sheets are system form
+  sheets on iPad and need no width handling.
+
 ## Widget
 
 - `CadenceWidgetExtension` (folder `CadenceWidget/`, a synchronized file-system
@@ -212,6 +253,14 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `WidgetData.requestCheckInOpen` (controls run in the extension process);
   `ContentView.openCheckInIfRequested` consumes it on foreground and presents
   `LogInputFlow` directly.
+- **Lock Screen / StandBy**: the same widget also serves `accessoryCircular`
+  / `accessoryRectangular` / `accessoryInline` (per-family switch in
+  `CadenceWidgetEntryView`). Circular/rectangular are wrapped in
+  `Button(intent: OpenCheckInIntent())` — tap goes straight into today's log
+  via the Control Center stash; they never log by themselves. Key content is
+  `.widgetAccentable()` for tinted/vibrant rendering. StandBy just shows the
+  `systemSmall` family. The widget extension's deployment target is 26.4
+  (the app's is 17.0), so iOS 18 APIs need no gating inside `CadenceWidget/`.
 
 ## App Intents (Siri / Shortcuts)
 
@@ -283,8 +332,21 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 
 - The doctor/personal PDF is built by `PDFBuilder`; a spreadsheet export is built
   by `CSVBuilder` (`csvString(from:)` is the pure, testable core; `build(logs:)`
-  writes the temp file). Both are driven from `ExportView` and shared via
-  `ShareSheet`.
+  writes the temp file). Both are driven from `ExportView`; PDFs open in
+  `ReportPreviewSheet` (PDFKit) with sharing in its toolbar — never straight
+  into a blind share sheet — while the CSV still uses `ShareSheet`.
+- `PDFBuilder` layout goes through the private `Cursor` class (page breaks,
+  per-page footer with page number + disclaimer, `section`/`line`/`bar`
+  primitives) — don't hand-place `y` offsets in renderers. Both report types
+  open with a shared header (date range, "N of M days logged", generated
+  date) and a **Trends** grid of Swift Charts images rendered via
+  `ImageRenderer` on the MainActor *before* the PDF context opens (mood,
+  energy, sleep quality, anxiety; skipped under 2 logs). Print inks come from
+  `printColor(_:fallback:)`, which resolves catalog colors for LIGHT mode —
+  a report generated on a dark-mode phone must not use dark-variant colors.
+  Symptom frequency renders as proportional bars carrying avg severity.
+  The Export screen's "Includes" list must stay truthful to what the PDFs
+  actually contain.
 - "Appointment" flow: `UserDefaultsKey.lastVisitDate` stores a visit anchor
   (`timeIntervalSinceReferenceDate`, 0 = unset) so a report can be scoped to
   everything since the last visit.
@@ -323,6 +385,16 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   localizes; then `Text(thatString)` displays the already-localized value.
 - Not yet migrated: debug-only copy behind the simulated-data tooling in
   `SettingsView` (the `seedResultMessage` interpolations) — intentionally left.
+- **Spanish (`es`) ships.** All catalog keys carry `es` translations
+  (`knownRegions` includes `es`). When a new key appears in the catalog after
+  a build, add its `es` value — an untranslated key silently falls back to
+  English. Test with the scheme's App Language = Spanish, or
+  `-AppleLanguages (es)`.
+- **Known English-only surfaces** (plain `String` literals that never reach
+  the catalog, each a deliberate follow-up, not an accident): `PDFBuilder`
+  report copy, `PatternEngine` insight titles/details, `NotificationService`
+  notification bodies, and the widget/watch targets (which would need their
+  own `Localizable.xcstrings` in their synchronized folders).
 
 ## Testing
 

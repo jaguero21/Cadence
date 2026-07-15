@@ -29,6 +29,7 @@ import SwiftData
         log.freeNote = "rough morning"
         log.isComplete = true
         log.hkSteps = 8200
+        log.hkWorkoutMinutes = 52
         log.peaksAndValleysNote = "Best: a walk. Worst: a headache."
         log.intentionsForTomorrow = "Sleep earlier"
 
@@ -42,7 +43,7 @@ import SwiftData
             dailyLogs: [log],
             weeklyReviews: [review],
             symptomTags: [BackupService.SymptomTagBackup(name: "Tinnitus", emoji: "🔔", isDefault: false, sortOrder: 9)],
-            medications: [BackupService.MedicationBackup(name: "Sertraline", dosage: "50 mg", startDate: day(30))],
+            medications: [BackupService.MedicationBackup(name: "Sertraline", dosage: "50 mg", startDate: day(30), reminderMinutes: [540])],
             flares: [BackupService.FlareBackup(startDate: day(14), endDate: day(12), peakSeverity: 8, note: "bad stretch")],
             customTrackers: [BackupService.CustomTrackerBackup(id: trackerID, name: "Hydration", minValue: 0, maxValue: 8, unit: "glasses", sortOrder: 0)]
         )
@@ -62,6 +63,7 @@ import SwiftData
         #expect(log.factors == ["Alcohol"])
         #expect(log.customMetrics.first?.trackerID == trackerID)
         #expect(log.hkSteps == 8200)
+        #expect(log.hkWorkoutMinutes == 52)
         #expect(log.peaksAndValleysNote == "Best: a walk. Worst: a headache.")
         #expect(log.intentionsForTomorrow == "Sleep earlier")
         let review = try #require(decoded.weeklyReviews.first)
@@ -69,6 +71,7 @@ import SwiftData
         #expect(review.intentionsForTomorrow == "Start the week with a plan")
         #expect(decoded.symptomTags.first?.name == "Tinnitus")
         #expect(decoded.medications.first?.dosage == "50 mg")
+        #expect(decoded.medications.first?.reminderMinutes == [540])
         #expect(decoded.flares.first?.peakSeverity == 8)
         let tracker = try #require(decoded.customTrackers.first)
         #expect(tracker.id == trackerID)

@@ -118,3 +118,45 @@ struct ExportRangeOverlapTests {
         #expect(!(weekStart <= exportEnd && weekEnd >= exportStart))
     }
 }
+
+// MARK: - Medication reminders
+
+@Suite("NotificationService – medication reminders")
+@MainActor
+struct MedicationReminderTests {
+
+    @Test("Reminder id is prefix + name + minute")
+    func reminderIDShape() {
+        let id = NotificationService.medicationReminderID(name: "Sertraline", minute: 540)
+        #expect(id == "med-reminder-Sertraline-540")
+        #expect(id.hasPrefix(NotificationID.medicationPrefix))
+    }
+
+    @Test("Minute-of-day round-trips through the picker Date")
+    func minuteOfDayRoundTrip() {
+        for minute in [0, 1, 540, 719, 1439] {
+            let date = Medication.timeToday(fromMinute: minute)
+            #expect(Medication.minuteOfDay(from: date) == minute)
+        }
+    }
+
+    @Test("Snapshot isActive mirrors the model rule")
+    func snapshotIsActive() {
+        let today = Calendar.current.startOfDay(for: .now)
+        #expect(MedicationSnapshot(name: "A", startDate: today).isActive)
+        #expect(MedicationSnapshot(name: "B", startDate: today, endDate: today).isActive)   // ends today = still active
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
+        #expect(!MedicationSnapshot(name: "C", startDate: yesterday, endDate: yesterday).isActive)
+    }
+
+    @Test("Sync sweeps and reschedules without crashing (no permission in tests)")
+    func syncDoesNotCrash() async {
+        let meds = [
+            MedicationSnapshot(name: "Sertraline", dosage: "50 mg", startDate: .now, reminderMinutes: [540, 1260]),
+            MedicationSnapshot(name: "Old Med", startDate: .distantPast,
+                               endDate: Calendar.current.date(byAdding: .day, value: -2, to: .now), reminderMinutes: [600]),
+        ]
+        await NotificationService.shared.syncMedicationReminders(meds)
+        await NotificationService.shared.syncMedicationReminders([])   // idempotent sweep
+    }
+}

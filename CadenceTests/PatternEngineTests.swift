@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import SwiftData
+import PDFKit
 @testable import Cadence
 
 // MARK: - Helpers
@@ -29,7 +30,8 @@ private func makeSnapshot(
     hkRestingHR: Double? = nil,
     hkWristTemp: Double? = nil,
     hkRespiratoryRate: Double? = nil,
-    hkDaylightMinutes: Double? = nil
+    hkDaylightMinutes: Double? = nil,
+    hkWorkoutMinutes: Double? = nil
 ) -> DailyLogSnapshot {
     let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now)!
     return DailyLogSnapshot(
@@ -54,7 +56,8 @@ private func makeSnapshot(
         hkRestingHR: hkRestingHR,
         hkWristTemp: hkWristTemp,
         hkRespiratoryRate: hkRespiratoryRate,
-        hkDaylightMinutes: hkDaylightMinutes
+        hkDaylightMinutes: hkDaylightMinutes,
+        hkWorkoutMinutes: hkWorkoutMinutes
     )
 }
 
@@ -445,7 +448,7 @@ struct CSVBuilderTests {
             makeSnapshot(daysAgo: 2),
         ]
         let lines = CSVBuilder.csvString(from: logs).split(separator: "\n", omittingEmptySubsequences: false)
-        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes,HK Wrist Temp,HK Respiratory Rate,HK Blood Oxygen,HK Daylight Minutes,HK Daytime HR")
+        #expect(lines.first == "Date,Mood,Energy,Sleep Hours,Sleep Quality,Pain,Brain Fog,Anxiety,Symptoms,Basics,Factors,Peaks and Valleys,Peaks and Valleys Voice Memo,Intentions for Tomorrow,Note,HK Steps,HK Resting HR,HK HRV,HK Sleep Hours,HK Active Energy,HK Mindful Minutes,HK Wrist Temp,HK Respiratory Rate,HK Blood Oxygen,HK Daylight Minutes,HK Daytime HR,HK Workout Minutes")
         #expect(lines.count == 3) // header + 2 rows
         // Oldest first: the day -2 row precedes the day 0 row.
         #expect(lines[1] < lines[2]) // ISO yyyy-MM-dd sorts chronologically as text
@@ -1174,6 +1177,103 @@ struct DaylightMoodCorrelationTests {
     }
 }
 
+// MARK: - PatternEngine: workout patterns
+
+@Suite("PatternEngine – workoutMoodCorrelation")
+struct WorkoutMoodCorrelationTests {
+
+    private func workoutCards(_ logs: [DailyLogSnapshot]) -> [InsightCard] {
+        PatternEngine.allInsights(from: logs).filter { $0.key == "workout-mood" }
+    }
+
+    // 5 workout days + 5 rest days with a controllable mood on each side.
+    private func splitLogs(workoutMood: Int, restMood: Int) -> [DailyLogSnapshot] {
+        let workout = (0..<5).map { makeSnapshot(daysAgo: $0, mood: workoutMood, hkWorkoutMinutes: 40) }
+        let rest = (5..<10).map { makeSnapshot(daysAgo: $0, mood: restMood) }
+        return workout + rest
+    }
+
+    @Test("Higher mood on workout days surfaces the insight")
+    func workoutDaysBetterMood() {
+        let cards = workoutCards(splitLogs(workoutMood: 5, restMood: 3))
+        #expect(cards.count == 1)
+        #expect(cards.first?.category == .mood)
+    }
+
+    @Test("No insight when the mood difference is under the threshold")
+    func smallDifferenceStaysQuiet() {
+        #expect(workoutCards(splitLogs(workoutMood: 4, restMood: 3)).isEmpty)
+    }
+
+    @Test("The inverse direction (workout days, worse mood) is not surfaced")
+    func inverseDirectionStaysQuiet() {
+        #expect(workoutCards(splitLogs(workoutMood: 3, restMood: 5)).isEmpty)
+    }
+
+    @Test("Without HealthKit data no workout side ever forms")
+    func noHealthKitDataStaysQuiet() {
+        // All-nil workout minutes (manual-only user): the detector must not
+        // treat missing data as rest-vs-workout evidence.
+        let logs = (0..<10).map { makeSnapshot(daysAgo: $0, mood: $0 < 5 ? 5 : 3) }
+        #expect(workoutCards(logs).isEmpty)
+    }
+
+    @Test("Fewer than the minimum workout days stays quiet")
+    func tooFewWorkoutDaysStaysQuiet() {
+        let workout = (0..<2).map { makeSnapshot(daysAgo: $0, mood: 5, hkWorkoutMinutes: 40) }
+        let rest = (2..<10).map { makeSnapshot(daysAgo: $0, mood: 3) }
+        #expect(workoutCards(workout + rest).isEmpty)
+    }
+}
+
+@Suite("PatternEngine – workoutRecoveryPattern")
+struct WorkoutRecoveryPatternTests {
+
+    private func recoveryCards(_ logs: [DailyLogSnapshot]) -> [InsightCard] {
+        PatternEngine.allInsights(from: logs).filter { $0.key == "workout-recovery" }
+    }
+
+    // Alternating consecutive days: even daysAgo are workout days, and the day
+    // after each carries `afterWorkoutSymptoms`; days after rest days carry
+    // `afterRestSymptoms`. 14 consecutive days → 6+ pairs per side.
+    private func alternatingLogs(afterWorkoutSymptoms: Int, afterRestSymptoms: Int) -> [DailyLogSnapshot] {
+        (0..<14).map { daysAgo in
+            let previousDayWasWorkout = (daysAgo + 1) % 2 == 0
+            let count = previousDayWasWorkout ? afterWorkoutSymptoms : afterRestSymptoms
+            return makeSnapshot(
+                daysAgo: daysAgo,
+                symptoms: (0..<count).map { _ in fatigueEntry() },
+                hkWorkoutMinutes: daysAgo % 2 == 0 ? 45 : nil
+            )
+        }
+    }
+
+    @Test("More symptoms the day after workouts surfaces the pacing insight")
+    func symptomsRiseAfterWorkouts() {
+        let cards = recoveryCards(alternatingLogs(afterWorkoutSymptoms: 3, afterRestSymptoms: 1))
+        #expect(cards.count == 1)
+        #expect(cards.first?.category == .symptom)
+    }
+
+    @Test("Fewer symptoms after workouts is not surfaced (reads as advice)")
+    func inverseDirectionStaysQuiet() {
+        #expect(recoveryCards(alternatingLogs(afterWorkoutSymptoms: 1, afterRestSymptoms: 3)).isEmpty)
+    }
+
+    @Test("Non-consecutive days contribute no pairs")
+    func gappedLogsStayQuiet() {
+        // Every log is 2 days apart — recovery says nothing across a gap.
+        let logs = (0..<14).map { i in
+            makeSnapshot(
+                daysAgo: i * 2,
+                symptoms: i % 2 == 0 ? [fatigueEntry(), fatigueEntry(), fatigueEntry()] : [],
+                hkWorkoutMinutes: i % 2 == 1 ? 45 : nil
+            )
+        }
+        #expect(recoveryCards(logs).isEmpty)
+    }
+}
+
 // MARK: - PatternEngine: flare respiratory precursor
 
 @Suite("PatternEngine – flare respiratory precursor")
@@ -1273,5 +1373,54 @@ struct SharedStatisticsTests {
         let cards = PatternEngine.allInsights(from: logs)
         #expect(cards.count >= 2)
         #expect(zip(cards, cards.dropFirst()).allSatisfy { $0.confidence >= $1.confidence })
+    }
+}
+
+// MARK: - PDFBuilder
+
+@Suite("PDFBuilder – report generation")
+@MainActor
+struct PDFBuilderTests {
+
+    private func sampleLogs() -> [DailyLogSnapshot] {
+        (0..<10).map {
+            makeSnapshot(
+                daysAgo: $0,
+                mood: 3 + $0 % 3,
+                symptoms: $0 % 2 == 0 ? [headacheEntry()] : [],
+                factors: $0 % 3 == 0 ? ["Travel"] : [],
+                hkSteps: 8000
+            )
+        }
+    }
+
+    @Test("Doctor report renders to an openable PDF with the styled sections")
+    func doctorReportBuilds() async throws {
+        let url = try #require(await PDFBuilder.build(type: .doctor, logs: sampleLogs(), reviews: []))
+        let document = try #require(PDFDocument(url: url))
+        #expect(document.pageCount >= 1)
+        let text = (0..<document.pageCount).compactMap { document.page(at: $0)?.string }.joined()
+        #expect(text.contains("Symptom Frequency"))
+        #expect(text.contains("avg severity"))          // severity now rides the frequency bars
+        #expect(text.contains("days logged"))           // header adherence line
+        #expect(text.contains("Page 1"))                // per-page footer
+    }
+
+    @Test("Personal summary renders an overview page plus one page per review")
+    func personalSummaryBuilds() async throws {
+        let review = WeeklyReview(weekStartDate: Date().startOfWeek)
+        review.overallRating = 4
+        let url = try #require(await PDFBuilder.build(
+            type: .personal, logs: sampleLogs(), reviews: [WeeklyReviewSnapshot(review)]
+        ))
+        let document = try #require(PDFDocument(url: url))
+        #expect(document.pageCount >= 2)
+    }
+
+    @Test("Empty data still produces a valid single-page PDF")
+    func emptyDataBuilds() async throws {
+        let url = try #require(await PDFBuilder.build(type: .doctor, logs: [], reviews: []))
+        let document = try #require(PDFDocument(url: url))
+        #expect(document.pageCount == 1)
     }
 }

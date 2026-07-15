@@ -78,6 +78,7 @@ struct HistoryView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, isFiltering ? 8 : 0)
+                .readableColumn()
             }
             .background(CadenceColor.background)
             .navigationTitle("History")
@@ -385,7 +386,8 @@ struct LogDetailView: View {
                 if log.hkSteps != nil || log.hkHRV != nil || log.hkRestingHR != nil
                     || log.hkSleepHours != nil || log.hkActiveEnergy != nil || log.hkMindfulMinutes != nil
                     || log.hkWristTemp != nil || log.hkRespiratoryRate != nil || log.hkBloodOxygen != nil
-                    || log.hkDaylightMinutes != nil || log.hkDaytimeHR != nil {
+                    || log.hkDaylightMinutes != nil || log.hkDaytimeHR != nil
+                    || log.hkWorkoutMinutes != nil {
                     Section("HealthKit Data") {
                         if let steps = log.hkSteps {
                             Label("\(steps) steps", systemImage: "figure.walk")
@@ -419,6 +421,9 @@ struct LogDetailView: View {
                         }
                         if let daytimeHR = log.hkDaytimeHR {
                             Label(String(format: "Daytime HR: %.0f bpm", daytimeHR), systemImage: "heart.circle")
+                        }
+                        if let workout = log.hkWorkoutMinutes {
+                            Label(String(format: "Workouts: %.0f min", workout), systemImage: "figure.run")
                         }
                     }
                 }

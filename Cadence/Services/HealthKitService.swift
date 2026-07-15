@@ -122,7 +122,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         async let sleep = fetchSleepDetail(start: lastNightStart, end: .now)
         async let symptoms = fetchExternalSymptoms(start: todayStart, end: .now)
         async let mood = fetchExternalDailyMood(start: todayStart, end: .now)
-        async let workout = fetchHadIntenseWorkout(predicate: todayPredicate)
+        async let workout = fetchWorkoutDetail(predicate: todayPredicate)
         async let respiratory = fetchAverage(.respiratoryRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: nightPredicate)
         async let spo2 = fetchAverage(.oxygenSaturation, unit: .percent(), predicate: nightPredicate)
         async let daylight = fetchSum(.timeInDaylight, unit: .minute(), predicate: todayPredicate)
@@ -131,6 +131,7 @@ final class HealthKitService: HealthKitServiceProtocol {
         async let daytimeHR = fetchAverage(.heartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: todayPredicate)
 
         let sleepDetail = await sleep
+        let workoutDetail = await workout
         return await HealthKitSnapshot(
             steps: steps.map(Int.init),
             restingHR: hr,
@@ -143,7 +144,8 @@ final class HealthKitService: HealthKitServiceProtocol {
             menstrualFlow: flow,
             symptoms: symptoms,
             mood: mood,
-            intenseWorkout: workout,
+            intenseWorkout: workoutDetail.intense,
+            workoutMinutes: workoutDetail.minutes,
             respiratoryRate: respiratory,
             bloodOxygen: spo2.map { $0 * 100 },   // HK .percent() is 0–1; store 0–100
             daylightMinutes: daylight,
@@ -174,6 +176,9 @@ final class HealthKitService: HealthKitServiceProtocol {
         if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
             types.append(sleep)
         }
+        // Workouts usually land after the log was created (an evening run
+        // after a morning check-in) — same freshness rationale as sleep.
+        types.append(HKObjectType.workoutType())
         for type in types {
             let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completionHandler, error in
                 if let error {
@@ -495,15 +500,16 @@ final class HealthKitService: HealthKitServiceProtocol {
         }
     }
 
-    // Whether the day's workouts add up to "Intense exercise" (see
-    // isIntenseExercise). nil = no workouts, so the factor chip stays untouched;
-    // false is never reported for the same reason as menstrual flow below.
-    nonisolated private func fetchHadIntenseWorkout(predicate: NSPredicate) async -> Bool? {
+    // The day's workouts, summed: total minutes plus whether they clear the
+    // "Intense exercise" gate (see isIntenseExercise). nil = no workouts, so
+    // the factor chip and the log's minutes stay untouched; false/0 is never
+    // reported for the same reason as menstrual flow below.
+    nonisolated private func fetchWorkoutDetail(predicate: NSPredicate) async -> (minutes: Double?, intense: Bool?) {
         await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: HKObjectType.workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
-                if let error { Self.log.error("fetchHadIntenseWorkout failed: \(error, privacy: .public)") }
+                if let error { Self.log.error("fetchWorkoutDetail failed: \(error, privacy: .public)") }
                 guard error == nil, let workouts = samples as? [HKWorkout], !workouts.isEmpty else {
-                    cont.resume(returning: nil); return
+                    cont.resume(returning: (nil, nil)); return
                 }
                 let minutes = workouts.reduce(0) { $0 + $1.duration } / 60
                 let kilocalories = workouts.reduce(0.0) { total, workout in
@@ -511,7 +517,8 @@ final class HealthKitService: HealthKitServiceProtocol {
                         .sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
                     return total + energy
                 }
-                cont.resume(returning: Self.isIntenseExercise(totalMinutes: minutes, totalKilocalories: kilocalories) ? true : nil)
+                let intense = Self.isIntenseExercise(totalMinutes: minutes, totalKilocalories: kilocalories)
+                cont.resume(returning: (minutes, intense ? true : nil))
             }
             store.execute(query)
         }
@@ -621,6 +628,7 @@ extension DailyLog {
         if let spo2    = snapshot.bloodOxygen      { hkBloodOxygen    = spo2 }
         if let daylight = snapshot.daylightMinutes { hkDaylightMinutes = daylight }
         if let hr      = snapshot.daytimeHR        { hkDaytimeHR      = hr }
+        if let workout = snapshot.workoutMinutes   { hkWorkoutMinutes = workout }
     }
 }
 
@@ -668,6 +676,7 @@ struct HealthKitSnapshot {
     var symptoms: [SymptomEntry] = []   // today's symptoms from OTHER apps, mapped to Cadence names
     var mood: Int?                // 1–5, today's State of Mind daily mood from another app (iOS 18+)
     var intenseWorkout: Bool?     // true when today's workouts clear the intensity gate; nil = none
+    var workoutMinutes: Double?   // total workout duration today; nil = no workouts
     var respiratoryRate: Double?  // breaths/min, overnight average
     var bloodOxygen: Double?      // %, overnight average SpO2 (0–100)
     var daylightMinutes: Double?  // minutes of daylight today

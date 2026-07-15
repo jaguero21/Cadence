@@ -40,6 +40,80 @@ struct CadenceWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
+        switch family {
+        case .accessoryCircular:    circularView
+        case .accessoryRectangular: rectangularView
+        case .accessoryInline:      inlineView
+        default:                    systemView
+        }
+    }
+
+    // MARK: - Lock Screen / StandBy accessories
+
+    // Tapping an accessory goes straight into today's log via the same
+    // stash-and-open intent as the Control Center button — never logging
+    // anything by itself (unchosen data is fake awareness).
+
+    private var circularView: some View {
+        Button(intent: OpenCheckInIntent()) {
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: -2) {
+                    Image(systemName: entry.summary.loggedToday ? "checkmark.circle.fill" : "pencil.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("\(entry.summary.streak)")
+                        .font(.system(.title3, design: .rounded).bold())
+                        .contentTransition(.numericText())
+                }
+                .widgetAccentable()
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(entry.summary.loggedToday
+            ? "Logged today. \(entry.summary.streak)-day streak."
+            : "Not logged yet. \(entry.summary.streak)-day streak. Opens today's log.")
+    }
+
+    private var rectangularView: some View {
+        Button(intent: OpenCheckInIntent()) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Image(systemName: "flame.fill")
+                    Text("\(entry.summary.streak)-day streak")
+                        .font(.headline)
+                        .contentTransition(.numericText())
+                }
+                .widgetAccentable()
+
+                if entry.summary.loggedToday {
+                    Label("Logged today", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                } else if let mood = entry.pendingMood {
+                    Text("\(MoodScale.emoji(for: mood)) Mood saved")
+                        .font(.caption)
+                } else {
+                    Text("Tap to check in")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var inlineView: some View {
+        Label(
+            entry.summary.loggedToday
+                ? "Streak \(entry.summary.streak) · logged"
+                : "Streak \(entry.summary.streak) · check in",
+            systemImage: "flame.fill"
+        )
+    }
+
+    // MARK: - Home Screen / StandBy
+
+    private var systemView: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "flame.fill").foregroundStyle(.orange)
@@ -50,6 +124,9 @@ struct CadenceWidgetEntryView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            // iOS 18 tinted Home Screens flatten colors; keep the streak
+            // cluster legible as the accented element.
+            .widgetAccentable()
 
             if family != .systemSmall {
                 Text("logging streak")
@@ -101,11 +178,28 @@ struct CadenceWidget: Widget {
         }
         .configurationDisplayName("Cadence")
         .description("Your logging streak and today's check-in.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([
+            .systemSmall, .systemMedium,
+            .accessoryCircular, .accessoryRectangular, .accessoryInline,
+        ])
     }
 }
 
 #Preview(as: .systemSmall) {
+    CadenceWidget()
+} timeline: {
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4))
+}
+
+#Preview(as: .accessoryCircular) {
+    CadenceWidget()
+} timeline: {
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4))
+}
+
+#Preview(as: .accessoryRectangular) {
     CadenceWidget()
 } timeline: {
     CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3))
