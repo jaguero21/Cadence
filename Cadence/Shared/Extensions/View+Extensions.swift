@@ -19,6 +19,26 @@ extension View {
         }
     }
 
+    // Caps a scrolling card column at a readable width and centers it, so
+    // iPad (and landscape) doesn't stretch phone-designed cards edge to edge.
+    // No-op wherever the proposed width is already narrower.
+    func readableColumn(maxWidth: CGFloat = CadenceLayout.readableColumnWidth) -> some View {
+        self
+            .frame(maxWidth: maxWidth)
+            .frame(maxWidth: .infinity)
+    }
+
+    // iPad gets the adaptable tab bar (iOS 18): a top bar the user can switch
+    // to a sidebar. iPhone and earlier systems keep the classic bottom bar.
+    @ViewBuilder
+    func adaptableTabBar() -> some View {
+        if #available(iOS 18.0, *) {
+            self.tabViewStyle(.sidebarAdaptable)
+        } else {
+            self
+        }
+    }
+
     // Tab bar tucks away while scrolling content (iOS 26); no-op earlier.
     @ViewBuilder
     func minimizableTabBar() -> some View {

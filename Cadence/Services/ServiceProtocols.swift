@@ -38,6 +38,7 @@ protocol NotificationServiceProtocol: AnyObject {
     func scheduleWeeklyReviewReminder(weekday: Int, hour: Int)
     func scheduleStreakAtRisk()
     func sendInsightNotification(title: String)
+    func syncMedicationReminders(_ medications: [MedicationSnapshot]) async
     func removeNotification(id: String)
     func removeAll()
 }

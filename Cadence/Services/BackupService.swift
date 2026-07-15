@@ -59,6 +59,7 @@ enum BackupService {
         var hkBloodOxygen: Double?
         var hkDaylightMinutes: Double?
         var hkDaytimeHR: Double?
+        var hkWorkoutMinutes: Double?
     }
 
     struct WeeklyReviewBackup: Codable {
@@ -86,6 +87,7 @@ enum BackupService {
         var startDate: Date
         var endDate: Date?
         var notes: String = ""
+        var reminderMinutes: [Int] = []
     }
 
     struct FlareBackup: Codable {
@@ -131,7 +133,8 @@ enum BackupService {
                     hkSleepHours: log.hkSleepHours, hkActiveEnergy: log.hkActiveEnergy,
                     hkMindfulMinutes: log.hkMindfulMinutes, hkWristTemp: log.hkWristTemp,
                     hkRespiratoryRate: log.hkRespiratoryRate, hkBloodOxygen: log.hkBloodOxygen,
-                    hkDaylightMinutes: log.hkDaylightMinutes, hkDaytimeHR: log.hkDaytimeHR
+                    hkDaylightMinutes: log.hkDaylightMinutes, hkDaytimeHR: log.hkDaytimeHR,
+                    hkWorkoutMinutes: log.hkWorkoutMinutes
                 )
             },
             weeklyReviews: reviews.map { review in
@@ -149,7 +152,7 @@ enum BackupService {
             },
             medications: medications.map {
                 MedicationBackup(name: $0.name, dosage: $0.dosage, startDate: $0.startDate,
-                                 endDate: $0.endDate, notes: $0.notes)
+                                 endDate: $0.endDate, notes: $0.notes, reminderMinutes: $0.reminderMinutes)
             },
             flares: flares.map {
                 FlareBackup(startDate: $0.startDate, endDate: $0.endDate,
@@ -250,6 +253,7 @@ enum BackupService {
             log.hkBloodOxygen = backup.hkBloodOxygen
             log.hkDaylightMinutes = backup.hkDaylightMinutes
             log.hkDaytimeHR = backup.hkDaytimeHR
+            log.hkWorkoutMinutes = backup.hkWorkoutMinutes
             context.insert(log)
             summary.insertedLogs += 1
         }
@@ -289,7 +293,7 @@ enum BackupService {
             existingMeds.insert(identity)
             context.insert(Medication(name: backup.name, dosage: backup.dosage,
                                       startDate: backup.startDate, endDate: backup.endDate,
-                                      notes: backup.notes))
+                                      notes: backup.notes, reminderMinutes: backup.reminderMinutes))
             summary.insertedMedications += 1
         }
 

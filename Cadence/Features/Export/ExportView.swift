@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PDFKit
 
 struct ExportView: View {
     @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
@@ -16,6 +17,7 @@ struct ExportView: View {
     @State private var isGenerating = false
     @State private var shareItem: URL?
     @State private var showingShare = false
+    @State private var previewItem: ReportPreviewItem?
     @State private var generationTask: Task<Void, Never>?
 
     var body: some View {
@@ -73,6 +75,11 @@ struct ExportView: View {
                     ShareSheet(items: [url])
                 }
             }
+            // PDFs open in a preview first — check the report before handing
+            // it to anyone; sharing happens from the preview's toolbar.
+            .sheet(item: $previewItem) { item in
+                ReportPreviewSheet(url: item.url)
+            }
             .onDisappear { generationTask?.cancel() }
         }
     }
@@ -110,13 +117,14 @@ struct ExportView: View {
     private var includes: some View {
         switch reportType {
         case .doctor:
-            Label("Symptom frequency table", systemImage: "checkmark")
+            Label("Trend charts",             systemImage: "checkmark")
+            Label("Symptom frequency & severity", systemImage: "checkmark")
             Label("Medication list",          systemImage: "checkmark")
             Label("Pattern flags",            systemImage: "checkmark")
             Label("HealthKit objective data", systemImage: "checkmark")
         case .personal:
-            Label("Weekly reviews",           systemImage: "checkmark")
             Label("Trend charts",             systemImage: "checkmark")
+            Label("Weekly reviews",           systemImage: "checkmark")
             Label("Win/miss/intention history",systemImage: "checkmark")
         }
     }
@@ -175,9 +183,60 @@ struct ExportView: View {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 isGenerating = false
-                shareItem = url
-                showingShare = url != nil
+                previewItem = url.map(ReportPreviewItem.init)
             }
+        }
+    }
+}
+
+// A generated PDF, wrapped for sheet(item:) presentation.
+struct ReportPreviewItem: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+}
+
+// Full-page preview of the generated report so the user can read what they're
+// about to hand over; the share action lives in its toolbar.
+struct ReportPreviewSheet: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            PDFDocumentView(url: url)
+                .ignoresSafeArea(edges: .bottom)
+                .navigationTitle("Report Preview")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        ShareLink(item: url) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                }
+        }
+    }
+}
+
+// PDFKit-backed page view; PDFView has no SwiftUI equivalent.
+private struct PDFDocumentView: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> PDFView {
+        let view = PDFView()
+        view.autoScales = true
+        view.displayMode = .singlePageContinuous
+        view.backgroundColor = .secondarySystemBackground
+        view.document = PDFDocument(url: url)
+        return view
+    }
+
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        if uiView.document?.documentURL != url {
+            uiView.document = PDFDocument(url: url)
         }
     }
 }
