@@ -159,7 +159,7 @@ private struct OnboardingPage: View {
                 Image(systemName: icon)
                     .font(.system(size: 80))
                     .foregroundStyle(iconColor)
-                    .symbolEffect(.bounce, value: iconAppeared)
+                    .cadenceSymbolBounce(value: iconAppeared)
                     .onAppear { iconAppeared = true }
 
                 VStack(spacing: 12) {

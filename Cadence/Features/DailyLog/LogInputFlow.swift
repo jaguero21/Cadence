@@ -556,7 +556,7 @@ struct LogInputFlow: View {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 72))
                 .foregroundStyle(CadenceColor.successGreen)
-                .symbolEffect(.bounce, value: 1)
+                .cadenceSymbolBounce(value: 1)
 
             VStack(spacing: 8) {
                 Text("Log complete!")
