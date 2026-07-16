@@ -9,6 +9,7 @@ struct LogInputFlow: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.healthKitService) private var healthKitService
     @Environment(\.notificationService) private var notificationService
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var vm = DailyLogViewModel()
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
 
@@ -76,10 +77,7 @@ struct LogInputFlow: View {
                     }
                     .padding()
                 }
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal:   .move(edge: .leading).combined(with: .opacity)
-                ))
+                .transition(.cadenceStepSlide(reduceMotion: reduceMotion))
                 .id(vm.currentStep)
                 .safeAreaInset(edge: .bottom) {
                     // No bar at all on the completion screen — an empty glass
