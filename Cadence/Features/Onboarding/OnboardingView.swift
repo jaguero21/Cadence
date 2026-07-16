@@ -4,6 +4,7 @@ struct OnboardingView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.healthKitService) private var healthKitService
     @Environment(\.notificationService) private var notificationService
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var step: OnboardingStep = .welcome
     @State private var isRequestingPermission = false
 
@@ -18,10 +19,7 @@ struct OnboardingView: View {
                 case .ready:         readyPage
                 }
             }
-            .transition(.asymmetric(
-                insertion: .move(edge: .trailing).combined(with: .opacity),
-                removal:   .move(edge: .leading).combined(with: .opacity)
-            ))
+            .transition(.cadenceStepSlide(reduceMotion: reduceMotion))
             .id(step)
             .readableColumn()
 
