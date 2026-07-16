@@ -50,4 +50,19 @@ extension NotificationServiceProtocol {
     func scheduleWeeklyReviewReminder() {
         scheduleWeeklyReviewReminder(weekday: 1, hour: 19)
     }
+
+    // Shared reconcile-sweep trigger for every foreground/restore call site:
+    // fetch every medication fresh from the context and hand snapshots to
+    // syncMedicationReminders. Skipped under UI tests, where firing a real
+    // permission prompt mid-run would block the smoke test. The medication
+    // editor's save and the medication list's delete build their own
+    // snapshots directly (they already know the post-edit state) and don't
+    // go through this.
+    func reconcileMedicationReminders(context: ModelContext) {
+        guard !AppLaunch.isUITesting else { return }
+        let snapshots = ((try? context.fetch(FetchDescriptor<Medication>())) ?? []).map(MedicationSnapshot.init)
+        Task {
+            await syncMedicationReminders(snapshots)
+        }
+    }
 }

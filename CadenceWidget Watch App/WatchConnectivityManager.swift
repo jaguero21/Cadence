@@ -21,12 +21,12 @@ final class WatchConnectivityManager: NSObject, WCSessionDelegate {
         WCSession.default.activate()
     }
 
-    func sendQuickLog(mood: Int, energy: Int, completion: @escaping @Sendable (DeliveryState) -> Void) {
-        let payload: [String: Any] = [
+    func sendQuickLog(mood: Int, energy: Int?, completion: @escaping @Sendable (DeliveryState) -> Void) {
+        var payload: [String: Any] = [
             "mood": mood,
-            "energy": energy,
             "date": Date().timeIntervalSinceReferenceDate,
         ]
+        if let energy { payload["energy"] = energy }
         let session = WCSession.default
         if session.activationState == .activated, session.isReachable {
             session.sendMessage(payload, replyHandler: { _ in

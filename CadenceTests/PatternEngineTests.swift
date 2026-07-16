@@ -502,6 +502,38 @@ struct CSVBuilderTests {
         #expect(csv.contains("Headache; Fatigue"))
         #expect(csv.contains("Alcohol; Travel"))
     }
+
+    @Test("Custom tracker columns append to the header, using \"name (unit)\" when a unit is set")
+    func csv_trackerColumns_header() {
+        let trackers = [
+            CustomTrackerSnapshot(id: UUID(), name: "Joint Pain", unit: "pts"),
+            CustomTrackerSnapshot(id: UUID(), name: "Water Intake"),
+        ]
+        let header = CSVBuilder.csvString(from: [], trackers: trackers).split(separator: "\n")[0]
+        #expect(header.hasSuffix(",Joint Pain (pts),Water Intake"))
+    }
+
+    @Test("Row cells pull the right tracker by ID, in caller order; a missing entry is an empty cell")
+    func csv_trackerColumns_rowValues() {
+        let idA = UUID()
+        let idB = UUID()
+        let trackers = [
+            CustomTrackerSnapshot(id: idA, name: "Joint Pain"),
+            CustomTrackerSnapshot(id: idB, name: "Water Intake"),
+        ]
+        // Only idB has an entry today; idA is untracked for this day.
+        let logs = [makeSnapshot(daysAgo: 0, customMetrics: [MetricEntry(trackerID: idB, value: 6)])]
+        let fields = CSVBuilder.csvString(from: logs, trackers: trackers)
+            .split(separator: "\n")[1]
+            .split(separator: ",", omittingEmptySubsequences: false)
+        #expect(Array(fields.suffix(2)) == ["", "6"])
+    }
+
+    @Test("Omitting trackers matches passing an empty array (default parameter)")
+    func csv_noTrackers_matchesEmptyArray() {
+        let logs = [makeSnapshot(daysAgo: 0)]
+        #expect(CSVBuilder.csvString(from: logs) == CSVBuilder.csvString(from: logs, trackers: []))
+    }
 }
 
 // MARK: - CustomTracker logic

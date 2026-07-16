@@ -188,11 +188,7 @@ struct ContentView: View {
     // (or one deleted on another device via CloudKit) without the user
     // touching the medication screen.
     private func syncMedicationReminders() {
-        guard !AppLaunch.isUITesting else { return }
-        let snapshots = ((try? modelContext.fetch(FetchDescriptor<Medication>())) ?? []).map(MedicationSnapshot.init)
-        Task { [notificationService] in
-            await notificationService.syncMedicationReminders(snapshots)
-        }
+        notificationService.reconcileMedicationReminders(context: modelContext)
     }
 
     // On foreground, recompute insights via the shared pipeline (same 90-day
@@ -251,13 +247,22 @@ struct ContentView: View {
         guard !AppLaunch.isUITesting else { return }
         let pending = WidgetData.consumePendingQuickLogs()
         guard !pending.isEmpty else { return }
-        var applied = false
+        var appliedDays: Set<Date> = []
+        var failed: [WidgetData.PendingQuickLog] = []
         for entry in pending {
             if PhoneConnectivityManager.applyQuickLog(entry.payload, context: modelContext) {
-                applied = true
+                appliedDays.insert(Calendar.current.startOfDay(for: entry.date))
+            } else {
+                failed.append(entry)
             }
         }
-        if applied {
+        if !failed.isEmpty {
+            // A save failure (disk full, store error) must not drop the tap —
+            // re-stash it so the next foreground retries instead of stranding
+            // the widget's "mood saved" state on data that never landed.
+            WidgetData.restorePendingQuickLogs(failed)
+        }
+        if !appliedDays.isEmpty {
             let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
             DashboardViewModel.publishWidgetSummary(logs: logs)
             // publishWidgetSummary skips its reload when the summary is
@@ -267,7 +272,6 @@ struct ContentView: View {
             WidgetCenter.shared.reloadTimelines(ofKind: WidgetData.widgetKind)
             // Mirror the applied days' moods into Health's State of Mind —
             // a widget tap is still a check-in. Best-effort, fire-and-forget.
-            let appliedDays = Set(pending.map { Calendar.current.startOfDay(for: $0.date) })
             let snapshots = logs.filter { appliedDays.contains($0.date) }.map(DailyLogSnapshot.init)
             let service = healthKitService
             Task {

@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 // part of the backup document.
 struct SyncBackupSection: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.notificationService) private var notificationService
     @State private var syncMonitor = CloudSyncMonitor.shared
 
     @Query(sort: \DailyLog.date) private var logs: [DailyLog]
@@ -120,8 +121,14 @@ struct SyncBackupSection: View {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             let document = try BackupService.decode(try Data(contentsOf: url))
             let summary = try BackupService.restore(document, context: modelContext)
-            // Restored logs can change today's status/streak on the widget.
-            DashboardViewModel.publishWidgetSummary(logs: logs)
+            // Restored logs can change today's status/streak on the widget —
+            // fetch fresh rather than using the @Query array above, which
+            // hasn't re-evaluated inside this synchronous closure yet.
+            let freshLogs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
+            DashboardViewModel.publishWidgetSummary(logs: freshLogs)
+            // Restored medications can carry reminders; reconcile now instead
+            // of waiting for the next foreground pass to silence/schedule them.
+            notificationService.reconcileMedicationReminders(context: modelContext)
             if summary.insertedTotal == 0 {
                 resultMessage = String(localized: "Everything in that backup is already on this device.")
             } else {
