@@ -7,7 +7,12 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 
 - **MVVM-ish.** Views own `@State` view models (`@Observable`, `@MainActor`).
   View models hold transient flow state and `save(...)` logic; SwiftData
-  `@Model`s hold persisted data.
+  `@Model`s hold persisted data. Only 4 features have a dedicated
+  `<Feature>ViewModel.swift` (`Insights`, `DailyLog`, `Dashboard`,
+  `WeeklyReview`) — others (Settings, Export, History, Onboarding) keep state
+  inline in the View. Extract a separate ViewModel file once the view owns
+  non-trivial save or multi-step flow logic; don't for a view that just binds
+  to `@Model` properties or toggles local UI state.
 - **Models** (`Cadence/Models/`): `@Model` classes `DailyLog`, `WeeklyReview`,
   `SymptomTag`, `Medication`. The schema is declared in
   `CadenceApp.sharedModelContainer`.
@@ -146,9 +151,10 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - **Snapshots.** `DailyLogSnapshot` / `WeeklyReviewSnapshot` are `Sendable`
   structs that live **next to their model** in `Models/`. They are plain-value
   projections of the `@Model`s so `PatternEngine` and PDF export can run off any
-  isolation context — `@Model`s are not `Sendable` and would race on their
-  SwiftData-backed fields. Build a snapshot from a model; never pass a `@Model`
-  across actors.
+  isolation context — `@Model`s' `Sendable` conformance is macro-synthesized,
+  not a real safety guarantee (see Code quality conventions), so they'd still
+  race on their mutable, `ModelContext`-bound fields if passed across actors.
+  Build a snapshot from a model; never pass a `@Model` across actors.
 - **Services behind protocols** (`Cadence/Services/`): concrete services are
   `@MainActor` singletons (`HealthKitService.shared`, `NotificationService.shared`).
   Views/view models depend on the protocols (`HealthKitServiceProtocol`,
@@ -173,7 +179,14 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   it. `ContentView` passes `today` (refreshed on `scenePhase == .active`) so a
   midnight rollover re-inits the child with a new window — updating the `@Query`
   in place. Do **not** reintroduce `.id(dayId)`: changing identity tears the
-  subtree down and drops open sheets / scroll state.
+  subtree down and drops open sheets / scroll state. This is the required
+  shape for **any** new date-scoped `@Query` over `DailyLog`/`WeeklyReview`: a
+  `referenceDate: Date = .now` init param binding `_logs = Query(filter:
+  #Predicate<DailyLog> { $0.date >= cutoff }, ...)` in `init` — see
+  `DashboardView` (90d), `DailyLogView` (30d), `WeeklyReviewView` (14d),
+  `InsightsView` (180d). Unbounded `@Query` is only for small reference
+  tables (`SymptomTag`, `CustomTracker`, `Medication`, `Flare`) or
+  DEBUG-only tooling, not log/review data.
 - **Persistence resilience.** `sharedModelContainer` tries a **CloudKit-mirrored**
   store first (`cloudKitDatabase: .automatic`), then a local-only persistent
   store (used when the iCloud entitlement is absent), then in-memory, then
@@ -198,6 +211,54 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   (`PatternThreshold`, etc.). Don't hardcode these inline.
 - **Haptics:** `UINotificationFeedbackGenerator().notificationOccurred(...)` on
   successful saves.
+- **File placement:** cross-cutting extensions go in
+  `Shared/Extensions/Type+Extensions.swift` (`View+Extensions.swift`,
+  `EnvironmentValues+Services.swift`) — don't add one inline in the first
+  feature file that needs it. Reusable cross-feature UI goes in
+  `Shared/Components/` (`MetricSlider.swift`, `AttachmentPhotoStrip.swift`,
+  `AmbientMeshBackground.swift`); feature-local views stay in
+  `Features/<Feature>/`.
+
+## Code quality conventions
+
+- **Concurrency mode.** App/widget/watch targets build with `SWIFT_VERSION =
+  5.0`, `SWIFT_APPROACHABLE_CONCURRENCY = YES`,
+  `SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES`; test targets use
+  `SWIFT_VERSION = 5.9` with neither flag. No target enables
+  `SWIFT_STRICT_CONCURRENCY` or Swift 6 mode. Don't over-annotate with
+  `Sendable`/actor-isolation attributes the compiler isn't actually enforcing
+  here — the Snapshot boundary (see Architecture) is what's really preventing
+  cross-actor races, not the type system.
+- **Fire-and-forget `Task {}` vs. the cancelable pattern.** Bare `Task { }`
+  with no stored handle is the default for best-effort `@MainActor` side
+  effects that can silently fail or be superseded (HealthKit publish, widget
+  republish, etc.) — most call sites use this. Reserve a stored `Task` handle
+  + `Task.detached` + explicit `Task.isCancelled` checks + `MainActor.run`
+  hop-back for long-running or user-cancelable work — see `LogInputFlow`'s
+  `hkTask` and `ExportView`'s `generationTask`. Rule of thumb: if navigating
+  away mid-operation would waste work or race the UI, use the heavy pattern;
+  otherwise bare `Task {}` is correct, not a smell.
+- **No force unwraps, `try!`, `as!`, `fatalError`, or `assert`.** Use
+  `guard let`/`if let`/`??` instead, and the `Bool`-returning `save()` +
+  `saveError` convention instead of throwing+`try!`. This is essentially a
+  hard rule in this codebase already — hold new code to it.
+- **`try?` is for read-only fetches only**, always defaulted:
+  `(try? modelContext.fetch(...)) ?? []`. Never use `try?` to swallow a save
+  failure — saves go through `save()`/`saveError`; silently dropping a save
+  with `try?` would lose user data.
+- **Three known unseamed singletons:** `StoreService.shared`,
+  `CloudSyncMonitor.shared`, and `PhoneConnectivityManager` have no protocol
+  seam, unlike the documented protocol trio (see "Services behind protocols"
+  above). This is a deliberate, known gap — don't assume every `.shared`
+  singleton is fake-injectable, and don't retrofit a protocol onto one of
+  these three as unrequested cleanup.
+- **Accessibility on custom controls.** Any hand-built interactive control
+  (slider, chip, chart mark, non-standard `Button`) needs
+  `.accessibilityElement` + `.accessibilityLabel` + `.accessibilityValue` +
+  `.accessibilityHint` + traits — `SymptomPickerView`'s severity chip is the
+  reference pattern to copy. Standard `Form`/`List`/`Button(label:)` rows get
+  this for free and need nothing extra. Matters more than usual here since
+  Cadence is a health app.
 
 ## iPad
 
@@ -429,3 +490,10 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   there you can edit but not compile. SourceKit then reports spurious
   "Cannot find type ..." / "SwiftDataMacros ... plugin not found" diagnostics
   for cross-file and macro references — treat those as indexer noise, not errors.
+- **CI** (`.github/workflows/ci.yml`) runs on every push: newest available
+  Xcode, ensures a watchOS simulator runtime (the scheme embeds the watch
+  app), picks an iPhone simulator, runs `xcodebuild test -scheme Cadence`,
+  and gates on `** TEST SUCCEEDED **` in the log. There is no lint/format
+  tooling in the repo (no `.swiftlint.yml`/`.swiftformat`/lint build phase) —
+  style consistency is enforced only by the conventions in this file, not by
+  a linter.
