@@ -436,6 +436,8 @@ final class HealthKitService: HealthKitServiceProtocol {
                             if let error { Self.log.error("fetchExternalSymptoms(\(identifier.rawValue, privacy: .public)) failed: \(error, privacy: .public)") }
                             let external = (samples as? [HKCategorySample])?
                                 .filter { $0.sourceRevision.source.bundleIdentifier != ownBundle }
+                                // A sample explicitly recorded as absent isn't a symptom to prefill.
+                                .filter { $0.value != HKCategoryValueSeverity.notPresent.rawValue }
                             // Worst severity of the day wins.
                             cont.resume(returning: external?.max { $0.value < $1.value })
                         }
