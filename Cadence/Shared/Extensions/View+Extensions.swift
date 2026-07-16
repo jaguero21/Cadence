@@ -1,5 +1,32 @@
 import SwiftUI
 
+// Applies `.symbolEffect(.bounce, ...)` unless Reduce Motion is on, in which
+// case the bounce is skipped entirely — the icon/text next to it already
+// carries the meaning (e.g. "Log complete!"), so no substitute motion effect
+// is needed. See docs/superpowers/specs/2026-07-16-reduce-motion-audit-design.md.
+private struct CadenceSymbolBounceModifier<Trigger: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let trigger: Trigger
+    let repeatCount: Int?
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else if let repeatCount {
+            content.symbolEffect(.bounce, options: .repeat(repeatCount), value: trigger)
+        } else {
+            content.symbolEffect(.bounce, value: trigger)
+        }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func cadenceSymbolBounce(value: some Equatable, repeating: Int? = nil) -> some View {
+        modifier(CadenceSymbolBounceModifier(trigger: value, repeatCount: repeating))
+    }
+}
+
 extension View {
     func cadenceCard() -> some View {
         self
@@ -76,6 +103,19 @@ extension View {
                 .font(.title2.bold())
             self
         }
+    }
+}
+
+extension AnyTransition {
+    // The step/page slide transition, or a plain crossfade when Reduce
+    // Motion is on. See docs/superpowers/specs/2026-07-16-reduce-motion-audit-design.md.
+    static func cadenceStepSlide(reduceMotion: Bool) -> AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .move(edge: .leading).combined(with: .opacity)
+            )
     }
 }
 
