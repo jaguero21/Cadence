@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 // Lightweight app↔widget bridge over the shared App Group. The app writes a
@@ -64,22 +65,65 @@ enum WidgetData {
     private static let pendingKey = "pendingQuickLogs"
     private static let maxPending = 30
 
-    static func stashPendingQuickLog(mood: Int, date: Date = .now, defaults: UserDefaults? = nil) {
-        let store = defaults ?? self.store
-        var pending = readPending(from: store)
-        pending.append(PendingQuickLog(mood: mood, date: date))
-        // Bound the queue; the oldest taps are the least meaningful to keep.
+    // stash/consume/restore each do a read-modify-write on the same
+    // UserDefaults key; UserDefaults is thread-safe per call but not
+    // transactional across processes, so the app and the widget extension
+    // can race on this key and silently stomp each other's write. An
+    // advisory POSIX file lock on a marker file in the shared App Group
+    // container serializes the three across processes. Falls back to
+    // running unsynchronized if the container is unavailable (e.g. no App
+    // Group entitlement in a test host) rather than dropping the tap.
+    private static func withPendingLock<T>(_ body: () -> T) -> T {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
+            return body()
+        }
+        let fd = open(containerURL.appendingPathComponent("pendingQuickLogs.lock").path, O_CREAT | O_RDWR, 0o644)
+        guard fd >= 0 else { return body() }
+        defer { close(fd) }
+        flock(fd, LOCK_EX)
+        defer { flock(fd, LOCK_UN) }
+        return body()
+    }
+
+    // Cap at maxPending (oldest taps are least meaningful to keep), encode,
+    // and persist — the common tail of every mutation to the pending queue.
+    private static func persistPending(_ pending: [PendingQuickLog], to store: UserDefaults?) {
+        var pending = pending
         if pending.count > maxPending { pending.removeFirst(pending.count - maxPending) }
         guard let data = try? JSONEncoder().encode(pending) else { return }
         store?.set(data, forKey: pendingKey)
     }
 
+    static func stashPendingQuickLog(mood: Int, date: Date = .now, defaults: UserDefaults? = nil) {
+        let store = defaults ?? self.store
+        withPendingLock {
+            var pending = readPending(from: store)
+            pending.append(PendingQuickLog(mood: mood, date: date))
+            persistPending(pending, to: store)
+        }
+    }
+
     // Read-and-clear: the caller owns the returned entries.
     static func consumePendingQuickLogs(defaults: UserDefaults? = nil) -> [PendingQuickLog] {
         let store = defaults ?? self.store
-        let pending = readPending(from: store)
-        if !pending.isEmpty { store?.removeObject(forKey: pendingKey) }
-        return pending
+        return withPendingLock {
+            let pending = readPending(from: store)
+            if !pending.isEmpty { store?.removeObject(forKey: pendingKey) }
+            return pending
+        }
+    }
+
+    // Re-stash entries consumed but never successfully applied (e.g. a
+    // SwiftData save failure) so the next foreground retries them instead of
+    // losing the tap. Merges back in recorded-date order, honoring the same
+    // queue cap as a fresh stash.
+    static func restorePendingQuickLogs(_ entries: [PendingQuickLog], defaults: UserDefaults? = nil) {
+        guard !entries.isEmpty else { return }
+        let store = defaults ?? self.store
+        withPendingLock {
+            let pending = (entries + readPending(from: store)).sorted { $0.date < $1.date }
+            persistPending(pending, to: store)
+        }
     }
 
     // The most recent pending mood for the given day, for the widget's own

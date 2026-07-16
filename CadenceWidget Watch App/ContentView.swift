@@ -7,6 +7,7 @@ struct ContentView: View {
 
     @State private var mood = 3
     @State private var energy = 5
+    @State private var energyEdited = false
     @State private var sendState: SendState = .idle
 
     var body: some View {
@@ -35,11 +36,14 @@ struct ContentView: View {
                     Text("Energy: \(energy)").font(.caption)
                     Stepper("Energy", value: $energy, in: 0...10)
                         .labelsHidden()
-                        .onChange(of: energy) { _, _ in sendState = .idle }
+                        .onChange(of: energy) { _, _ in
+                            sendState = .idle
+                            energyEdited = true
+                        }
                 }
 
                 Button {
-                    WatchConnectivityManager.shared.sendQuickLog(mood: mood, energy: energy) { state in
+                    WatchConnectivityManager.shared.sendQuickLog(mood: mood, energy: energyEdited ? energy : nil) { state in
                         Task { @MainActor in
                             sendState = state == .sent ? .sent : .queued
                         }

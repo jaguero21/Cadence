@@ -371,22 +371,26 @@ enum PatternEngine {
 
         for log in logs {
             let day = cal.startOfDay(for: log.date)
-            var isPre = false
-            var isDuring = false
-            for flare in flares {
+            // Resolve in-flare status against EVERY flare first: a day that's
+            // in-flare for one flare must be excluded even if an earlier flare
+            // in the array would otherwise have counted it as that flare's
+            // precursor day (overlapping/adjacent flares can share days).
+            let isDuring = flares.contains { flare in
                 let start = cal.startOfDay(for: flare.startDate)
                 let end = flare.endDate.map { cal.startOfDay(for: $0) } ?? cal.startOfDay(for: .now)
-                if day >= start && day <= end {
-                    isDuring = true
-                    break
-                }
+                return day >= start && day <= end
+            }
+            if isDuring { continue }
+
+            var isPre = false
+            for flare in flares {
+                let start = cal.startOfDay(for: flare.startDate)
                 if let windowStart = cal.date(byAdding: .day, value: -PatternThreshold.flarePrecursorWindowDays, to: start),
                    day >= windowStart && day < start {
                     isPre = true
                     flaresWithRunUpData.insert(start)
                 }
             }
-            if isDuring { continue }
             if isPre { preFlareLogs.append(log) } else { baselineLogs.append(log) }
         }
 

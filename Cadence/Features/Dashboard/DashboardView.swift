@@ -7,9 +7,12 @@ struct DashboardView: View {
     @Query private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
+    @Query(sort: \Flare.startDate, order: .reverse) private var flares: [Flare]
+    @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
     @State private var vm = DashboardViewModel()
     @State private var showingDailyLog = false
     @State private var showingWeeklyReview = false
+    @State private var refreshTask: Task<Void, Never>?
 
     // referenceDate anchors the query window. The parent passes the current day
     // so that when it rolls over at midnight this view re-inits with a fresh
@@ -53,9 +56,27 @@ struct DashboardView: View {
                     }
                 }
             }
-            .onAppear { vm.refresh(logs: logs, reviews: reviews, medications: medications, notifications: notificationService) }
-            .onChange(of: logs)    { _, _ in vm.refresh(logs: logs, reviews: reviews, medications: medications, notifications: notificationService) }
-            .onChange(of: reviews) { _, _ in vm.refresh(logs: logs, reviews: reviews, medications: medications, notifications: notificationService) }
+            .onAppear { scheduleRefresh() }
+            .onChange(of: logs)           { _, _ in scheduleRefresh() }
+            .onChange(of: reviews)        { _, _ in scheduleRefresh() }
+            .onChange(of: medications)    { _, _ in scheduleRefresh() }
+            .onChange(of: flares)         { _, _ in scheduleRefresh() }
+            .onChange(of: customTrackers) { _, _ in scheduleRefresh() }
+        }
+    }
+
+    // Single entry point for every trigger above — keeps the 6 call sites
+    // from drifting out of sync (medications was previously threaded into
+    // vm.refresh() with no onChange to ever trigger it) and coalesces
+    // same-runloop-tick triggers into one vm.refresh() call: a single
+    // multi-model save (e.g. a JSON restore inserting logs, flares, and
+    // trackers together) would otherwise re-run the full
+    // PatternEngine.allInsights pass once per changed query instead of once.
+    private func scheduleRefresh() {
+        refreshTask?.cancel()
+        refreshTask = Task {
+            guard !Task.isCancelled else { return }
+            vm.refresh(logs: logs, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService)
         }
     }
 
