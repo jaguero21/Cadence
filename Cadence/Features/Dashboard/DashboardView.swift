@@ -25,43 +25,52 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: CadenceLayout.sectionSpacing) {
-                    greetingHeader
-                    todayCard
-                    weeklyCard
-                    if let insight = vm.latestInsight {
-                        insightPreviewCard(insight)
-                    }
-                    if logs.isEmpty {
-                        emptyState
-                    } else {
-                        quickStats
-                    }
+            content
+                .onAppear { scheduleRefresh() }
+                .onChange(of: logs)           { _, _ in scheduleRefresh() }
+                .onChange(of: reviews)        { _, _ in scheduleRefresh() }
+                .onChange(of: medications)    { _, _ in scheduleRefresh() }
+                .onChange(of: flares)         { _, _ in scheduleRefresh() }
+                .onChange(of: customTrackers) { _, _ in scheduleRefresh() }
+        }
+    }
+
+    // Split out of `body` so the type checker can solve the view hierarchy
+    // and the onAppear/onChange chain as two separate expressions — inlined
+    // together, six chained modifiers (five of them generic over a different
+    // Equatable query type) on top of this tree is enough to make the
+    // compiler give up with "unable to type-check in reasonable time."
+    private var content: some View {
+        ScrollView {
+            VStack(spacing: CadenceLayout.sectionSpacing) {
+                greetingHeader
+                todayCard
+                weeklyCard
+                if let insight = vm.latestInsight {
+                    insightPreviewCard(insight)
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 32)
-                .readableColumn()
-            }
-            .background(AmbientMeshBackground())
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        SettingsView()
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .foregroundStyle(.secondary)
-                    }
+                if logs.isEmpty {
+                    emptyState
+                } else {
+                    quickStats
                 }
             }
-            .onAppear { scheduleRefresh() }
-            .onChange(of: logs)           { _, _ in scheduleRefresh() }
-            .onChange(of: reviews)        { _, _ in scheduleRefresh() }
-            .onChange(of: medications)    { _, _ in scheduleRefresh() }
-            .onChange(of: flares)         { _, _ in scheduleRefresh() }
-            .onChange(of: customTrackers) { _, _ in scheduleRefresh() }
+            .padding(.horizontal)
+            .padding(.bottom, 32)
+            .readableColumn()
+        }
+        .background(AmbientMeshBackground())
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    SettingsView()
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
