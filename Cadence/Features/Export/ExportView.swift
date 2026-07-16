@@ -142,11 +142,34 @@ struct ExportView: View {
         }
     }
 
+    // The From picker's date keeps a time-of-day (it defaults to now-1mo and
+    // DatePicker preserves time components), while log days are midnight-
+    // normalized — every range filter must compare against midnight or the
+    // range's first day silently drops out.
+    private var rangeStart: Date { Calendar.current.startOfDay(for: startDate) }
+
+    // CloudKit sync can leave two complete DailyLog rows for the same day
+    // (DailyLog has no @Attribute(.unique), per this app's CloudKit
+    // constraints) — collapse to one log per day before export so a synced
+    // duplicate can't inflate a PDF's "N of M days logged" count or emit a
+    // duplicate CSV row for that date. Prefers the complete log when only one
+    // of the pair is; otherwise keeps whichever the store returns first.
+    private func dedupedByDay(_ source: [DailyLog]) -> [DailyLog] {
+        var seenDays: Set<Date> = []
+        var result: [DailyLog] = []
+        for log in source.sorted(by: { $0.isComplete && !$1.isComplete }) {
+            if seenDays.insert(Calendar.current.startOfDay(for: log.date)).inserted {
+                result.append(log)
+            }
+        }
+        return result
+    }
+
     private func exportCSV() {
-        let logSnapshots = logs
-            .filter { $0.date >= startDate && $0.date <= endDate }
+        let logSnapshots = dedupedByDay(logs.filter { $0.date >= rangeStart && $0.date <= endDate })
             .map(DailyLogSnapshot.init)
-        if let url = CSVBuilder.build(logs: logSnapshots) {
+        let trackerSnapshots = customTrackers.map(CustomTrackerSnapshot.init)
+        if let url = CSVBuilder.build(logs: logSnapshots, trackers: trackerSnapshots) {
             shareItem = url
             showingShare = true
         }
@@ -154,19 +177,18 @@ struct ExportView: View {
 
     private func generate() {
         isGenerating = true
-        let logSnapshots = logs
-            .filter { $0.date >= startDate && $0.date <= endDate }
+        let logSnapshots = dedupedByDay(logs.filter { $0.date >= rangeStart && $0.date <= endDate })
             .map(DailyLogSnapshot.init)
         let reviewSnapshots = reviews
-            .filter { $0.weekStartDate <= endDate && $0.weekEndDate >= startDate }
+            .filter { $0.weekStartDate <= endDate && $0.weekEndDate >= rangeStart }
             .map(WeeklyReviewSnapshot.init)
         // Include any medication whose course overlaps the export range.
         let medicationSnapshots = medications
-            .filter { $0.startDate <= endDate && ($0.endDate ?? .distantFuture) >= startDate }
+            .filter { $0.startDate <= endDate && ($0.endDate ?? .distantFuture) >= rangeStart }
             .map(MedicationSnapshot.init)
         // Include any flare overlapping the export range.
         let flareSnapshots = flares
-            .filter { $0.startDate <= endDate && ($0.endDate ?? .distantFuture) >= startDate }
+            .filter { $0.startDate <= endDate && ($0.endDate ?? .distantFuture) >= rangeStart }
             .map(FlareSnapshot.init)
         let trackerSnapshots = customTrackers.map(CustomTrackerSnapshot.init)
 

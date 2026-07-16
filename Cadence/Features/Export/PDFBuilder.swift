@@ -16,7 +16,7 @@ enum PDFBuilder {
 
         // Insights run once here so the renderer doesn't need to know about
         // PatternEngine — and personal-summary builds don't pay the cost.
-        let insights = type == .doctor ? PatternEngine.allInsights(from: logs, medications: medications) : []
+        let insights = type == .doctor ? PatternEngine.allInsights(from: logs, medications: medications, flares: flares, trackers: customTrackers) : []
         // Chart images render on the main actor (ImageRenderer requirement),
         // before the PDF context opens.
         let charts = await trendChartImages(logs: logs)
