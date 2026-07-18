@@ -25,7 +25,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.carpecadence.app.pr.lifetime",
+      "productID" : "com.carpecadence.pro.lifetime",
       "referenceName" : "Pro Lifetime",
       "type" : "NonConsumable"
     }
@@ -73,7 +73,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.carpecadence.app.pro.monthly",
+          "productID" : "com.carpecadence.pro.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Pro Monthly",
           "subscriptionGroupID" : "42774F4B",
