@@ -152,14 +152,21 @@ struct CadenceWidgetEntryView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(alignment: .bottomTrailing) {
-            Image("mascot-\(entry.summary.mascotPose.rawValue)")
-                .resizable()
-                .scaledToFit()
-                .frame(width: family == .systemSmall ? 44 : 56, height: family == .systemSmall ? 44 : 56)
-                .opacity(0.5)
-                .accessibilityHidden(true)
-                .padding(.trailing, -4)
-                .padding(.bottom, -4)
+            // .systemMedium only: task review measured a genuine bounding-box
+            // overlap between a .systemSmall-sized 44×44 corner mascot and the
+            // mood-buttons row on the smallest supported device class
+            // (iPhone SE-class .systemSmall). .systemMedium has 100pt+ of
+            // clearance at 56×56, comfortably safe.
+            if family == .systemMedium {
+                Image("mascot-\(entry.summary.mascotPose.rawValue)")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 56, height: 56)
+                    .opacity(0.5)
+                    .accessibilityHidden(true)
+                    .padding(.trailing, -4)
+                    .padding(.bottom, -4)
+            }
         }
     }
 
