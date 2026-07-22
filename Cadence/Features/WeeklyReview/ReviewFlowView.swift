@@ -193,7 +193,7 @@ struct ReviewFlowView: View {
             Image(systemName: "calendar.badge.checkmark")
                 .font(.system(size: 72))
                 .foregroundStyle(CadenceColor.sleepPurple)
-                .symbolEffect(.bounce, value: 1)
+                .cadenceSymbolBounce(value: 1)
 
             VStack(spacing: 8) {
                 Text("Review Complete!")
