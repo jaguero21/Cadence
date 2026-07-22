@@ -279,6 +279,7 @@ struct DashboardView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 96, height: 96)
+                .foregroundStyle(CadenceColor.accent)
                 .accessibilityHidden(true)
             Text("Log your first day to see insights")
                 .font(.subheadline.weight(.medium))
