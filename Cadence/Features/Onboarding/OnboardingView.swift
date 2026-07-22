@@ -58,7 +58,8 @@ struct OnboardingView: View {
             title: "Welcome to Cadence",
             message: "Track how you feel, sleep, and move — in under two minutes a day. Over time, Cadence finds patterns you wouldn't notice on your own.",
             primaryLabel: "Get Started",
-            primaryAction: advance
+            primaryAction: advance,
+            mascotPose: .welcoming
         )
     }
 
@@ -148,6 +149,10 @@ private struct OnboardingPage: View {
     let primaryLabel: String
     let primaryAction: () -> Void
     var skipAction: (() -> Void)? = nil
+    // Set only by the welcome page. Replaces the SF Symbol rather than
+    // sitting alongside it — decorative, so it's accessibilityHidden; the
+    // title/message text below already carries the page's meaning.
+    var mascotPose: WidgetData.MascotPose? = nil
 
     @State private var iconAppeared = false
 
@@ -156,11 +161,20 @@ private struct OnboardingPage: View {
             Spacer()
 
             VStack(spacing: 32) {
-                Image(systemName: icon)
-                    .font(.system(size: 80))
-                    .foregroundStyle(iconColor)
-                    .cadenceSymbolBounce(value: iconAppeared)
-                    .onAppear { iconAppeared = true }
+                if let mascotPose {
+                    Image("mascot-\(mascotPose.rawValue)")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 120, height: 120)
+                        .foregroundStyle(iconColor)
+                        .accessibilityHidden(true)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 80))
+                        .foregroundStyle(iconColor)
+                        .cadenceSymbolBounce(value: iconAppeared)
+                        .onAppear { iconAppeared = true }
+                }
 
                 VStack(spacing: 12) {
                     Text(title)

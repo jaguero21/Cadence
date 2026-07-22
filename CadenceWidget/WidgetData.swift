@@ -11,10 +11,22 @@ enum WidgetData {
     static let widgetKind = "CadenceWidget"
     private static let key = "todaySummary"
 
+    // Ambient companion pose, computed by MascotPoseEngine
+    // (Cadence/Services/MascotPoseEngine.swift) on the app side and
+    // published here so the widget extension — which has no SwiftData
+    // access — can render the same pose without recomputing it. Defined
+    // here rather than in Cadence/Models/ because this file is already
+    // compiled into both the Cadence and CadenceWidgetExtension targets,
+    // and Summary (below) needs this type to compile in both.
+    enum MascotPose: String, CaseIterable, Codable {
+        case welcoming, resting, soaking, cozy, sleepy
+    }
+
     struct Summary: Codable, Equatable {
         var date: Date          // start of day the summary describes
         var loggedToday: Bool
         var streak: Int
+        var mascotPose: MascotPose
     }
 
     private static var store: UserDefaults? { UserDefaults(suiteName: appGroup) }
@@ -38,12 +50,12 @@ enum WidgetData {
     static func resolved(_ stored: Summary?, now: Date = .now) -> Summary {
         let cal = Calendar.current
         guard let stored else {
-            return Summary(date: now, loggedToday: false, streak: 0)
+            return Summary(date: now, loggedToday: false, streak: 0, mascotPose: .welcoming)
         }
         if cal.isDate(stored.date, inSameDayAs: now) { return stored }
         let yesterday = cal.date(byAdding: .day, value: -1, to: now) ?? now
         let streak = cal.isDate(stored.date, inSameDayAs: yesterday) ? stored.streak : 0
-        return Summary(date: now, loggedToday: false, streak: streak)
+        return Summary(date: now, loggedToday: false, streak: streak, mascotPose: stored.mascotPose)
     }
 
     // MARK: - Pending quick logs (widget → app)
