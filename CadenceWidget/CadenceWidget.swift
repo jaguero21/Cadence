@@ -11,7 +11,7 @@ struct Provider: TimelineProvider {
     }
 
     func placeholder(in context: Context) -> CadenceEntry {
-        CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 5))
+        CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 5, mascotPose: .welcoming))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CadenceEntry) -> Void) {
@@ -188,20 +188,20 @@ struct CadenceWidget: Widget {
 #Preview(as: .systemSmall) {
     CadenceWidget()
 } timeline: {
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3))
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3, mascotPose: .welcoming))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4, mascotPose: .resting))
 }
 
 #Preview(as: .accessoryCircular) {
     CadenceWidget()
 } timeline: {
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3))
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3, mascotPose: .welcoming))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4, mascotPose: .resting))
 }
 
 #Preview(as: .accessoryRectangular) {
     CadenceWidget()
 } timeline: {
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3))
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3, mascotPose: .welcoming))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4, mascotPose: .resting))
 }
