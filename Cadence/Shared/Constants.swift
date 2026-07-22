@@ -147,6 +147,17 @@ enum HealthThreshold {
     static let hydrationLiters: Double = 1.5
 }
 
+enum MascotThreshold {
+    // Consecutive-day streak (see DashboardViewModel.computeStreak) at or
+    // above which the mascot switches to its ".soaking" (hot-spring) pose.
+    static let streakDaysForSoaking: Int = 7
+    // How many of the most recently logged days (by date, gaps allowed —
+    // see MascotPoseEngine.hasLowMoodTrend) must all sit below the overall
+    // average mood before the mascot switches to its ".cozy" pose. 3 is
+    // long enough that a single off day can't flip it.
+    static let lowMoodTrendDays: Int = 3
+}
+
 enum AppLaunch {
     // Set by the UI test runner (see CadenceUITests). Switches the app to an
     // in-memory store, fresh onboarding, and no permission prompts so UI tests
