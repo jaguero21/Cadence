@@ -75,12 +75,20 @@ struct MascotPoseEngineTests {
         #expect(pose != .cozy)
     }
 
-    @Test("A single low day among otherwise-average days does not trigger cozy")
+    @Test("Exactly lowMoodTrendDays logs with no older baseline never trigger cozy, regardless of mood")
+    func pose_exactlyThresholdLogs_noBaseline_doesNotTriggerMoodTrend() {
+        let logs = [makeLog(daysAgo: 2, mood: 1), makeLog(daysAgo: 1, mood: 1), makeLog(daysAgo: 0, mood: 1)]
+        let pose = MascotPoseEngine.pose(for: logs, activeFlare: nil, streakDays: 0)
+        #expect(pose != .cozy)
+    }
+
+    @Test("A single low day among otherwise-average recent days does not trigger cozy")
     func pose_singleLowDay_doesNotTriggerMoodTrend() {
         let logs = [
+            makeLog(daysAgo: 3, mood: 3),  // baseline
             makeLog(daysAgo: 2, mood: 3),
             makeLog(daysAgo: 1, mood: 3),
-            makeLog(daysAgo: 0, mood: 1),
+            makeLog(daysAgo: 0, mood: 1),  // the one low day
         ]
         let pose = MascotPoseEngine.pose(for: logs, activeFlare: nil, streakDays: 0)
         #expect(pose != .cozy)
