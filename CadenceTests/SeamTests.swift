@@ -130,7 +130,7 @@ struct WidgetStalenessTests {
     @Test("A summary from today passes through unchanged")
     func todaySummary_passesThrough() {
         let now = Date.now
-        let stored = WidgetData.Summary(date: day(0, from: now), loggedToday: true, streak: 7)
+        let stored = WidgetData.Summary(date: day(0, from: now), loggedToday: true, streak: 7, mascotPose: .welcoming)
         let resolved = WidgetData.resolved(stored, now: now)
         #expect(resolved == stored)
     }
@@ -141,7 +141,7 @@ struct WidgetStalenessTests {
     @Test("Yesterday's summary drops loggedToday but keeps the streak")
     func yesterdaySummary_dropsLoggedTodayKeepsStreak() {
         let now = Date.now
-        let stored = WidgetData.Summary(date: day(-1, from: now), loggedToday: true, streak: 7)
+        let stored = WidgetData.Summary(date: day(-1, from: now), loggedToday: true, streak: 7, mascotPose: .welcoming)
         let resolved = WidgetData.resolved(stored, now: now)
         #expect(resolved.loggedToday == false)
         #expect(resolved.streak == 7)
@@ -150,7 +150,7 @@ struct WidgetStalenessTests {
     @Test("A summary older than yesterday resets the streak to zero")
     func olderSummary_breaksStreak() {
         let now = Date.now
-        let stored = WidgetData.Summary(date: day(-3, from: now), loggedToday: true, streak: 7)
+        let stored = WidgetData.Summary(date: day(-3, from: now), loggedToday: true, streak: 7, mascotPose: .welcoming)
         let resolved = WidgetData.resolved(stored, now: now)
         #expect(resolved.loggedToday == false)
         #expect(resolved.streak == 0)

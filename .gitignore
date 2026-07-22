@@ -46,3 +46,6 @@ Carthage/Build/
 __pycache__/
 *.pyc
 .venv/
+
+# Claude Code / superpowers scratch state
+.superpowers/

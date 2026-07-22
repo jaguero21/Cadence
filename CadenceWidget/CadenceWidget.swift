@@ -11,7 +11,7 @@ struct Provider: TimelineProvider {
     }
 
     func placeholder(in context: Context) -> CadenceEntry {
-        CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 5))
+        CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 5, mascotPose: .welcoming))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CadenceEntry) -> Void) {
@@ -151,6 +151,23 @@ struct CadenceWidgetEntryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(alignment: .bottomTrailing) {
+            // .systemMedium only: task review measured a genuine bounding-box
+            // overlap between a .systemSmall-sized 44×44 corner mascot and the
+            // mood-buttons row on the smallest supported device class
+            // (iPhone SE-class .systemSmall). .systemMedium has 100pt+ of
+            // clearance at 56×56, comfortably safe.
+            if family == .systemMedium {
+                Image("mascot-\(entry.summary.mascotPose.rawValue)")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 56, height: 56)
+                    .opacity(0.5)
+                    .accessibilityHidden(true)
+                    .padding(.trailing, -4)
+                    .padding(.bottom, -4)
+            }
+        }
     }
 
     // One-tap quick log straight from the home screen.
@@ -188,20 +205,20 @@ struct CadenceWidget: Widget {
 #Preview(as: .systemSmall) {
     CadenceWidget()
 } timeline: {
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3))
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3, mascotPose: .welcoming))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4, mascotPose: .resting))
 }
 
 #Preview(as: .accessoryCircular) {
     CadenceWidget()
 } timeline: {
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3))
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3, mascotPose: .welcoming))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4, mascotPose: .resting))
 }
 
 #Preview(as: .accessoryRectangular) {
     CadenceWidget()
 } timeline: {
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3))
-    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: false, streak: 3, mascotPose: .welcoming))
+    CadenceEntry(date: .now, summary: WidgetData.Summary(date: .now, loggedToday: true, streak: 4, mascotPose: .resting))
 }
