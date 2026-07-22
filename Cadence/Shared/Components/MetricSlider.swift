@@ -85,7 +85,7 @@ struct StreakBadge: View {
         HStack(spacing: 4) {
             Image(systemName: "flame.fill")
                 .foregroundStyle(isMilestone ? .yellow : .orange)
-                .symbolEffect(.bounce, options: .repeat(2), value: isMilestone)
+                .cadenceSymbolBounce(value: isMilestone, repeating: 2)
             Text("\(count)")
                 .font(.subheadline.bold())
                 .contentTransition(.numericText())

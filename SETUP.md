@@ -1,99 +1,143 @@
 # Cadence — Xcode Setup Guide
 
-Complete these five steps before building to a device or submitting to the App Store.
+Most of this project's capabilities (HealthKit, CloudKit, App Groups, assets)
+are already configured in the checked-in project and entitlements — cloning
+the repo and opening it in Xcode gets you most of the way there. The steps
+below cover what's still developer-specific: your own signing team, and (if
+you want CloudKit sync or in-app purchases to actually work end to end under
+your own Apple Developer account) your own container/App Group/products.
 
 ---
 
 ## 1. Set Your Development Team
 
-**Why:** Xcode requires a signing identity to install the app on a physical device.
+**Why:** Xcode requires a signing identity to install the app on a physical
+device. The team ID checked into the project (`4NWCR79S38`) is the original
+developer's — you can't reuse it.
 
 1. Open `Cadence.xcodeproj` in Xcode
-2. In the Project Navigator, click the **Cadence** project (top of the file tree, blue icon)
-3. Select the **Cadence** target under TARGETS
-4. Open the **Signing & Capabilities** tab
-5. Under **Signing**, set **Team** to your Apple Developer account
-   - If none appear, go to **Xcode → Settings → Accounts** and sign in with your Apple ID
-   - A free Apple ID works for device testing; a paid developer account ($99/yr) is required for App Store submission
-6. Xcode will auto-generate a provisioning profile — the "Signing Certificate" field should show your name and turn green
+2. In the Project Navigator, click the **Cadence** project (top of the file
+   tree, blue icon)
+3. Repeat for each target under TARGETS — **Cadence**, **CadenceWidgetExtension**,
+   **CadenceWidget Watch App**, and **CadenceTests**:
+   - Open the **Signing & Capabilities** tab
+   - Under **Signing**, set **Team** to your Apple Developer account
+     - If none appear, go to **Xcode → Settings → Accounts** and sign in
+       with your Apple ID
+     - A free Apple ID works for on-device testing without CloudKit/StoreKit;
+       a paid developer account ($99/yr) is required for CloudKit, push,
+       and App Store submission
+4. Xcode will auto-generate provisioning profiles — each target's "Signing
+   Certificate" field should show your name and turn green
 
 ---
 
-## 2. Add the HealthKit Capability
+## 2. HealthKit — already configured
 
-**Why:** HealthKit access requires an explicit entitlement in addition to the `Info.plist` usage descriptions (already included).
+**Why:** HealthKit access requires an explicit entitlement in addition to
+`Info.plist` usage descriptions. Both are already in place:
 
-1. With the **Cadence** target selected, stay on the **Signing & Capabilities** tab
-2. Click **+ Capability** (top-left of the tab)
-3. Search for **HealthKit** and double-click it to add
-4. In the new HealthKit section that appears, check **Health Records** only if you intend to read clinical records — leave it unchecked for now
-5. Confirm `Cadence.entitlements` appears in the Project Navigator (Xcode creates it automatically)
-6. Verify the two `Info.plist` keys are present (they are — already added):
-   - `NSHealthShareUsageDescription`
-   - `NSHealthUpdateUsageDescription`
+- `Cadence/Cadence.entitlements` already declares
+  `com.apple.developer.healthkit` and
+  `com.apple.developer.healthkit.background-delivery`
+- `Cadence/App/Info.plist` already has `NSHealthShareUsageDescription` and
+  `NSHealthUpdateUsageDescription`
+
+Nothing to do here unless Xcode strips the capability during re-signing —
+if so, re-add it via **Signing & Capabilities → + Capability → HealthKit**
+on the **Cadence** target and confirm the entitlements file is unchanged.
 
 ---
 
-## 3. Add StoreKit Product IDs and a Testing Config
+## 3. CloudKit sync and App Groups — need your own identifiers
 
-**Why:** The `StoreService` references two product identifiers that must match what you register in App Store Connect (or a local StoreKit config for testing).
+**Why:** `Cadence.entitlements` requests the iCloud container
+`iCloud.com.carpecadence.app` and CloudKit service, and both the app and
+`CadenceWidgetExtension.entitlements` share the App Group
+`group.com.carpecadence.app` (the app↔widget bridge — see
+[CLAUDE.md](CLAUDE.md)'s Widget section). These identifiers are registered
+under the original developer's account; you can't provision against them.
 
-### Step A — Update the product IDs in code
+1. In **Signing & Capabilities**, if iCloud/App Groups show a provisioning
+   error, either:
+   - Ask to be added as a team member on the existing developer account
+     (identifiers stay as-is), **or**
+   - Change the container/group identifiers to ones registered under your
+     own account (update `Cadence.entitlements` and
+     `CadenceWidgetExtension.entitlements`, and the corresponding strings in
+     `WidgetData.appGroup` and `CadenceApp.swift`'s CloudKit container config)
+2. This is **not launch-blocking either way**: `sharedModelContainer` (see
+   `CadenceApp.swift`) falls back from CloudKit-mirrored storage to a
+   local-only store, then in-memory, so the app still runs without a working
+   iCloud entitlement — sync just won't happen.
 
-Open [Cadence/Shared/Constants.swift](Cadence/Shared/Constants.swift) and set your actual bundle-prefixed IDs:
+---
+
+## 4. StoreKit Product IDs and a Testing Config
+
+**Why:** `StoreService` references two product identifiers that must match
+what's registered in App Store Connect (or a local StoreKit config for
+testing).
+
+### Step A — Confirm the product IDs in code
+
+[Cadence/Shared/Constants.swift](Cadence/Shared/Constants.swift) already
+defines the real IDs — only change these if you're shipping under a
+different bundle prefix:
 
 ```swift
 enum StoreKitID {
-    static let proOneTime = "com.cadence.app.pro.lifetime"   // ← your real ID
-    static let proMonthly = "com.cadence.app.pro.monthly"    // ← your real ID
+    static let proOneTime = "com.carpecadence.pro.lifetime"
+    static let proMonthly = "com.carpecadence.pro.monthly"
 }
 ```
 
-### Step B — Create a local StoreKit configuration file for testing
+### Step B — Local StoreKit config
 
-1. In Xcode, go to **File → New → File**
-2. Filter for **StoreKit Configuration File**, click Next
-3. Name it `Cadence.storekit`, save it inside the `Cadence/` folder
-4. Click **+** in the StoreKit editor to add products:
-   - **Non-Consumable** → ID: `com.cadence.app.pro.lifetime`, Reference Name: `Pro Lifetime`, Price: $9.99
-   - **Auto-Renewable Subscription** → ID: `com.cadence.app.pro.monthly`, Reference Name: `Pro Monthly`, Price: $2.99/mo
-5. Attach the config to your scheme: **Product → Scheme → Edit Scheme → Run → Options → StoreKit Configuration → Cadence.storekit**
+A local config already exists at `Cadence/CarpeCadence.storekit`, with
+product IDs matching `StoreKitID` above — it just isn't attached to the
+`Cadence` scheme by default. To use it:
+
+1. **Product → Scheme → Edit Scheme → Run → Options → StoreKit
+   Configuration → CarpeCadence.storekit**
 
 ### Step C — Register in App Store Connect (before release)
 
 1. Log in at [appstoreconnect.apple.com](https://appstoreconnect.apple.com)
-2. Create a new app with bundle ID `com.cadence.app`
-3. Go to **In-App Purchases** and create the same two products with matching IDs
+2. Create a new app with bundle ID `com.carpecadence.app`
+3. Go to **In-App Purchases** and create the same two products with
+   matching IDs (`com.carpecadence.pro.lifetime`, `com.carpecadence.pro.monthly`)
 
 ---
 
-## 4. Add an Accent Color in Assets
+## 5. App icon and accent color — already configured
 
-**Why:** `CadenceColor.accent` references an asset named `"AccentColor"` — without it the app compiles but tint falls back to system blue.
+**Why:** `CadenceColor.accent` and the App Store icon both reference assets
+in `Cadence/Assets.xcassets`, which already has an `AccentColor` color set
+and a filled-in `AppIcon` — nothing to add before your first build.
 
-1. In the Project Navigator, look for `Assets.xcassets` — if it's missing:
-   - **File → New → File → Asset Catalog**, name it `Assets`, save inside `Cadence/`
-   - In the target's **Build Settings**, set `ASSETCATALOG_COMPILER_APPICON_NAME` = `AppIcon` and `ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME` = `AccentColor`
-2. Open `Assets.xcassets`
-3. Click **+** at the bottom → **New Color Set**
-4. Rename it `AccentColor`
-5. Click the color swatch in the **Any Appearance** slot and pick your brand color
-   - Suggested: a calm teal or indigo — something that reads well on white and dark backgrounds
-6. Add a **Dark Appearance** variant if you want a different shade in dark mode
-
-> **Tip:** Also add an `AppIcon` image set here before App Store submission. Xcode 15+ can generate all required sizes from a single 1024×1024 PNG.
+To adjust the palette, edit the existing color sets (`AccentColor`,
+`MoodBlue`, `EnergyOrange`, `SleepPurple`, `StressRed`, `SuccessGreen` —
+see CLAUDE.md's Styling convention) rather than adding new ones inline in
+view code.
 
 ---
 
-## 5. Build and Run
+## 6. Build and Run
 
-**Why:** Confirms signing, capabilities, and assets are wired up correctly before writing more code.
+**Why:** Confirms signing and capabilities are wired up correctly before
+writing more code.
 
-### Simulator (no account required)
+### Simulator (no paid account required)
 
-1. Choose an iPhone 15 or later simulator from the device picker (top-center toolbar)
+1. Choose an iPhone 15 or later simulator from the device picker (top-center
+   toolbar)
 2. Press **⌘R** — the app should build and launch
-3. Walk through the daily log flow and confirm SwiftData persistence works (close the app, reopen, log reappears)
+3. Walk through the daily log flow and confirm SwiftData persistence works
+   (close the app, reopen, log reappears)
+4. HealthKit and the paired-watch quick-log flow can't be exercised in the
+   Simulator alone — HealthKit needs a device, and WatchConnectivity needs a
+   paired iPhone + Watch simulator (or two real devices)
 
 ### Physical device
 
@@ -101,7 +145,8 @@ enum StoreKitID {
 2. Trust the Mac on the device if prompted
 3. Select your device from the picker
 4. Press **⌘R** — Xcode installs the app
-5. On first launch, go to **Settings → General → VPN & Device Management** on the iPhone and trust your developer certificate
+5. On first launch, go to **Settings → General → VPN & Device Management**
+   on the iPhone and trust your developer certificate
 
 ### Smoke-test checklist
 
@@ -118,8 +163,8 @@ enum StoreKitID {
 
 | Issue | Fix |
 |---|---|
-| "No signing certificate" | Sign in to Xcode → Settings → Accounts, then re-select your team |
+| "No signing certificate" | Sign in to Xcode → Settings → Accounts, then re-select your team on every target (app, widget extension, watch app, tests) |
 | `HKHealthStore` crash on simulator | HealthKit is not available in the Simulator — guard calls with `HealthKitService.shared.isAvailable` (already done) |
-| StoreKit products not loading | Confirm the StoreKit config is attached to the Run scheme (Step 3B) |
-| `AccentColor` shows system blue | Asset name must be exactly `AccentColor` — case-sensitive |
+| CloudKit/App Group provisioning errors | You need your own iCloud container / App Group, or team access to the existing one — see Step 3 |
+| StoreKit products not loading | Confirm the StoreKit config is attached to the Run scheme, and that its product IDs match `StoreKitID` (Step 4B) |
 | SwiftData migration error | Delete the app from the simulator/device to reset the store during development |
