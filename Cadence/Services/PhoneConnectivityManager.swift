@@ -67,7 +67,8 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
             // Publish a fresh widget summary — a bare timeline reload would
             // just republish the stale App Group data.
             let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
-            DashboardViewModel.publishWidgetSummary(logs: logs)
+            let flares = (try? context.fetch(FetchDescriptor<Flare>())) ?? []
+            DashboardViewModel.publishWidgetSummary(logs: logs, flares: flares)
             // Mirror the mood into Health's State of Mind — a wrist check-in
             // is still a check-in. Best-effort, fire-and-forget.
             let recordedAt = (payload["date"] as? TimeInterval).map(Date.init(timeIntervalSinceReferenceDate:)) ?? .now

@@ -125,7 +125,8 @@ struct SyncBackupSection: View {
             // fetch fresh rather than using the @Query array above, which
             // hasn't re-evaluated inside this synchronous closure yet.
             let freshLogs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
-            DashboardViewModel.publishWidgetSummary(logs: freshLogs)
+            let freshFlares = (try? modelContext.fetch(FetchDescriptor<Flare>())) ?? []
+            DashboardViewModel.publishWidgetSummary(logs: freshLogs, flares: freshFlares)
             // Restored medications can carry reminders; reconcile now instead
             // of waiting for the next foreground pass to silence/schedule them.
             notificationService.reconcileMedicationReminders(context: modelContext)
