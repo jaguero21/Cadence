@@ -40,15 +40,16 @@ final class DashboardViewModel {
     // the timeline reload when nothing changed — reloads are system-budgeted,
     // and burning the budget on no-op refreshes leaves real changes stranded.
     //
-    // `flares` defaults to `[]`: only `refresh` (the Dashboard's own full
-    // refresh path) has flare data in scope for free. The other callers —
-    // CadenceApp's foreground sweep, LogInputFlow's save, the watch/Siri
-    // quick-log paths, and SyncBackupSection's restore — are narrow,
-    // single-purpose paths; adding a Flare fetch to each just for the
-    // mascot would be disproportionate for a decorative feature. They
-    // publish with a flare-blind pose, which self-corrects on the next full
-    // Dashboard refresh — the same brief-staleness tradeoff the widget
-    // already accepts elsewhere (its interim "mood saved" state).
+    // `flares` defaults to `[]` only for callers with no ModelContext in
+    // scope at all (none currently exist — every real call site fetches
+    // Flare alongside DailyLog, the same cheap unbounded-table fetch already
+    // used for Medication elsewhere). This isn't optional: a caller that
+    // publishes without flares would silently overwrite an active flare's
+    // stored `.cozy` pose with whatever `.soaking`/`.resting`/`.welcoming`
+    // the flare-blind computation produces instead — not a staleness lag,
+    // an active downgrade, since `pose` is recomputed from scratch each call
+    // and the `summary != WidgetData.read()` guard republishes any different
+    // value it gets.
     static func publishWidgetSummary(logs: [DailyLog], flares: [Flare] = []) {
         let streak = computeStreak(from: logs)
         let activeFlare = flares.first { $0.endDate == nil }

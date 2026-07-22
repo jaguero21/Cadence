@@ -777,7 +777,8 @@ struct LogInputFlow: View {
             // Keep the home-screen widget current without requiring a visit to
             // the Dashboard tab.
             let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
-            DashboardViewModel.publishWidgetSummary(logs: logs)
+            let flares = (try? modelContext.fetch(FetchDescriptor<Flare>())) ?? []
+            DashboardViewModel.publishWidgetSummary(logs: logs, flares: flares)
             publishToHealth(log)
         } catch {
             Self.log.error("Partial save failed: \(error, privacy: .public)")
