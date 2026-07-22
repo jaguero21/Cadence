@@ -151,6 +151,16 @@ struct CadenceWidgetEntryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(alignment: .bottomTrailing) {
+            Image("mascot-\(entry.summary.mascotPose.rawValue)")
+                .resizable()
+                .scaledToFit()
+                .frame(width: family == .systemSmall ? 44 : 56, height: family == .systemSmall ? 44 : 56)
+                .opacity(0.5)
+                .accessibilityHidden(true)
+                .padding(.trailing, -4)
+                .padding(.bottom, -4)
+        }
     }
 
     // One-tap quick log straight from the home screen.
