@@ -32,6 +32,7 @@ protocol HealthKitServiceProtocol: AnyObject {
 
 @MainActor
 protocol NotificationServiceProtocol: AnyObject {
+    @discardableResult
     func requestAuthorization() async -> Bool
     func checkAuthorizationStatus() async -> Bool
     func scheduleDailyReminder(at hour: Int, minute: Int)
