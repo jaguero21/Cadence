@@ -32,18 +32,35 @@ final class DashboardViewModel {
             notifications.removeNotification(id: NotificationID.streakRisk)
         }
 
-        Self.publishWidgetSummary(logs: logs)
+        Self.publishWidgetSummary(logs: logs, flares: flares)
     }
 
     // Single publish point for the home-screen widget, callable from any save
     // path (dashboard refresh, watch quick-log, log flow). Skips the write AND
     // the timeline reload when nothing changed — reloads are system-budgeted,
     // and burning the budget on no-op refreshes leaves real changes stranded.
-    static func publishWidgetSummary(logs: [DailyLog]) {
+    //
+    // `flares` defaults to `[]`: only `refresh` (the Dashboard's own full
+    // refresh path) has flare data in scope for free. The other callers —
+    // CadenceApp's foreground sweep, LogInputFlow's save, the watch/Siri
+    // quick-log paths, and SyncBackupSection's restore — are narrow,
+    // single-purpose paths; adding a Flare fetch to each just for the
+    // mascot would be disproportionate for a decorative feature. They
+    // publish with a flare-blind pose, which self-corrects on the next full
+    // Dashboard refresh — the same brief-staleness tradeoff the widget
+    // already accepts elsewhere (its interim "mood saved" state).
+    static func publishWidgetSummary(logs: [DailyLog], flares: [Flare] = []) {
+        let streak = computeStreak(from: logs)
+        let activeFlare = flares.first { $0.endDate == nil }
         let summary = WidgetData.Summary(
             date: Calendar.current.startOfDay(for: .now),
             loggedToday: logs.first { Calendar.current.isDateInToday($0.date) }?.isComplete == true,
-            streak: computeStreak(from: logs)
+            streak: streak,
+            mascotPose: MascotPoseEngine.pose(
+                for: logs.map(DailyLogSnapshot.init),
+                activeFlare: activeFlare.map(FlareSnapshot.init),
+                streakDays: streak
+            )
         )
         guard summary != WidgetData.read() else { return }
         WidgetData.write(summary)
