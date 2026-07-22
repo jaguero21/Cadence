@@ -9,6 +9,7 @@ final class DashboardViewModel {
     var thisWeekReview: WeeklyReview?
     var streak: Int = 0
     var latestInsight: InsightCard?
+    var mascotPose: WidgetData.MascotPose = .welcoming
 
     func refresh(logs: [DailyLog], reviews: [WeeklyReview], medications: [Medication] = [], flares: [Flare] = [], customTrackers: [CustomTracker] = [], notifications: (any NotificationServiceProtocol)? = nil) {
         let notifications = notifications ?? NotificationService.shared
@@ -25,6 +26,7 @@ final class DashboardViewModel {
             flares: flares.map(FlareSnapshot.init),
             trackers: customTrackers.map(CustomTrackerSnapshot.init)
         ).first
+        mascotPose = Self.resolvePose(logs: logs, flares: flares, streakDays: streak)
 
         if streak > 0 && todayLog?.isComplete != true {
             notifications.scheduleStreakAtRisk()
@@ -33,6 +35,19 @@ final class DashboardViewModel {
         }
 
         Self.publishWidgetSummary(logs: logs, flares: flares)
+    }
+
+    // Shared by refresh (for the Dashboard's own mascotPose) and
+    // publishWidgetSummary (for the widget's copy) so the two can never
+    // disagree about which flare counts as "active" or how streak feeds
+    // into the pose.
+    private static func resolvePose(logs: [DailyLog], flares: [Flare], streakDays: Int) -> WidgetData.MascotPose {
+        let activeFlare = flares.first { $0.endDate == nil }
+        return MascotPoseEngine.pose(
+            for: logs.map(DailyLogSnapshot.init),
+            activeFlare: activeFlare.map(FlareSnapshot.init),
+            streakDays: streakDays
+        )
     }
 
     // Single publish point for the home-screen widget, callable from any save
@@ -52,16 +67,11 @@ final class DashboardViewModel {
     // value it gets.
     static func publishWidgetSummary(logs: [DailyLog], flares: [Flare] = []) {
         let streak = computeStreak(from: logs)
-        let activeFlare = flares.first { $0.endDate == nil }
         let summary = WidgetData.Summary(
             date: Calendar.current.startOfDay(for: .now),
             loggedToday: logs.first { Calendar.current.isDateInToday($0.date) }?.isComplete == true,
             streak: streak,
-            mascotPose: MascotPoseEngine.pose(
-                for: logs.map(DailyLogSnapshot.init),
-                activeFlare: activeFlare.map(FlareSnapshot.init),
-                streakDays: streak
-            )
+            mascotPose: resolvePose(logs: logs, flares: flares, streakDays: streak)
         )
         guard summary != WidgetData.read() else { return }
         WidgetData.write(summary)
