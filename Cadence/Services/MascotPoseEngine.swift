@@ -5,8 +5,10 @@ import Foundation
 // PatternEngine.allInsights): an active flare or a real low-mood stretch
 // always outranks a celebratory streak pose, which outranks the plain
 // default. Pure and snapshot-based (never a @Model across actors, same
-// rule PatternEngine follows) so every caller — the app now, the widget
-// once it's wired — computes the identical pose from the identical inputs.
+// rule PatternEngine follows) — only the app computes a pose with this
+// function; the widget extension has no SwiftData access and instead
+// reads the pose the app already computed and published to
+// WidgetData.Summary.mascotPose (see that type's doc comment).
 enum MascotPoseEngine {
     static func pose(
         for logs: [DailyLogSnapshot],
