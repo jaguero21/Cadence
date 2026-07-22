@@ -40,6 +40,7 @@
 		9B471578B10D71BD04E4D8EC /* SwiftData in Frameworks */ = {isa = PBXBuildFile; fileRef = EB8A65FA882473E559C0012B /* SwiftData */; };
 		A23AD9351A5BCD460DCFD6BA /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABD3C5951CAE74F5C1693742 /* Foundation.framework */; };
 		AA11BB22CC33DD44EE55FF61 /* PatternEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF01 /* PatternEngineTests.swift */; };
+		AABBCCDD0000000000000303 /* MascotPoseEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000304 /* MascotPoseEngineTests.swift */; };
 		AA11BB22CC33DD44EE55FF62 /* StoreServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF02 /* StoreServiceTests.swift */; };
 		AA11BB22CC33DD44EE55FF63 /* SchemaMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF03 /* SchemaMigrationTests.swift */; };
 		AA11BB22CC33DD44EE55FF64 /* HealthKitServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF04 /* HealthKitServiceTests.swift */; };
@@ -82,6 +83,7 @@
 		C7F20E34EA5B3C5F84042DA4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91AC27A765654C1A1DFFBD5 /* AppState.swift */; };
 		CCAADDEE00000000000000B1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CCAADDEE00000000000000F1 /* Localizable.xcstrings */; };
 		D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0989CA66FE09F78B729A4E /* PatternEngine.swift */; };
+		AABBCCDD0000000000000301 /* MascotPoseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000302 /* MascotPoseEngine.swift */; };
 		D45ECE5968E07CA77E8B26D5 /* StoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F51B62D7D39FC0309276D9D /* StoreService.swift */; };
 		D7C825C8710DDE261D377518 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7F46C62532314DD37DC860 /* HealthKitService.swift */; };
 		D7F560CFF67830EE4B7964D0 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20317D6C051870F466BF81F7 /* ExportView.swift */; };
@@ -164,6 +166,7 @@
 		25762D652FEDDF5200A132C8 /* CadenceWidget Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CadenceWidget Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		26D33A415B0A6E15E6DA6EA9 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = ./Cadence/App/Info.plist; sourceTree = "<absolute>"; };
 		3F0989CA66FE09F78B729A4E /* PatternEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PatternEngine.swift; path = ./Cadence/Services/PatternEngine.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000302 /* MascotPoseEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MascotPoseEngine.swift; path = ./Cadence/Services/MascotPoseEngine.swift; sourceTree = "<absolute>"; };
 		445D893A69E7D38B6B8C7E75 /* InsightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightsView.swift; path = ./Cadence/Features/Insights/InsightsView.swift; sourceTree = "<absolute>"; };
 		493F590706A348D0857DA49A /* ServiceProtocols.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ServiceProtocols.swift; path = ./Cadence/Services/ServiceProtocols.swift; sourceTree = "<absolute>"; };
 		4A51F97BA927E7299C9A1B07 /* PDFBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PDFBuilder.swift; path = ./Cadence/Features/Export/PDFBuilder.swift; sourceTree = "<absolute>"; };
@@ -182,6 +185,7 @@
 		A292713D8D2930BB2E51C28C /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotificationService.swift; path = ./Cadence/Services/NotificationService.swift; sourceTree = "<absolute>"; };
 		A54B34C3966B1BD7CE976D7F /* Cadence.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cadence.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA11BB22CC33DD44EE55FF01 /* PatternEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PatternEngineTests.swift; path = ./CadenceTests/PatternEngineTests.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000304 /* MascotPoseEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MascotPoseEngineTests.swift; path = ./CadenceTests/MascotPoseEngineTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF02 /* StoreServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StoreServiceTests.swift; path = ./CadenceTests/StoreServiceTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF03 /* SchemaMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SchemaMigrationTests.swift; path = ./CadenceTests/SchemaMigrationTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF04 /* HealthKitServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitServiceTests.swift; path = ./CadenceTests/HealthKitServiceTests.swift; sourceTree = "<absolute>"; };
@@ -502,6 +506,7 @@
 			isa = PBXGroup;
 			children = (
 				AA11BB22CC33DD44EE55FF01 /* PatternEngineTests.swift */,
+				AABBCCDD0000000000000304 /* MascotPoseEngineTests.swift */,
 				AA11BB22CC33DD44EE55FF02 /* StoreServiceTests.swift */,
 				AA11BB22CC33DD44EE55FF03 /* SchemaMigrationTests.swift */,
 				AA11BB22CC33DD44EE55FF04 /* HealthKitServiceTests.swift */,
@@ -532,6 +537,7 @@
 				1A7F46C62532314DD37DC860 /* HealthKitService.swift */,
 				A292713D8D2930BB2E51C28C /* NotificationService.swift */,
 				3F0989CA66FE09F78B729A4E /* PatternEngine.swift */,
+				AABBCCDD0000000000000302 /* MascotPoseEngine.swift */,
 				AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */,
 				AABBCCDD0000000000000109 /* InsightRecorder.swift */,
 				AABBCCDD0000000000000112 /* CloudSyncMonitor.swift */,
@@ -819,6 +825,7 @@
 				D7C825C8710DDE261D377518 /* HealthKitService.swift in Sources */,
 				1D96522AE7200D9F795F68E8 /* NotificationService.swift in Sources */,
 				D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */,
+				AABBCCDD0000000000000301 /* MascotPoseEngine.swift in Sources */,
 				AABBCCDD000000000000020F /* PhoneConnectivityManager.swift in Sources */,
 				AABBCCDD0000000000000208 /* InsightRecord.swift in Sources */,
 				AABBCCDD0000000000000209 /* InsightRecorder.swift in Sources */,
@@ -839,6 +846,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA11BB22CC33DD44EE55FF61 /* PatternEngineTests.swift in Sources */,
+				AABBCCDD0000000000000303 /* MascotPoseEngineTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF62 /* StoreServiceTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF63 /* SchemaMigrationTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF64 /* HealthKitServiceTests.swift in Sources */,

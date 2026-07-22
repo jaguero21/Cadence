@@ -9,6 +9,7 @@ final class DashboardViewModel {
     var thisWeekReview: WeeklyReview?
     var streak: Int = 0
     var latestInsight: InsightCard?
+    var mascotPose: WidgetData.MascotPose = .welcoming
 
     func refresh(logs: [DailyLog], reviews: [WeeklyReview], medications: [Medication] = [], flares: [Flare] = [], customTrackers: [CustomTracker] = [], notifications: (any NotificationServiceProtocol)? = nil) {
         let notifications = notifications ?? NotificationService.shared
@@ -25,6 +26,7 @@ final class DashboardViewModel {
             flares: flares.map(FlareSnapshot.init),
             trackers: customTrackers.map(CustomTrackerSnapshot.init)
         ).first
+        mascotPose = Self.resolvePose(logs: logs, flares: flares, streakDays: streak)
 
         if streak > 0 && todayLog?.isComplete != true {
             notifications.scheduleStreakAtRisk()
@@ -32,18 +34,44 @@ final class DashboardViewModel {
             notifications.removeNotification(id: NotificationID.streakRisk)
         }
 
-        Self.publishWidgetSummary(logs: logs)
+        Self.publishWidgetSummary(logs: logs, flares: flares)
+    }
+
+    // Shared by refresh (for the Dashboard's own mascotPose) and
+    // publishWidgetSummary (for the widget's copy) so the two can never
+    // disagree about which flare counts as "active" or how streak feeds
+    // into the pose.
+    private static func resolvePose(logs: [DailyLog], flares: [Flare], streakDays: Int) -> WidgetData.MascotPose {
+        let activeFlare = flares.first { $0.endDate == nil }
+        return MascotPoseEngine.pose(
+            for: logs.map(DailyLogSnapshot.init),
+            activeFlare: activeFlare.map(FlareSnapshot.init),
+            streakDays: streakDays
+        )
     }
 
     // Single publish point for the home-screen widget, callable from any save
     // path (dashboard refresh, watch quick-log, log flow). Skips the write AND
     // the timeline reload when nothing changed — reloads are system-budgeted,
     // and burning the budget on no-op refreshes leaves real changes stranded.
-    static func publishWidgetSummary(logs: [DailyLog]) {
+    //
+    // `flares` defaults to `[]` only for callers with no ModelContext in
+    // scope at all (none currently exist — every real call site fetches
+    // Flare alongside DailyLog, the same cheap unbounded-table fetch already
+    // used for Medication elsewhere). This isn't optional: a caller that
+    // publishes without flares would silently overwrite an active flare's
+    // stored `.cozy` pose with whatever `.soaking`/`.resting`/`.welcoming`
+    // the flare-blind computation produces instead — not a staleness lag,
+    // an active downgrade, since `pose` is recomputed from scratch each call
+    // and the `summary != WidgetData.read()` guard republishes any different
+    // value it gets.
+    static func publishWidgetSummary(logs: [DailyLog], flares: [Flare] = []) {
+        let streak = computeStreak(from: logs)
         let summary = WidgetData.Summary(
             date: Calendar.current.startOfDay(for: .now),
             loggedToday: logs.first { Calendar.current.isDateInToday($0.date) }?.isComplete == true,
-            streak: computeStreak(from: logs)
+            streak: streak,
+            mascotPose: resolvePose(logs: logs, flares: flares, streakDays: streak)
         )
         guard summary != WidgetData.read() else { return }
         WidgetData.write(summary)
