@@ -274,7 +274,12 @@ struct DashboardView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
+            Image("mascot-\(vm.mascotPose.rawValue)")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 96, height: 96)
+                .accessibilityHidden(true)
             Text("Log your first day to see insights")
                 .font(.subheadline.weight(.medium))
             Text("Tap Today's Log above to get started.")
