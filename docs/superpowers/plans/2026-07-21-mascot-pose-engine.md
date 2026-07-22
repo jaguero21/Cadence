@@ -667,3 +667,46 @@ git commit -m "Wire MascotPoseEngine into publishWidgetSummary"
 - No `DashboardViewModel.mascotPose` published property for the view layer
   to bind to — that's added alongside the view wiring above, not before
   anything reads it.
+
+## Known follow-up item (found in final whole-branch review, 2026-07-22)
+
+**`publishWidgetSummary`'s flare-blind callers can downgrade a correct
+`.cozy` pose, not just lag it.** Task 4's `flares: [Flare] = []` default was
+framed as "brief staleness" — the 6 non-`refresh` callers publish a
+flare-blind pose that self-corrects on the next full Dashboard refresh. The
+final review traced this further: for a user with an active flare who
+quick-logs from the widget/watch/Siri, or who simply foregrounds the app
+without opening the Dashboard, the flare-blind computation doesn't just fail
+to *add* `.cozy` — it actively **overwrites an already-correct stored
+`.cozy`** with `.soaking`/`.resting` (since `pose` is recomputed from scratch
+each call, and the new value differs from what's stored, so the
+`summary != WidgetData.read()` guard fires and republishes the worse pose).
+For a widget-only quick-logger, that wrong pose then persists across
+midnight via `resolved()`, not "almost immediately" as originally assumed.
+(Mood-trend `.cozy` is unaffected — every flare-blind caller already fetches
+full `DailyLog` history — only the flare arm is lost.)
+
+This is **currently latent**: nothing in this plan renders `mascotPose`
+anywhere, so no user sees it yet. It must be resolved as part of the
+view-wiring follow-up, before that plan ships anything visible. Two options
+the review suggested, in order of preference:
+
+1. Fetch `Flare` in the three callers that already hold a `context` and
+   fetch `DailyLog` anyway (`CadenceApp.swift`'s foreground sweep,
+   `LogInputFlow.swift`'s save, `PhoneConnectivityManager.swift`'s watch
+   quick-log) — `(try? context.fetch(FetchDescriptor<Flare>())) ?? []` is a
+   one-line addition at each, zero new architectural surface.
+2. Have flare-blind paths preserve the previously-stored `mascotPose`
+   (read-modify-write against `WidgetData.read()`) instead of recomputing a
+   potentially-worse one.
+
+Also flagged, both genuinely minor and not blocking that follow-up either:
+- `refresh` computes `hasLowMoodTrend` over a 90-day window; the
+  unbounded-fetch callers compute it over full history — the mood-trend
+  verdict can differ by which path last published, mild tension with "every
+  surface agrees" (spec §7). Low practical impact; mood trends move slowly.
+- A pre-upgrade persisted `WidgetData.Summary` (no `mascotPose` field) fails
+  to decode as a whole struct, so the one-time migration blip resets
+  `streak`/`loggedToday` too, not just the pose, until the next publish. A
+  hand-rolled `Codable.init(from:)` with `decodeIfPresent` for `mascotPose`
+  would avoid this if the blip ever proves user-visible enough to matter.
