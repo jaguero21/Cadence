@@ -211,11 +211,21 @@ draft) is cut from this list — see Section 8.3.
 - **Don't** duplicate `MascotPoseEngine`'s logic per-surface — Dashboard,
   widget, and (when picked back up) notifications must never disagree on
   which pose is "correct" for a given day.
-- **Don't** add a new `Flare` fetch to the watch/Siri quick-log paths just
-  to feed the mascot — widen `publishWidgetSummary`'s signature (Section
-  6, step 5) and accept that those paths publish a flare-blind pose until
-  the next full Dashboard refresh, which follows almost immediately in
-  practice.
+- **Do** fetch `Flare` alongside `DailyLog` at every `publishWidgetSummary`
+  call site (superseded — see the note below the original Don't this
+  replaced). Leaving any caller flare-blind doesn't just delay `.cozy`, it
+  actively overwrites an already-correct stored `.cozy` with
+  `.soaking`/`.resting`/`.welcoming`, since the pose is recomputed from
+  scratch each call and the `summary != WidgetData.read()` guard
+  republishes whatever it gets. All six callers now fetch Flare — see
+  `docs/superpowers/plans/2026-07-21-mascot-pose-engine.md`'s "Known
+  follow-up item" section and `DashboardViewModel.publishWidgetSummary`'s
+  doc comment for the full reasoning and the fix's history. (This replaced
+  an earlier Don't in this same list that said the opposite — flagged by
+  a whole-branch review as exactly the kind of doc drift that could lead a
+  future maintainer to "simplify" by deleting those fetches and
+  reintroduce the bug. If you're reading this while touching that code:
+  don't remove the Flare fetches.)
 
 ## 8. Review Findings (2026-07-21) and Resolutions
 
@@ -234,16 +244,32 @@ func` called from **7 sites**: `CadenceApp` (foreground refresh),
 `DashboardViewModel.refresh` itself — and it previously took only
 `logs: [DailyLog]`, no Flare data.
 
-**Resolution:** give it a `flares: [Flare] = []` default, matching the
-existing default-parameter convention on `DashboardViewModel.refresh`.
-`refresh` already receives `flares` as a parameter (wired in for
-`PatternEngine`) and can pass it through for free — no new fetch. The
-other 6 call sites are narrow, single-purpose save paths; adding a
-`FetchDescriptor<Flare>` to each just for the mascot would be
+**Resolution (as originally implemented):** give it a `flares: [Flare] = []`
+default, matching the existing default-parameter convention on
+`DashboardViewModel.refresh`. `refresh` already receives `flares` as a
+parameter (wired in for `PatternEngine`) and can pass it through for free —
+no new fetch. The other 6 call sites are narrow, single-purpose save paths;
+adding a `FetchDescriptor<Flare>` to each just for the mascot would be
 disproportionate for a decorative feature. They publish with the default
 `[]`, meaning `.cozy` may lag by one refresh cycle after a quick-log —
 consistent with how the widget already tolerates brief staleness elsewhere
 (the documented "mood saved" interim state).
+
+**Superseded (2026-07-22, before any view actually rendered a pose):** the
+mascot-pose-engine plan's own whole-branch review traced this further and
+found it wasn't just staleness — a flare-blind caller doesn't merely fail
+to *add* `.cozy`, it *overwrites* an already-correct stored `.cozy` with
+whatever the flare-blind computation produces instead, since `pose` is
+recomputed from scratch every call and the `summary != WidgetData.read()`
+guard republishes any different value it gets. Fixed by fetching `Flare`
+alongside `DailyLog` at all 6 non-`refresh` call sites (all of them already
+had a `ModelContext` in scope, the same cheap unbounded-table fetch already
+used for `Medication` elsewhere) — see
+`docs/superpowers/plans/2026-07-21-mascot-pose-engine.md`'s "Known
+follow-up item" section for the full writeup. Section 7's Do's and Don'ts
+above has been updated to match; this paragraph is left in place rather
+than deleted so the "why we first thought `[]` was fine, and why that
+turned out wrong" reasoning survives for whoever reads this next.
 
 ### 8.2 — The Dashboard doesn't have a "no log yet today" empty state
 
