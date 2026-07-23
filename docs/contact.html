@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — Cadence</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #F5F1EB;
+      color: #2A2520;
+      line-height: 1.7;
+      padding: 0 16px 64px;
+    }
+
+    header {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 0 32px;
+      border-bottom: 1px solid rgba(42,37,32,0.12);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .logo-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .logo-name {
+      font-size: 22px;
+      font-weight: 600;
+      color: #2A2520;
+      letter-spacing: 0.2px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #2A2520;
+      margin-bottom: 8px;
+    }
+
+    .meta {
+      font-size: 15px;
+      color: #8A7D74;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 40px auto 0;
+    }
+
+    section {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(42,37,32,0.06);
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #2A2520;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h2 .icon {
+      width: 28px;
+      height: 28px;
+      background: rgba(42,157,143,0.15);
+      border-radius: 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    p { margin-bottom: 12px; color: #3D3530; font-size: 15px; }
+    p:last-child { margin-bottom: 0; }
+
+    a { color: #2A9D8F; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #2A2520;
+      margin-bottom: 6px;
+      margin-top: 16px;
+    }
+
+    label:first-of-type { margin-top: 0; }
+
+    select,
+    input[type="text"],
+    input[type="email"],
+    textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid rgba(42,37,32,0.15);
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: inherit;
+      color: #2A2520;
+      background: #FDFAF6;
+      transition: border-color 0.15s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238A7D74' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+      cursor: pointer;
+    }
+
+    select:focus,
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #2A9D8F;
+      box-shadow: 0 0 0 3px rgba(42,157,143,0.15);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 140px;
+    }
+
+    .submit-btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 14px 32px;
+      background: #2A9D8F;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: inherit;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      width: 100%;
+    }
+
+    .submit-btn:hover { background: #258A7E; }
+    .submit-btn:active { transform: scale(0.98); }
+
+    .note {
+      font-size: 13px;
+      color: #8A7D74;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .highlight {
+      background: rgba(42,157,143,0.1);
+      border-left: 3px solid #2A9D8F;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      font-size: 15px;
+      color: #3D3530;
+    }
+
+    .topics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .topic-card {
+      background: #FDFAF6;
+      border: 1.5px solid rgba(42,37,32,0.1);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 14px;
+      color: #3D3530;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .topic-card .t-icon { font-size: 18px; }
+
+    footer {
+      max-width: 720px;
+      margin: 32px auto 0;
+      text-align: center;
+      font-size: 13px;
+      color: #8A7D74;
+    }
+
+    @media (max-width: 520px) {
+      .topics { grid-template-columns: 1fr; }
+      section { padding: 20px 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon"><img src="./app_icon.png" alt="Cadence" /></div>
+    <span class="logo-name">Cadence</span>
+  </div>
+  <h1>Contact Us</h1>
+  <p class="meta">We'd love to hear from you. We aim to respond within 5 business days.</p>
+</header>
+
+<main>
+
+  <section>
+    <h2><span class="icon">💬</span> What can we help with?</h2>
+    <div class="topics">
+      <div class="topic-card"><span class="t-icon">🐛</span> Bug reports</div>
+      <div class="topic-card"><span class="t-icon">💡</span> Feature requests</div>
+      <div class="topic-card"><span class="t-icon">💳</span> Subscription &amp; billing</div>
+      <div class="topic-card"><span class="t-icon">🔒</span> Privacy questions</div>
+      <div class="topic-card"><span class="t-icon">🗑️</span> Data deletion</div>
+      <div class="topic-card"><span class="t-icon">✉️</span> General feedback</div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="icon">✉️</span> Send a Message</h2>
+    <div class="highlight">
+      Tapping "Open in Mail" will open your email app with a pre-filled message. No information is submitted through this website.
+    </div>
+
+    <form id="contactForm">
+      <label for="topic">Topic</label>
+      <select id="topic" name="topic">
+        <option value="General question">General question</option>
+        <option value="Bug report">Bug report</option>
+        <option value="Feature request">Feature request</option>
+        <option value="Subscription / billing">Subscription / billing</option>
+        <option value="Privacy question">Privacy question</option>
+        <option value="Data deletion request">Data deletion request</option>
+        <option value="Other">Other</option>
+      </select>
+
+      <label for="name">Your name <span style="font-weight:400;color:#8A7D74">(optional)</span></label>
+      <input type="text" id="name" name="name" placeholder="Jane Smith" autocomplete="name" />
+
+      <label for="email">Your email <span style="font-weight:400;color:#8A7D74">(so we can reply)</span></label>
+      <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" />
+
+      <label for="message">Message</label>
+      <textarea id="message" name="message" placeholder="Describe your question, feedback, or concern…"></textarea>
+
+      <button type="button" class="submit-btn" onclick="openMail()">Open in Mail</button>
+      <p class="note">This opens your default mail app with the message pre-filled.</p>
+    </form>
+  </section>
+
+  <section>
+    <h2><span class="icon">📬</span> Direct Email</h2>
+    <p>Prefer to write your own email? Reach us directly at:</p>
+    <p><strong><a href="mailto:carpecarb@icloud.com">carpecarb@icloud.com</a></strong></p>
+    <p>For subscription cancellations or billing issues, you can also manage your subscription directly through <strong>Settings → Apple ID → Subscriptions</strong> on your iPhone.</p>
+  </section>
+
+</main>
+
+<footer>
+  <p>© 2026 Cadence. All rights reserved.</p>
+  <p style="margin-top:8px;">
+    <a href="./index.html">Home</a>
+    &nbsp;·&nbsp;
+    <a href="./privacy-policy.html">Privacy Policy</a>
+    &nbsp;·&nbsp;
+    <a href="./eula.html">Terms of Use</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/jaguero21/Cadence">GitHub</a>
+  </p>
+</footer>
+
+<script>
+  function openMail() {
+    var topic = document.getElementById('topic').value;
+    var name = document.getElementById('name').value.trim();
+    var replyTo = document.getElementById('email').value.trim();
+    var message = document.getElementById('message').value.trim();
+
+    if (!message) {
+      alert('Please enter a message before continuing.');
+      document.getElementById('message').focus();
+      return;
+    }
+
+    if (replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) {
+      alert('Please enter a valid email address so we can reply.');
+      document.getElementById('email').focus();
+      return;
+    }
+
+    var subject = encodeURIComponent('Cadence: ' + topic);
+
+    var body = '';
+    if (name) body += 'Name: ' + name + '\n';
+    if (replyTo) body += 'Reply-to: ' + replyTo + '\n';
+    body += '\n' + message;
+
+    window.location.href = 'mailto:carpecarb@icloud.com?subject=' + subject + '&body=' + encodeURIComponent(body);
+  }
+</script>
+
+</body>
+</html>
