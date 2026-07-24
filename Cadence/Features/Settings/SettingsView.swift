@@ -232,11 +232,14 @@ struct SettingsView: View {
     private var aboutSection: some View {
         Section("About") {
             LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-            if let privacyURL = URL(string: "https://carpecadence.com/privacy") {
+            if let privacyURL = URL(string: "https://jaguero21.github.io/Cadence/privacy-policy.html") {
                 Link("Privacy Policy", destination: privacyURL)
             }
-            if let termsURL = URL(string: "https://carpecadence.com/terms") {
+            if let termsURL = URL(string: "https://jaguero21.github.io/Cadence/eula.html") {
                 Link("Terms of Service", destination: termsURL)
+            }
+            if let learnMoreURL = URL(string: "https://jaguero21.github.io/Cadence/") {
+                Link("Learn More About Cadence", destination: learnMoreURL)
             }
         }
     }
