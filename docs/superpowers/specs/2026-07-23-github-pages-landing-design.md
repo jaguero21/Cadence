@@ -99,9 +99,11 @@ just a similar layout.
 3. **Everything Free Gets You** — bulleted list: Daily Log, Weekly Review,
    Custom Trackers, Flares, Medications + reminders, two-way HealthKit sync,
    iCloud sync + JSON backup/restore, Widgets (Home/Lock/StandBy/Control
-   Center), Apple Watch quick-log, Siri Shortcuts, CSV export, symptom
-   library. (Every item here is confirmed free — not Pro-gated — in the
-   current code.)
+   Center), Apple Watch quick-log, Siri Shortcuts, symptom library. (Every
+   item here is confirmed free — not Pro-gated — in the current code. CSV
+   export was originally listed here but removed after the final review
+   found `ExportView.swift:47-70` gates it behind `store.isPro` in the same
+   block as PDF export — it is not actually free.)
 4. **Cadence Pro** (feature-grid, mirrors CarpeCarb's premium-features
    pattern) — Pattern Insights (correlation detection across sleep, mood,
    stress, symptoms), PDF Export (doctor-ready + personal reports), 90-Day
