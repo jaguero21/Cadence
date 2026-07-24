@@ -482,6 +482,26 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - **Do not run `generate_project.rb`.** It is stale: it regenerates only the
   **app** target and would wipe the hand-added **test** target.
 
+## Web presence — IMPORTANT
+
+- This repo is **public** and `docs/` is the live GitHub Pages root
+  (Settings → Pages, source `main` / `/docs`, serving
+  `jaguero21.github.io/Cadence`) — everything under `docs/` is publicly
+  served, not just the four site pages. `docs/superpowers/` (this repo's
+  spec/plan doc convention, per the `brainstorming`/`writing-plans`
+  Claude Code skills) briefly leaked into this folder and got scrubbed from
+  git history entirely (`git filter-repo`, force-pushed) on 2026-07-24 —
+  don't reintroduce it.
+- **Spec and plan docs for this repo do not go in `docs/`.** Write them to
+  `/Volumes/APFS2/SwiftPorjects/tmpfiles/Cadence/docs-superpowers/{plans,specs}/`
+  instead (outside the repo entirely, so there's nothing to accidentally
+  commit or serve). `docs/superpowers/` is also listed in `.gitignore` as a
+  belt-and-suspenders backstop, but the working convention is: never write
+  there in the first place.
+- Before adding any new file under `docs/`, ask whether it's meant to be
+  public — `docs/` should contain only the site's HTML/CSS/JS and the two
+  image assets (`app_icon.png`, `mascot.png`), nothing else.
+
 ## Build / test
 
 - Build & run tests in Xcode with ⌘U (scheme `Cadence`, test plan
