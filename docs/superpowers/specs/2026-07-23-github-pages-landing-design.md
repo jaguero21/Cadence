@@ -89,9 +89,7 @@ just a similar layout.
 
 ## index.html — sections
 
-1. **Hero** — app icon, "Cadence", tagline ("Spot the patterns in how you
-   feel — daily symptom tracking with on-device insights and a doctor-ready
-   report"), badge row (`Free to Download`, `iOS 17+`), CTA button "Join the
+1. **Hero** — app icon, "Cadence", tagline ("On-device symptom tracking that finds the patterns — and turns them into a doctor-ready report."), badge row (`Free to Download`, `iOS 17+`), CTA button "Join the
    TestFlight Beta" linking to a placeholder `#testflight-link-here` (clearly
    commented in the HTML so it's easy to find and swap before publishing).
 2. **How It Works** (4-card step-grid, mirrors CarpeCarb's pattern) — log in
