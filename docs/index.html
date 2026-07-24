@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadence — Daily Symptom Tracking for iOS</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #F5F1EB;
+      color: #2A2520;
+      line-height: 1.7;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 64px 24px 48px;
+      text-align: center;
+    }
+
+    .hero-logo {
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+      margin: 0 auto 24px;
+      display: block;
+      box-shadow: 0 8px 24px rgba(42,37,32,0.15);
+    }
+
+    .hero h1 {
+      font-size: 42px;
+      font-weight: 800;
+      color: #2A2520;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+    }
+
+    .hero p {
+      font-size: 18px;
+      color: #8A7D74;
+      max-width: 480px;
+      margin: 0 auto 28px;
+    }
+
+    .cta-btn {
+      display: inline-block;
+      background: #2A9D8F;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 14px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+
+    .cta-btn:hover { background: #258A7E; text-decoration: none; }
+
+    .badge {
+      display: inline-block;
+      background: #2A9D8F;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 999px;
+      margin: 20px 4px 4px;
+    }
+
+    .badge-outline {
+      display: inline-block;
+      background: transparent;
+      color: #2A9D8F;
+      border: 1.5px solid #2A9D8F;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 999px;
+      margin: 20px 4px 4px;
+    }
+
+    /* ── Sections ── */
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 16px 64px;
+    }
+
+    section {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(42,37,32,0.06);
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #2A2520;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h2 .icon {
+      width: 32px;
+      height: 32px;
+      background: rgba(42,157,143,0.15);
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+
+    h2 .icon.accent-purple { background: rgba(139,126,200,0.18); }
+
+    p { color: #3D3530; font-size: 15px; margin-bottom: 12px; }
+    p:last-child { margin-bottom: 0; }
+
+    ul {
+      padding-left: 20px;
+      margin-bottom: 12px;
+    }
+
+    ul:last-child { margin-bottom: 0; }
+
+    li {
+      color: #3D3530;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    li strong { color: #2A2520; }
+
+    .step-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .step-card {
+      background: #FDFAF6;
+      border: 1.5px solid rgba(42,37,32,0.08);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .step-num {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #2A9D8F;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .step-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2A2520;
+      margin-bottom: 4px;
+    }
+
+    .step-desc {
+      font-size: 13px;
+      color: #8A7D74;
+      line-height: 1.5;
+    }
+
+    .highlight {
+      background: rgba(42,157,143,0.1);
+      border-left: 3px solid #2A9D8F;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      margin-top: 12px;
+      font-size: 14px;
+      color: #3D3530;
+    }
+
+    .highlight.accent-purple {
+      background: rgba(139,126,200,0.12);
+      border-left-color: #8B7EC8;
+    }
+
+    a { color: #2A9D8F; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Pro features ── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .feature-card {
+      background: #FDFAF6;
+      border: 1.5px solid rgba(42,37,32,0.08);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .feature-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+
+    .feature-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #2A2520;
+      margin-bottom: 2px;
+    }
+
+    .feature-desc {
+      font-size: 12px;
+      color: #8A7D74;
+      line-height: 1.45;
+    }
+
+    /* ── Support / mascot ── */
+    .support-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .mascot {
+      width: 88px;
+      height: auto;
+      flex-shrink: 0;
+    }
+
+    /* ── Footer ── */
+    footer {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+      text-align: center;
+      font-size: 13px;
+      color: #8A7D74;
+      border-top: 1px solid rgba(42,37,32,0.1);
+    }
+
+    footer a { color: #2A9D8F; }
+
+    footer .links {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    footer .links a {
+      font-weight: 500;
+    }
+
+    footer .sep { color: rgba(42,37,32,0.2); }
+
+    @media (max-width: 520px) {
+      .hero h1 { font-size: 30px; }
+      .step-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .support-row { flex-direction: column; text-align: center; }
+      section { padding: 20px 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <img src="./app_icon.png" alt="Cadence app icon" class="hero-logo" />
+  <h1>Cadence</h1>
+  <p>On-device symptom tracking that finds the patterns — and turns them into a doctor-ready report.</p>
+  <!-- TODO: replace with the real public TestFlight link before publishing -->
+  <a href="#testflight-link-here" class="cta-btn">Join the TestFlight Beta</a>
+  <div>
+    <span class="badge">Free to Download</span>
+    <span class="badge-outline">iOS 17+</span>
+  </div>
+</div>
+
+<main>
+
+  <!-- How it works -->
+  <section>
+    <h2><span class="icon">⚡</span> How It Works</h2>
+    <div class="step-grid">
+      <div class="step-card">
+        <div class="step-num">Step 1</div>
+        <div class="step-title">Log in under 90 seconds</div>
+        <div class="step-desc">Mood, energy, sleep, symptoms, and whatever else stood out today — quick sliders and taps, not a form.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 2</div>
+        <div class="step-title">HealthKit fills in what it can</div>
+        <div class="step-desc">Sleep, wrist temperature, workouts, and more prefill automatically — always optional, never overwriting what you typed.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 3</div>
+        <div class="step-title">Patterns surface on their own</div>
+        <div class="step-desc">An on-device engine compares your days and flags real correlations — confidence-scored and explainable.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 4</div>
+        <div class="step-title">Bring it to your next appointment</div>
+        <div class="step-desc">Export a doctor-ready PDF or a spreadsheet, scoped to any date range.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Free features -->
+  <section>
+    <h2><span class="icon">🆓</span> Everything Free Gets You</h2>
+    <p>Cadence's core tracking is free — no trial, no time limit.</p>
+    <ul>
+      <li><strong>Daily Log</strong> — mood, energy, sleep, pain, symptoms, and contextual factors in under 90 seconds</li>
+      <li><strong>Weekly Review</strong> — guided reflection prompts and Intentions for Tomorrow</li>
+      <li><strong>Custom Trackers</strong> — track any metric that matters to you, beyond the built-in set</li>
+      <li><strong>Flares</strong> — multi-day symptom episode tracking with early-warning precursor detection</li>
+      <li><strong>Medications</strong> — course tracking, symptom-effect correlation, and reminder notifications</li>
+      <li><strong>HealthKit Sync</strong> — two-way sync for symptoms and mood, always optional</li>
+      <li><strong>iCloud Sync &amp; Backup</strong> — CloudKit sync plus a JSON backup/restore that merges, never overwrites</li>
+      <li><strong>Widgets</strong> — Home Screen, Lock Screen, StandBy, and a Control Center check-in button</li>
+      <li><strong>Apple Watch</strong> — wrist quick-log for mood and energy</li>
+      <li><strong>Siri Shortcuts</strong> — log a check-in hands-free</li>
+      <li><strong>Symptom Library</strong> — toggle from ~34 built-in symptoms to match what you're tracking</li>
+    </ul>
+  </section>
+
+  <!-- Pro -->
+  <section>
+    <h2><span class="icon accent-purple">⭐</span> Cadence Pro</h2>
+    <p>Free covers day-to-day tracking. Pro unlocks the deeper analysis once you've got enough history to make it meaningful.</p>
+    <div class="feature-grid" style="margin-top: 16px;">
+      <div class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <div>
+          <div class="feature-title">Pattern Insights</div>
+          <div class="feature-desc">Correlation detection across sleep, mood, stress, and symptoms — confidence-scored, always explainable.</div>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📄</div>
+        <div>
+          <div class="feature-title">PDF Export</div>
+          <div class="feature-desc">Doctor-ready and personal reports, previewed before you share them.</div>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📈</div>
+        <div>
+          <div class="feature-title">90-Day Trends</div>
+          <div class="feature-desc">Full trend history across every metric you track, not just 30 days.</div>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">✍️</div>
+        <div>
+          <div class="feature-title">Custom Symptoms</div>
+          <div class="feature-desc">Add your own free-text symptoms beyond the built-in library.</div>
+        </div>
+      </div>
+    </div>
+    <div class="highlight accent-purple">
+      <strong>One-time purchase or monthly subscription</strong> — current pricing is shown in the app before you buy. Manage or cancel anytime via <strong>Settings → Apple ID → Subscriptions</strong>.
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section>
+    <h2><span class="icon">🔒</span> Privacy &amp; Security</h2>
+    <ul>
+      <li><strong>No servers, period</strong> — Cadence has no backend of any kind. Purchases are verified on-device by Apple's StoreKit; there's no server to send a receipt to.</li>
+      <li><strong>HealthKit stays optional</strong> — reads and writes are always supplementary. No feature is ever gated on Health access, and nothing you type is overwritten by HealthKit data.</li>
+      <li><strong>On-device pattern engine</strong> — insights are deterministic correlation detection that runs entirely on your phone. No ML, no cloud processing, no black box.</li>
+      <li><strong>Your data, your iCloud</strong> — sync goes through your own private iCloud account. We never see it.</li>
+    </ul>
+    <p style="margin-top:12px;">Read our full <a href="./privacy-policy.html">Privacy Policy</a> for details.</p>
+  </section>
+
+  <!-- Apple ecosystem -->
+  <section>
+    <h2><span class="icon">🍎</span> Built for the Apple Ecosystem</h2>
+    <ul>
+      <li><strong>Siri &amp; Shortcuts</strong> — "Hey Siri, log my check-in" from anywhere</li>
+      <li><strong>Widgets</strong> — glanceable streak and today's status on your Home Screen, Lock Screen, and StandBy</li>
+      <li><strong>Apple Watch</strong> — a wrist quick-log for mood and energy</li>
+      <li><strong>HealthKit</strong> — two-way sync for symptoms and mood</li>
+      <li><strong>iPad</strong> — full support for all four orientations, including Stage Manager</li>
+    </ul>
+  </section>
+
+  <!-- Support -->
+  <section>
+    <h2><span class="icon">✉️</span> Support</h2>
+    <div class="support-row">
+      <img src="./mascot.png" alt="Cadence's mascot, a waving capybara" class="mascot" />
+      <div>
+        <p>Have a question, found a bug, or want to request a feature? We'd love to hear from you.</p>
+        <p><a href="./contact.html">Contact us</a> — we aim to respond within 5 business days.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>© 2026 Cadence. All rights reserved.</p>
+  <div class="links">
+    <a href="./privacy-policy.html">Privacy Policy</a>
+    <span class="sep">·</span>
+    <a href="./eula.html">Terms of Use</a>
+    <span class="sep">·</span>
+    <a href="./contact.html">Contact</a>
+    <span class="sep">·</span>
+    <a href="https://github.com/jaguero21/Cadence">GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>
