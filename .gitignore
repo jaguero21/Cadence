@@ -49,3 +49,10 @@ __pycache__/
 
 # Claude Code / superpowers scratch state
 .superpowers/
+# docs/ is the live GitHub Pages root (source: main /docs) — internal
+# planning/spec docs must never land here. Keep them outside the repo
+# entirely (see /Volumes/APFS2/SwiftPorjects/tmpfiles).
+docs/superpowers/
+
+# Editor
+.vscode/
