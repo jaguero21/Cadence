@@ -273,16 +273,28 @@ struct DashboardView: View {
         .accessibilityLabel("\(label): \(value) \(suffix)")
     }
 
+    // Gated purely on `logs.isEmpty`, so `vm.mascotPose` here is always
+    // either `.welcoming` (no active flare) or `.cozy` (an active flare
+    // outranks the empty-history default — see MascotPoseEngine's priority
+    // order) — never `.soaking`/`.resting`, which both require history or a
+    // streak. The headline must track which of those two it actually is:
+    // showing the comfort pose next to first-time-user copy reads as a
+    // mismatch for someone logging a flare during a hard stretch.
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image("mascot-\(vm.mascotPose.rawValue)")
+            Image(vm.mascotPose.imageName)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 96, height: 96)
                 .foregroundStyle(CadenceColor.accent)
                 .accessibilityHidden(true)
-            Text("Log your first day to see insights")
-                .font(.subheadline.weight(.medium))
+            if vm.mascotPose == .cozy {
+                Text("Tracking can help through a hard stretch")
+                    .font(.subheadline.weight(.medium))
+            } else {
+                Text("Log your first day to see insights")
+                    .font(.subheadline.weight(.medium))
+            }
             Text("Tap Today's Log above to get started.")
                 .font(.caption)
                 .foregroundStyle(.secondary)

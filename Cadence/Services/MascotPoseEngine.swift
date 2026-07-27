@@ -13,16 +13,37 @@ enum MascotPoseEngine {
     static func pose(
         for logs: [DailyLogSnapshot],
         activeFlare: FlareSnapshot?,
-        streakDays: Int
+        streakDays: Int,
+        referenceDate: Date = .now
     ) -> WidgetData.MascotPose {
+        // Bound the logs we reason about to the canonical insight window
+        // (PatternThreshold.insightWindowDays) before deciding anything —
+        // the same window every other cross-surface pattern computation
+        // uses (see InsightRecorder). Callers hand us wildly different
+        // breadths: the Dashboard passes its own 90-day @Query slice, while
+        // the widget-publish paths pass the whole unbounded DailyLog table.
+        // Both hasLowMoodTrend's baseline (mean of every OLDER day) and the
+        // welcoming-vs-resting `isEmpty` check below shift with how many
+        // older days are included, so without this the Dashboard's own pose
+        // and the pose published to the widget could disagree for the same
+        // day. The cutoff mirrors DashboardView's @Query exactly
+        // (startOfDay(referenceDate) − window), so a caller's 90-day slice
+        // and an unbounded caller's table window down to the identical set.
+        let cutoff = Calendar.current.date(
+            byAdding: .day,
+            value: -PatternThreshold.insightWindowDays,
+            to: Calendar.current.startOfDay(for: referenceDate)
+        ) ?? .distantPast
+        let windowed = logs.filter { $0.date >= cutoff }
+
         let isFlareActive = activeFlare.map { $0.endDate == nil } ?? false
-        if isFlareActive || hasLowMoodTrend(logs) {
+        if isFlareActive || hasLowMoodTrend(windowed) {
             return .cozy
         }
         if streakDays >= MascotThreshold.streakDaysForSoaking {
             return .soaking
         }
-        guard !logs.isEmpty else {
+        guard !windowed.isEmpty else {
             return .welcoming
         }
         return .resting
@@ -40,11 +61,22 @@ enum MascotPoseEngine {
     // that baseline downward, making the trend harder to detect than it
     // should be. Requires at least one older day to compare against.
     private static func hasLowMoodTrend(_ logs: [DailyLogSnapshot]) -> Bool {
-        let sorted = logs.sorted { $0.date > $1.date }
-        let recent = sorted.prefix(MascotThreshold.lowMoodTrendDays)
-        let baseline = sorted.dropFirst(MascotThreshold.lowMoodTrendDays)
+        // Collapse to one mood per calendar day before splitting recent vs
+        // baseline — CloudKit sync can leave two logs for the same day (no
+        // @Attribute(.unique) on DailyLog; DashboardViewModel.computeStreak
+        // dedupes for the same reason). Without this, a duplicate today
+        // would fill the recent window with two records for one calendar
+        // day, so "the most recent 3 days" would silently span only 2 real
+        // days. Same-day records are averaged, so a merge conflict between
+        // two entries for one day resolves to a neutral midpoint.
+        let dailyMoods = Dictionary(grouping: logs) { Calendar.current.startOfDay(for: $0.date) }
+            .mapValues { sameDay in Double(sameDay.map(\.mood).reduce(0, +)) / Double(sameDay.count) }
+            .sorted { $0.key > $1.key }
+            .map(\.value)
+        let recent = dailyMoods.prefix(MascotThreshold.lowMoodTrendDays)
+        let baseline = dailyMoods.dropFirst(MascotThreshold.lowMoodTrendDays)
         guard recent.count == MascotThreshold.lowMoodTrendDays, !baseline.isEmpty else { return false }
-        let baselineMeanMood = Double(baseline.map(\.mood).reduce(0, +)) / Double(baseline.count)
-        return recent.allSatisfy { Double($0.mood) < baselineMeanMood }
+        let baselineMeanMood = baseline.reduce(0, +) / Double(baseline.count)
+        return recent.allSatisfy { $0 < baselineMeanMood }
     }
 }

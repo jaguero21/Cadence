@@ -162,7 +162,7 @@ private struct OnboardingPage: View {
 
             VStack(spacing: 32) {
                 if let mascotPose {
-                    Image("mascot-\(mascotPose.rawValue)")
+                    Image(mascotPose.imageName)
                         .resizable()
                         .scaledToFit()
                         .frame(width: 120, height: 120)
