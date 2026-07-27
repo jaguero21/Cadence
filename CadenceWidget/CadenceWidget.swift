@@ -158,7 +158,7 @@ struct CadenceWidgetEntryView: View {
             // (iPhone SE-class .systemSmall). .systemMedium has 100pt+ of
             // clearance at 56×56, comfortably safe.
             if family == .systemMedium {
-                Image("mascot-\(entry.summary.mascotPose.rawValue)")
+                Image(entry.summary.mascotPose.imageName)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 56, height: 56)

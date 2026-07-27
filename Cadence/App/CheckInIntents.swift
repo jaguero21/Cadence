@@ -48,8 +48,7 @@ struct LogCheckInIntent: AppIntent {
             return .result(dialog: "The check-in couldn't be saved. Try again from the app.")
         }
         let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
-        let flares = (try? context.fetch(FetchDescriptor<Flare>())) ?? []
-        DashboardViewModel.publishWidgetSummary(logs: logs, flares: flares)
+        DashboardViewModel.publishWidgetSummary(logs: logs, activeFlare: DashboardViewModel.activeFlare(in: context))
         // Mirror the mood into Health's State of Mind — a Siri check-in is
         // still a check-in. Best-effort, fire-and-forget.
         let today = Calendar.current.startOfDay(for: .now)

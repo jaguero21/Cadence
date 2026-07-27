@@ -155,6 +155,56 @@ struct WidgetStalenessTests {
         #expect(resolved.loggedToday == false)
         #expect(resolved.streak == 0)
     }
+
+    // Regression: .soaking's whole meaning is "streak >= threshold" — once
+    // the streak resets to zero it must not keep showing, since it would
+    // directly contradict the zeroed streak count displayed beside it.
+    @Test("A broken streak downgrades a soaking pose to resting")
+    func olderSummary_downgradesSoakingPose() {
+        let now = Date.now
+        let stored = WidgetData.Summary(date: day(-3, from: now), loggedToday: true, streak: 7, mascotPose: .soaking)
+        let resolved = WidgetData.resolved(stored, now: now)
+        #expect(resolved.streak == 0)
+        #expect(resolved.mascotPose == .resting)
+    }
+
+    // Regression: unlike .soaking, .cozy isn't derived from the streak
+    // number, so a broken streak shouldn't touch it — the flare/mood signal
+    // that triggered it may still hold.
+    @Test("A broken streak leaves a cozy pose untouched")
+    func olderSummary_leavesCozyPoseUntouched() {
+        let now = Date.now
+        let stored = WidgetData.Summary(date: day(-3, from: now), loggedToday: true, streak: 7, mascotPose: .cozy)
+        let resolved = WidgetData.resolved(stored, now: now)
+        #expect(resolved.streak == 0)
+        #expect(resolved.mascotPose == .cozy)
+    }
+
+    // Regression: the one-day grace period means the streak (and therefore
+    // .soaking's validity) hasn't actually broken yet — no downgrade.
+    @Test("Yesterday's summary keeps a soaking pose (streak still alive)")
+    func yesterdaySummary_keepsSoakingPose() {
+        let now = Date.now
+        let stored = WidgetData.Summary(date: day(-1, from: now), loggedToday: true, streak: 7, mascotPose: .soaking)
+        let resolved = WidgetData.resolved(stored, now: now)
+        #expect(resolved.streak == 7)
+        #expect(resolved.mascotPose == .soaking)
+    }
+
+    // Regression: a Summary persisted by a build from before `mascotPose`
+    // existed has no such key. It must decode (defaulting the pose to
+    // welcoming) so the real streak/loggedToday survive — a hard decode
+    // failure there would reset the widget to zeros on the first launch
+    // after updating. `date` is a bare TimeInterval to match the default
+    // JSONEncoder WidgetData.write uses.
+    @Test("A pre-mascot summary blob decodes, defaulting the pose and keeping the streak")
+    func legacySummary_withoutMascotPose_decodes() throws {
+        let legacy = Data(#"{"date": 0, "loggedToday": true, "streak": 9}"#.utf8)
+        let decoded = try JSONDecoder().decode(WidgetData.Summary.self, from: legacy)
+        #expect(decoded.streak == 9)
+        #expect(decoded.loggedToday == true)
+        #expect(decoded.mascotPose == .welcoming)
+    }
 }
 
 // MARK: Widget → app pending quick-log queue

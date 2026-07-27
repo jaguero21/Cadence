@@ -264,8 +264,7 @@ struct ContentView: View {
         }
         if !appliedDays.isEmpty {
             let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
-            let flares = (try? modelContext.fetch(FetchDescriptor<Flare>())) ?? []
-            DashboardViewModel.publishWidgetSummary(logs: logs, flares: flares)
+            DashboardViewModel.publishWidgetSummary(logs: logs, activeFlare: DashboardViewModel.activeFlare(in: modelContext))
             // publishWidgetSummary skips its reload when the summary is
             // unchanged — and a quick log doesn't complete the day, so it
             // usually is. Reload explicitly so the widget's interim

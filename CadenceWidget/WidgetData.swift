@@ -20,6 +20,12 @@ enum WidgetData {
     // and Summary (below) needs this type to compile in both.
     enum MascotPose: String, CaseIterable, Codable {
         case welcoming, resting, soaking, cozy, sleepy
+
+        // Asset-catalog image-set name; raw values map 1:1 to the imported
+        // `mascot-<pose>` sets. Centralizing the interpolation keeps the
+        // render sites (onboarding, dashboard, widget) from each
+        // hand-building — and risking a typo in — the name.
+        var imageName: String { "mascot-\(rawValue)" }
     }
 
     struct Summary: Codable, Equatable {
@@ -27,6 +33,26 @@ enum WidgetData {
         var loggedToday: Bool
         var streak: Int
         var mascotPose: MascotPose
+
+        init(date: Date, loggedToday: Bool, streak: Int, mascotPose: MascotPose) {
+            self.date = date
+            self.loggedToday = loggedToday
+            self.streak = streak
+            self.mascotPose = mascotPose
+        }
+
+        // A Summary persisted by a build from before `mascotPose` existed has
+        // no such key. Decode it as `.welcoming` rather than letting the
+        // missing key throw and fail the whole struct — that would strand the
+        // real streak/loggedToday and reset the widget to zeros on the first
+        // launch after updating, until the app next republishes.
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            date = try c.decode(Date.self, forKey: .date)
+            loggedToday = try c.decode(Bool.self, forKey: .loggedToday)
+            streak = try c.decode(Int.self, forKey: .streak)
+            mascotPose = try c.decodeIfPresent(MascotPose.self, forKey: .mascotPose) ?? .welcoming
+        }
     }
 
     private static var store: UserDefaults? { UserDefaults(suiteName: appGroup) }
@@ -54,8 +80,16 @@ enum WidgetData {
         }
         if cal.isDate(stored.date, inSameDayAs: now) { return stored }
         let yesterday = cal.date(byAdding: .day, value: -1, to: now) ?? now
-        let streak = cal.isDate(stored.date, inSameDayAs: yesterday) ? stored.streak : 0
-        return Summary(date: now, loggedToday: false, streak: streak, mascotPose: stored.mascotPose)
+        let streakBroken = !cal.isDate(stored.date, inSameDayAs: yesterday)
+        let streak = streakBroken ? 0 : stored.streak
+        // .soaking's whole meaning is "streakDays >= threshold" — the only
+        // pose tied directly to the streak number shown right next to it.
+        // Once the streak is confirmed broken, carrying it forward would
+        // contradict that number; every other pose's trigger (flare, mood
+        // trend, plain history) isn't streak-derived, so it's still the best
+        // information we have and stays as published.
+        let mascotPose = (streakBroken && stored.mascotPose == .soaking) ? .resting : stored.mascotPose
+        return Summary(date: now, loggedToday: false, streak: streak, mascotPose: mascotPose)
     }
 
     // MARK: - Pending quick logs (widget → app)
