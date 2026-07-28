@@ -13,8 +13,6 @@ private struct RateSeverityTip: Tip {
 struct SymptomPickerView: View {
     @Binding var selectedSymptoms: [SymptomEntry]
     @Query(sort: \SymptomTag.sortOrder) private var allTags: [SymptomTag]
-    @Environment(StoreService.self) private var store
-    @Environment(AppState.self) private var appState
     @State private var expandedTag: String?
     @State private var showingAddSheet = false
     @State private var newSymptomName = ""
@@ -114,17 +112,13 @@ struct SymptomPickerView: View {
 
     private var addChip: some View {
         Button {
-            if store.isPro {
-                showingAddSheet = true
-            } else {
-                appState.showingProPaywall = true
-            }
+            showingAddSheet = true
         } label: {
             VStack(spacing: 6) {
-                Image(systemName: store.isPro ? "plus.circle.fill" : "lock.fill")
+                Image(systemName: "plus.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(store.isPro ? CadenceColor.moodBlue : CadenceColor.sleepPurple)
-                Text(store.isPro ? "Add" : "Pro")
+                    .foregroundStyle(CadenceColor.moodBlue)
+                Text("Add")
                     .font(.subheadline.weight(.medium))
             }
             .frame(maxWidth: .infinity)
@@ -132,7 +126,7 @@ struct SymptomPickerView: View {
             .background(CadenceColor.cardBG, in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(store.isPro ? "Add custom symptom" : "Add custom symptom — Pro feature")
+        .accessibilityLabel("Add custom symptom")
         .sheet(isPresented: $showingAddSheet) {
             AddSymptomSheet(onSave: { _, _ in showingAddSheet = false })
         }
