@@ -79,7 +79,7 @@ struct SettingsView: View {
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Upgrade to Pro").font(.headline)
-                    Text("Unlock full history, PDF export, pattern insights, custom symptoms, and HealthKit sync.")
+                    Text("Unlock pattern insights, 90-day trend history, and doctor-ready PDF reports.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 

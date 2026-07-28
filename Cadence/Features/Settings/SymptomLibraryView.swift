@@ -12,8 +12,6 @@ import SwiftData
 // the picker's existing @Query needs no changes.
 struct SymptomLibraryView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(StoreService.self) private var store
-    @Environment(AppState.self) private var appState
     @Query(sort: \SymptomTag.sortOrder) private var tags: [SymptomTag]
     @State private var showingAddSheet = false
     @State private var saveError: String?
@@ -60,25 +58,12 @@ struct SymptomLibraryView: View {
                     persist()
                 }
 
-                if store.isPro {
-                    Button("Add custom symptom") {
-                        showingAddSheet = true
-                    }
-                    .foregroundStyle(CadenceColor.accent)
-                } else {
-                    Button {
-                        appState.showingProPaywall = true
-                    } label: {
-                        Label("Upgrade to add custom symptoms", systemImage: "lock.fill")
-                    }
-                    .foregroundStyle(CadenceColor.sleepPurple)
+                Button("Add custom symptom") {
+                    showingAddSheet = true
                 }
+                .foregroundStyle(CadenceColor.accent)
             } header: {
                 Text("Custom")
-            } footer: {
-                if !store.isPro {
-                    Text("Custom symptoms beyond the library require Pro.")
-                }
             }
         }
         .navigationTitle("Symptoms")
