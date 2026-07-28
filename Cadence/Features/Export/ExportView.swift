@@ -44,6 +44,8 @@ struct ExportView: View {
                 }
 
                 Section {
+                    // PDF is a generated, doctor-ready report — the "polished
+                    // output" that stays Pro.
                     if store.isPro {
                         Button {
                             generate()
@@ -57,16 +59,19 @@ struct ExportView: View {
                             }
                         }
                         .disabled(isGenerating)
-
-                        Button {
-                            exportCSV()
-                        } label: {
-                            Label("Export Spreadsheet (CSV)", systemImage: "tablecells")
-                        }
-                        .disabled(isGenerating)
                     } else {
                         proPrompt
                     }
+
+                    // CSV is a raw dump of the user's own data — free, on the
+                    // same "users own their data" principle that keeps JSON
+                    // backup ungated.
+                    Button {
+                        exportCSV()
+                    } label: {
+                        Label("Export Spreadsheet (CSV)", systemImage: "tablecells")
+                    }
+                    .disabled(isGenerating)
                 }
             }
             .navigationTitle("Export")
