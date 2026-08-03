@@ -30,4 +30,44 @@ import PDFKit
         let doc = try #require(PDFDocument(url: resolved))
         #expect(doc.pageCount >= 1)
     }
+
+    // Recovered from the old embedded PDFBuilderTests suite (CadenceTests/PatternEngineTests.swift,
+    // pre-5056e1c) when the two-report-type system collapsed into one. Ported from
+    // `PDFBuilder.build(type: .doctor, ...)` to the current signature — the assertions target the
+    // surviving `renderReport` path, which still carries the same section titles and footer.
+    @Test("build renders the symptom-frequency section, severity, adherence line, and page footer")
+    func build_rendersSymptomFrequencyAndFooter() async throws {
+        var logs: [DailyLogSnapshot] = []
+        for i in 0..<10 {
+            let day = Calendar.current.date(byAdding: .day, value: -i, to: .now) ?? .now
+            let log = DailyLog(date: day)
+            log.mood = 3 + i % 3
+            log.hkSteps = 8000
+            if i % 2 == 0 {
+                log.symptoms = [SymptomEntry(name: "Headache", severity: 6, emoji: "🤕")]
+            }
+            if i % 3 == 0 {
+                log.factors = ["Travel"]
+            }
+            logs.append(DailyLogSnapshot(log))
+        }
+
+        let url = await PDFBuilder.build(logs: logs, reviews: [])
+        let resolved = try #require(url)
+        let document = try #require(PDFDocument(url: resolved))
+        #expect(document.pageCount >= 1)
+        let text = (0..<document.pageCount).compactMap { document.page(at: $0)?.string }.joined()
+        #expect(text.contains("Symptom Frequency"))
+        #expect(text.contains("avg severity"))          // severity rides the frequency bars
+        #expect(text.contains("days logged"))           // header adherence line
+        #expect(text.contains("Page 1"))                // per-page footer
+    }
+
+    @Test("build with empty logs and reviews still produces a valid single-page PDF")
+    func build_withEmptyData_producesSinglePage() async throws {
+        let url = await PDFBuilder.build(logs: [], reviews: [])
+        let resolved = try #require(url)
+        let document = try #require(PDFDocument(url: resolved))
+        #expect(document.pageCount == 1)
+    }
 }
