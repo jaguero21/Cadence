@@ -10,8 +10,6 @@ struct ExportView: View {
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
     @Environment(StoreService.self) private var store
     @Environment(AppState.self) private var appState
-    @AppStorage(UserDefaultsKey.lastVisitDate) private var lastVisitInterval: Double = 0
-    @State private var reportType: ReportType = .doctor
     @State private var startDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: .now) ?? .now
     @State private var endDate: Date = .now
     @State private var isGenerating = false
@@ -23,24 +21,17 @@ struct ExportView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Report Type") {
-                    Picker("Type", selection: $reportType) {
-                        ForEach(ReportType.allCases, id: \.self) { t in
-                            Text(t.rawValue).tag(t)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
                 Section("Date Range") {
                     DatePicker("From", selection: $startDate, in: ...endDate, displayedComponents: .date)
                     DatePicker("To",   selection: $endDate,   in: startDate..., displayedComponents: .date)
                 }
 
-                appointmentSection
-
-                Section("Includes") {
+                Section {
                     includes
+                } header: {
+                    Text("Includes")
+                } footer: {
+                    Text("Your personal insights and patterns — a warm look back at what you've logged, for reflection and self-discovery.")
                 }
 
                 Section {
@@ -51,7 +42,7 @@ struct ExportView: View {
                             generate()
                         } label: {
                             HStack {
-                                Label("Generate PDF", systemImage: "doc.richtext.fill")
+                                Label("Generate Report", systemImage: "doc.richtext.fill")
                                 Spacer()
                                 if isGenerating {
                                     ProgressView().progressViewStyle(.circular)
@@ -89,49 +80,15 @@ struct ExportView: View {
         }
     }
 
-    private var lastVisitDate: Date? {
-        lastVisitInterval > 0 ? Date(timeIntervalSinceReferenceDate: lastVisitInterval) : nil
-    }
-
-    @ViewBuilder
-    private var appointmentSection: some View {
-        Section {
-            if let last = lastVisitDate {
-                HStack {
-                    Text("Last visit")
-                    Spacer()
-                    Text(last.formatted(date: .abbreviated, time: .omitted))
-                        .foregroundStyle(.secondary)
-                }
-                Button("Set range to since last visit") {
-                    startDate = last
-                    endDate = .now
-                }
-            }
-            Button("Mark today as last visit") {
-                lastVisitInterval = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
-            }
-        } header: {
-            Text("Appointment")
-        } footer: {
-            Text("Mark a visit, then quickly scope your next report to everything since then.")
-        }
-    }
-
     @ViewBuilder
     private var includes: some View {
-        switch reportType {
-        case .doctor:
-            Label("Trend charts",             systemImage: "checkmark")
-            Label("Symptom frequency & severity", systemImage: "checkmark")
-            Label("Medication list",          systemImage: "checkmark")
-            Label("Pattern flags",            systemImage: "checkmark")
-            Label("HealthKit objective data", systemImage: "checkmark")
-        case .personal:
-            Label("Trend charts",             systemImage: "checkmark")
-            Label("Weekly reviews",           systemImage: "checkmark")
-            Label("Win/miss/intention history",systemImage: "checkmark")
-        }
+        Label("Pattern insights",             systemImage: "checkmark")
+        Label("Trend charts",                 systemImage: "checkmark")
+        Label("Weekly reflections",           systemImage: "checkmark")
+        Label("Your marked moments & notes",  systemImage: "checkmark")
+        Label("Daily metrics & symptoms",     systemImage: "checkmark")
+        Label("HealthKit averages",           systemImage: "checkmark")
+        Label("Medications & flares",         systemImage: "checkmark")
     }
 
     private var proPrompt: some View {
@@ -200,7 +157,6 @@ struct ExportView: View {
         generationTask?.cancel()
         generationTask = Task.detached {
             let url = await PDFBuilder.build(
-                type: reportType,
                 logs: logSnapshots,
                 reviews: reviewSnapshots,
                 medications: medicationSnapshots,

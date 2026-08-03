@@ -2,31 +2,20 @@ import SwiftUI
 import PDFKit
 import Charts
 
-enum ReportType: String, CaseIterable {
-    case doctor   = "Cadence Trend"
-    case personal = "Personal Summary"
-}
-
 enum PDFBuilder {
-    static func build(type: ReportType, logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = [], headerTitle: String? = nil) async -> URL? {
+    static func build(logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = []) async -> URL? {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
         let uid = UUID().uuidString
-        let filename = type == .doctor ? "cadence-doctor-report-\(uid).pdf" : "cadence-personal-summary-\(uid).pdf"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("in-rhythm-cadence-report-\(uid).pdf")
 
-        // Insights run once here so the renderer doesn't need to know about
-        // PatternEngine — and personal-summary builds don't pay the cost.
-        let insights = type == .doctor ? PatternEngine.allInsights(from: logs, medications: medications, flares: flares, trackers: customTrackers) : []
+        let insights = PatternEngine.allInsights(from: logs, medications: medications, flares: flares, trackers: customTrackers)
         // Chart images render on the main actor (ImageRenderer requirement),
         // before the PDF context opens.
         let charts = await trendChartImages(logs: logs)
 
         do {
             try renderer.writePDF(to: url) { ctx in
-                switch type {
-                case .doctor:   renderDoctorReport(ctx: ctx, logs: logs, charts: charts, insights: insights, medications: medications, flares: flares, customTrackers: customTrackers, headerTitle: headerTitle)
-                case .personal: renderPersonalSummary(ctx: ctx, logs: logs, charts: charts, reviews: reviews)
-                }
+                renderReport(ctx: ctx, logs: logs, charts: charts, insights: insights, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers)
             }
             return url
         } catch {
@@ -83,7 +72,7 @@ enum PDFBuilder {
                 .font: UIFont.systemFont(ofSize: 8),
                 .foregroundColor: UIColor(white: 0.55, alpha: 1),
             ]
-            "Created with Cadence — observations from the user's own logs, not medical advice."
+            "Made with Cadence, from your own daily reflections."
                 .draw(in: CGRect(x: 40, y: 814, width: 440, height: 12), withAttributes: attrs)
             let pageStyle = NSMutableParagraphStyle()
             pageStyle.alignment = .right
@@ -206,7 +195,7 @@ enum PDFBuilder {
 
     private static func drawChartGrid(_ charts: [UIImage], cursor: Cursor) {
         guard !charts.isEmpty else { return }
-        cursor.section("Trends")
+        cursor.section("Your rhythm at a glance")
         for pair in stride(from: 0, to: charts.count, by: 2) {
             cursor.breakIfNeeded(chartSize.height + 8)
             cursor.image(charts[pair], at: 40, size: chartSize, advance: pair + 1 >= charts.count)
@@ -216,53 +205,105 @@ enum PDFBuilder {
         }
     }
 
-    // MARK: - Doctor report
+    // Weekly reflections folded in from the retired Personal Summary: per week,
+    // the star rating, prompt responses, and weekly intentions. Rendered
+    // compactly inline (not a page-per-week). `reviews` arrive newest-first from
+    // the caller; the snapshot carries no date, so we keep that order as given.
+    private static func drawWeeklyReflections(_ reviews: [WeeklyReviewSnapshot], cursor: Cursor) {
+        guard !reviews.isEmpty else { return }
+        let bodyFont = UIFont.systemFont(ofSize: 11)
+        cursor.section("Weekly reflections")
+        for review in reviews {
+            cursor.line(review.weekLabel, font: .systemFont(ofSize: 12, weight: .semibold), spacing: 2)
+            if review.overallRating > 0 {
+                let stars = String(repeating: "★", count: review.overallRating)
+                    + String(repeating: "☆", count: 5 - review.overallRating)
+                cursor.line("Overall: \(stars) (\(review.overallRating)/5)", font: bodyFont, color: inkSecondary, spacing: 3)
+            }
+            for response in review.promptResponses where !response.response.isEmpty {
+                cursor.line(response.section, font: .systemFont(ofSize: 10.5, weight: .medium), color: inkSecondary, spacing: 1)
+                cursor.line(response.response, font: bodyFont, x: 60, width: 495, spacing: 4)
+            }
+            if !review.intentionsForTomorrow.isEmpty {
+                cursor.line("Intentions: \(review.intentionsForTomorrow)", font: bodyFont, spacing: 8)
+            }
+        }
+    }
 
-    private static func renderDoctorReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot], headerTitle: String?) {
+    // MARK: - Report
+
+    private static func renderReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot]) {
         let cursor = Cursor(ctx: ctx)
         cursor.beginPage()
-        drawReportHeader(cursor: cursor, title: headerTitle ?? "Cadence Trend", logs: logs)
+        drawReportHeader(
+            cursor: cursor,
+            title: "In Rhythm: Your Cadence Report",
+            intro: "A look back at the days you logged — what shifted, what held steady, and a few patterns worth noticing.",
+            logs: logs
+        )
 
+        let bodyFont = UIFont.systemFont(ofSize: 11)
+
+        // ===== Part 1 · What stood out =====
+
+        // What we're noticing (Pattern Insights) — moved to the top.
+        cursor.section("What we're noticing")
+        cursor.line("Patterns from your own logs, offered for reflection — not medical advice.",
+                    font: .systemFont(ofSize: 9.5), color: inkSecondary, x: 40, width: 515, spacing: 8)
+        if insights.isEmpty {
+            cursor.line("No patterns detected from the current log set.", font: bodyFont, color: inkSecondary)
+        } else {
+            for insight in insights {
+                cursor.line("\(insight.title) — \(Int(insight.confidence * 100))% confidence",
+                            font: .systemFont(ofSize: 11, weight: .semibold), spacing: 2)
+                cursor.line(insight.detail, font: bodyFont, color: inkSecondary, x: 60, width: 495, spacing: 10)
+            }
+        }
+
+        // Your rhythm at a glance (Trends). drawChartGrid draws its own section header.
         drawChartGrid(charts, cursor: cursor)
 
-        // Symptom frequency as bars, with the average severity the old text
-        // list never carried.
-        let bodyFont = UIFont.systemFont(ofSize: 11)
-        let entries = logs.flatMap(\.symptoms)
-        let symptomCounts = entries.reduce(into: [String: Int]()) { $0[$1.name, default: 0] += 1 }
-        cursor.section("Symptom Frequency")
-        if symptomCounts.isEmpty {
-            cursor.line("No symptoms logged in this period.", font: bodyFont, color: inkSecondary)
-        }
-        let maxCount = symptomCounts.values.max() ?? 1
-        for (symptom, count) in symptomCounts.sorted(by: { $0.value > $1.value }) {
-            let severities = entries.filter { $0.name == symptom }.map(\.severity)
-            let avgSeverity = Double(severities.reduce(0, +)) / Double(max(severities.count, 1))
-            let label = "\(symptom) — \(count) day\(count == 1 ? "" : "s") · avg severity \(String(format: "%.1f", avgSeverity))/10"
-            cursor.bar(label, fraction: CGFloat(count) / CGFloat(maxCount), color: inkAccent)
-        }
+        drawWeeklyReflections(reviews, cursor: cursor)
 
-        let factorCounts = logs.flatMap(\.factors).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
-        if !factorCounts.isEmpty {
-            cursor.section("Common Factors")
-            let maxFactor = factorCounts.values.max() ?? 1
-            for (factor, count) in factorCounts.sorted(by: { $0.value > $1.value }) {
-                cursor.bar("\(factor) — \(count) day\(count == 1 ? "" : "s")",
-                           fraction: CGFloat(count) / CGFloat(maxFactor), color: inkMood)
+        // Moments you marked (Peaks & Valleys).
+        let dayFmt = Date.FormatStyle().month(.abbreviated).day()
+        let peaksAndValleysDays = logs
+            .filter { !$0.peaksAndValleysNote.isEmpty || $0.hasPeaksAndValleysVoiceMemo }
+            .sorted { $0.date > $1.date }
+        if !peaksAndValleysDays.isEmpty {
+            cursor.section("Moments you marked")
+            for log in peaksAndValleysDays {
+                var body = log.peaksAndValleysNote.isEmpty ? "(voice memo only)" : log.peaksAndValleysNote
+                if log.hasPeaksAndValleysVoiceMemo && !log.peaksAndValleysNote.isEmpty {
+                    body += " (+ voice memo)"
+                }
+                cursor.datedLine(log.date.formatted(dayFmt), body)
             }
         }
 
-        let basicsCounts = logs.flatMap(\.basicsCompleted).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
-        if !basicsCounts.isEmpty {
-            cursor.section("Daily Basics")
-            for (basic, count) in basicsCounts.sorted(by: { $0.value > $1.value }) {
-                cursor.bar("\(basic) — \(count) of \(logs.count) days",
-                           fraction: CGFloat(count) / CGFloat(max(logs.count, 1)), color: inkSleep)
+        // Notes to yourself (daily Intentions for Tomorrow).
+        let intentionDays = logs.filter { !$0.intentionsForTomorrow.isEmpty }.sorted { $0.date > $1.date }
+        if !intentionDays.isEmpty {
+            cursor.section("Notes to yourself")
+            for log in intentionDays {
+                cursor.datedLine(log.date.formatted(dayFmt), log.intentionsForTomorrow)
             }
         }
 
+        // In your words (Daily Notes).
+        let noteDays = logs.filter { !$0.freeNote.isEmpty }.sorted { $0.date > $1.date }
+        if !noteDays.isEmpty {
+            cursor.section("In your words")
+            for log in noteDays {
+                cursor.datedLine(log.date.formatted(dayFmt), log.freeNote)
+            }
+        }
+
+        // ===== Part 2 · The details =====
+
+        // How your days felt (Average Metrics).
         if !logs.isEmpty {
-            cursor.section("Average Metrics")
+            cursor.section("How your days felt")
             let count = Double(logs.count)
             let avg: (KeyPath<DailyLogSnapshot, Int>) -> Double = { path in
                 Double(logs.map { $0[keyPath: path] }.reduce(0, +)) / count
@@ -287,8 +328,43 @@ enum PDFBuilder {
             }
         }
 
-        // HealthKit objective data (promised by the Export screen's "Includes"
-        // list): average of each measure over the days that have it.
+        // Symptoms (Symptom Frequency + severity).
+        let entries = logs.flatMap(\.symptoms)
+        let symptomCounts = entries.reduce(into: [String: Int]()) { $0[$1.name, default: 0] += 1 }
+        cursor.section("Symptoms")
+        if symptomCounts.isEmpty {
+            cursor.line("No symptoms logged in this period.", font: bodyFont, color: inkSecondary)
+        }
+        let maxCount = symptomCounts.values.max() ?? 1
+        for (symptom, count) in symptomCounts.sorted(by: { $0.value > $1.value }) {
+            let severities = entries.filter { $0.name == symptom }.map(\.severity)
+            let avgSeverity = Double(severities.reduce(0, +)) / Double(max(severities.count, 1))
+            let label = "\(symptom) — \(count) day\(count == 1 ? "" : "s") · avg severity \(String(format: "%.1f", avgSeverity))/10"
+            cursor.bar(label, fraction: CGFloat(count) / CGFloat(maxCount), color: inkAccent)
+        }
+
+        // What tends to be around (Common Factors).
+        let factorCounts = logs.flatMap(\.factors).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        if !factorCounts.isEmpty {
+            cursor.section("What tends to be around")
+            let maxFactor = factorCounts.values.max() ?? 1
+            for (factor, count) in factorCounts.sorted(by: { $0.value > $1.value }) {
+                cursor.bar("\(factor) — \(count) day\(count == 1 ? "" : "s")",
+                           fraction: CGFloat(count) / CGFloat(maxFactor), color: inkMood)
+            }
+        }
+
+        // Daily basics.
+        let basicsCounts = logs.flatMap(\.basicsCompleted).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        if !basicsCounts.isEmpty {
+            cursor.section("Daily basics")
+            for (basic, count) in basicsCounts.sorted(by: { $0.value > $1.value }) {
+                cursor.bar("\(basic) — \(count) of \(logs.count) days",
+                           fraction: CGFloat(count) / CGFloat(max(logs.count, 1)), color: inkSleep)
+            }
+        }
+
+        // From your Health data (HealthKit averages).
         var hkLines: [String] = []
         func hkAverage(_ label: String, _ values: [Double], format: (Double) -> String) {
             guard !values.isEmpty else { return }
@@ -308,12 +384,13 @@ enum PDFBuilder {
         hkAverage("Daytime heart rate", logs.compactMap(\.hkDaytimeHR)) { String(format: "%.0f bpm", $0) }
         hkAverage("Workout time", logs.compactMap(\.hkWorkoutMinutes)) { String(format: "%.0f min", $0) }
         if !hkLines.isEmpty {
-            cursor.section("HealthKit Data (averages)")
+            cursor.section("From your Health data")
             for line in hkLines {
                 cursor.line(line, font: bodyFont)
             }
         }
 
+        // Medications.
         let dateFmt = Date.FormatStyle().month(.abbreviated).day().year()
         if !medications.isEmpty {
             cursor.section("Medications")
@@ -323,111 +400,20 @@ enum PDFBuilder {
             }
         }
 
+        // Flares.
         if !flares.isEmpty {
-            cursor.section("Symptom Flares")
+            cursor.section("Flares")
             for flare in flares.sorted(by: { $0.startDate > $1.startDate }) {
                 let range = flare.endDate.map { "\(flare.startDate.formatted(dateFmt)) – \($0.formatted(dateFmt))" }
                     ?? "since \(flare.startDate.formatted(dateFmt)) (ongoing)"
                 cursor.line("\(range): \(flare.durationDays) day\(flare.durationDays == 1 ? "" : "s"), peak \(flare.peakSeverity)/10", font: bodyFont)
             }
         }
-
-        let dayFmt = Date.FormatStyle().month(.abbreviated).day()
-        let peaksAndValleysDays = logs
-            .filter { !$0.peaksAndValleysNote.isEmpty || $0.hasPeaksAndValleysVoiceMemo }
-            .sorted { $0.date > $1.date }
-        if !peaksAndValleysDays.isEmpty {
-            cursor.section("Peaks & Valleys")
-            for log in peaksAndValleysDays {
-                var body = log.peaksAndValleysNote.isEmpty ? "(voice memo only)" : log.peaksAndValleysNote
-                if log.hasPeaksAndValleysVoiceMemo && !log.peaksAndValleysNote.isEmpty {
-                    body += " (+ voice memo)"
-                }
-                cursor.datedLine(log.date.formatted(dayFmt), body)
-            }
-        }
-
-        let intentionDays = logs.filter { !$0.intentionsForTomorrow.isEmpty }.sorted { $0.date > $1.date }
-        if !intentionDays.isEmpty {
-            cursor.section("Intentions for Tomorrow")
-            for log in intentionDays {
-                cursor.datedLine(log.date.formatted(dayFmt), log.intentionsForTomorrow)
-            }
-        }
-
-        let noteDays = logs.filter { !$0.freeNote.isEmpty }.sorted { $0.date > $1.date }
-        if !noteDays.isEmpty {
-            cursor.section("Daily Notes")
-            for log in noteDays {
-                cursor.datedLine(log.date.formatted(dayFmt), log.freeNote)
-            }
-        }
-
-        cursor.section("Pattern Insights")
-        cursor.line("Observations from the patient's own daily logs, for awareness — not a diagnosis.",
-                    font: .systemFont(ofSize: 9.5), color: inkSecondary, x: 40, width: 515, spacing: 8)
-        if insights.isEmpty {
-            cursor.line("No patterns detected from the current log set.", font: bodyFont, color: inkSecondary)
-        } else {
-            for insight in insights {
-                cursor.line("\(insight.title) — \(Int(insight.confidence * 100))% confidence",
-                            font: .systemFont(ofSize: 11, weight: .semibold), spacing: 2)
-                cursor.line(insight.detail, font: bodyFont, color: inkSecondary, x: 60, width: 495, spacing: 10)
-            }
-        }
-    }
-
-    // MARK: - Personal summary
-
-    private static func renderPersonalSummary(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], reviews: [WeeklyReviewSnapshot]) {
-        let cursor = Cursor(ctx: ctx)
-        cursor.beginPage()
-        drawReportHeader(cursor: cursor, title: "Personal Summary", logs: logs)
-        drawChartGrid(charts, cursor: cursor)
-
-        let bodyFont = UIFont.systemFont(ofSize: 11)
-        if reviews.isEmpty {
-            cursor.section("Weekly Reviews")
-            cursor.line("No weekly reviews in this period.", font: bodyFont, color: inkSecondary)
-        }
-        for review in reviews {
-            // Each week keeps its own page — this report reads as a journal.
-            cursor.beginPage()
-            cursor.line(review.weekLabel, font: .systemFont(ofSize: 17, weight: .bold), x: 40, width: 515, spacing: 10)
-
-            // The closing star rating and the auto-populated Week at a Glance
-            // stats, mirroring what the review flow itself shows.
-            var glanceLines: [String] = []
-            if review.overallRating > 0 {
-                let stars = String(repeating: "★", count: review.overallRating)
-                    + String(repeating: "☆", count: 5 - review.overallRating)
-                glanceLines.append("Overall week: \(stars) (\(review.overallRating)/5)")
-            }
-            if review.avgMood > 0 || review.avgEnergy > 0 || review.avgSleep > 0 {
-                glanceLines.append("Averages — mood \(String(format: "%.1f", review.avgMood))/5, energy \(String(format: "%.1f", review.avgEnergy))/10, sleep \(String(format: "%.1f", review.avgSleep)) hrs")
-            }
-            if !review.topSymptoms.isEmpty {
-                glanceLines.append("Top symptoms: \(review.topSymptoms.joined(separator: ", "))")
-            }
-            for line in glanceLines {
-                cursor.line(line, font: bodyFont, x: 40, width: 515, spacing: 4)
-            }
-
-            for response in review.promptResponses {
-                cursor.section(response.section)
-                cursor.line(response.response.isEmpty ? "—" : response.response, font: bodyFont)
-            }
-
-            if !review.intentionsForTomorrow.isEmpty {
-                cursor.section("Intentions for Tomorrow")
-                cursor.line(review.intentionsForTomorrow, font: bodyFont)
-            }
-        }
     }
 
     // MARK: - Shared header
 
-    private static func drawReportHeader(cursor: Cursor, title: String, logs: [DailyLogSnapshot]) {
+    private static func drawReportHeader(cursor: Cursor, title: String, intro: String? = nil, logs: [DailyLogSnapshot]) {
         title.draw(in: CGRect(x: 40, y: cursor.y, width: 420, height: 30),
                    withAttributes: [.font: UIFont.systemFont(ofSize: 23, weight: .bold), .foregroundColor: inkText])
 
@@ -449,6 +435,16 @@ enum PDFBuilder {
         subtitle.draw(in: CGRect(x: 40, y: cursor.y, width: 515, height: 16),
                       withAttributes: [.font: UIFont.systemFont(ofSize: 11), .foregroundColor: inkSecondary])
         cursor.y += 24
+
+        if let intro {
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.italicSystemFont(ofSize: 10.5),
+                .foregroundColor: inkSecondary,
+            ]
+            let h = textHeight(intro, attrs: attrs, width: 515)
+            intro.draw(in: CGRect(x: 40, y: cursor.y, width: 515, height: h), withAttributes: attrs)
+            cursor.y += h + 8
+        }
 
         inkAccent.setFill()
         UIBezierPath(roundedRect: CGRect(x: 40, y: cursor.y, width: 515, height: 3), cornerRadius: 1.5).fill()
