@@ -1,7 +1,6 @@
 import Testing
 import Foundation
 import SwiftData
-import PDFKit
 @testable import Cadence
 
 // MARK: - Helpers
@@ -1405,54 +1404,5 @@ struct SharedStatisticsTests {
         let cards = PatternEngine.allInsights(from: logs)
         #expect(cards.count >= 2)
         #expect(zip(cards, cards.dropFirst()).allSatisfy { $0.confidence >= $1.confidence })
-    }
-}
-
-// MARK: - PDFBuilder
-
-@Suite("PDFBuilder – report generation")
-@MainActor
-struct PDFBuilderTests {
-
-    private func sampleLogs() -> [DailyLogSnapshot] {
-        (0..<10).map {
-            makeSnapshot(
-                daysAgo: $0,
-                mood: 3 + $0 % 3,
-                symptoms: $0 % 2 == 0 ? [headacheEntry()] : [],
-                factors: $0 % 3 == 0 ? ["Travel"] : [],
-                hkSteps: 8000
-            )
-        }
-    }
-
-    @Test("Doctor report renders to an openable PDF with the styled sections")
-    func doctorReportBuilds() async throws {
-        let url = try #require(await PDFBuilder.build(type: .doctor, logs: sampleLogs(), reviews: []))
-        let document = try #require(PDFDocument(url: url))
-        #expect(document.pageCount >= 1)
-        let text = (0..<document.pageCount).compactMap { document.page(at: $0)?.string }.joined()
-        #expect(text.contains("Symptom Frequency"))
-        #expect(text.contains("avg severity"))          // severity now rides the frequency bars
-        #expect(text.contains("days logged"))           // header adherence line
-        #expect(text.contains("Page 1"))                // per-page footer
-    }
-
-    @Test("Personal summary renders an overview page plus one page per review")
-    func personalSummaryBuilds() async throws {
-        let review = WeeklyReview(weekStartDate: Date().startOfWeek)
-        review.overallRating = 4
-        let url = try #require(await PDFBuilder.build(
-            type: .personal, logs: sampleLogs(), reviews: [WeeklyReviewSnapshot(review)]
-        ))
-        let document = try #require(PDFDocument(url: url))
-        #expect(document.pageCount >= 2)
-    }
-
-    @Test("Empty data still produces a valid single-page PDF")
-    func emptyDataBuilds() async throws {
-        let url = try #require(await PDFBuilder.build(type: .doctor, logs: [], reviews: []))
-        let document = try #require(PDFDocument(url: url))
-        #expect(document.pageCount == 1)
     }
 }

@@ -47,6 +47,7 @@
 		AA11BB22CC33DD44EE55FF66 /* ViewModelSaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */; };
 		AA11BB22CC33DD44EE55FF67 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */; };
 		AA11BB22CC33DD44EE55FF68 /* SeamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */; };
+		AA11BB22CC33DD44EE55FF6A /* PDFBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF0A /* PDFBuilderTests.swift */; };
 		AA11BB22CC33DD44EE55FF69 /* BackupServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF09 /* BackupServiceTests.swift */; };
 		AABBCCDD0000000000000201 /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000101 /* Medication.swift */; };
 		AABBCCDD0000000000000202 /* MedicationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000102 /* MedicationsView.swift */; };
@@ -193,6 +194,7 @@
 		AA11BB22CC33DD44EE55FF06 /* ViewModelSaveTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ViewModelSaveTests.swift; path = ./CadenceTests/ViewModelSaveTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotificationServiceTests.swift; path = ./CadenceTests/NotificationServiceTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SeamTests.swift; path = ./CadenceTests/SeamTests.swift; sourceTree = "<absolute>"; };
+		AA11BB22CC33DD44EE55FF0A /* PDFBuilderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PDFBuilderTests.swift; path = ./CadenceTests/PDFBuilderTests.swift; sourceTree = "<absolute>"; };
 		AA11BB22CC33DD44EE55FF09 /* BackupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BackupServiceTests.swift; path = ./CadenceTests/BackupServiceTests.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000101 /* Medication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Medication.swift; path = ./Cadence/Models/Medication.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000102 /* MedicationsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MedicationsView.swift; path = ./Cadence/Features/Settings/MedicationsView.swift; sourceTree = "<absolute>"; };
@@ -514,6 +516,7 @@
 				AA11BB22CC33DD44EE55FF08 /* SeamTests.swift */,
 				AA11BB22CC33DD44EE55FF09 /* BackupServiceTests.swift */,
 				AA11BB22CC33DD44EE55FF07 /* NotificationServiceTests.swift */,
+				AA11BB22CC33DD44EE55FF0A /* PDFBuilderTests.swift */,
 			);
 			name = CadenceTests;
 			path = ../CadenceTests;
@@ -854,6 +857,7 @@
 				AA11BB22CC33DD44EE55FF68 /* SeamTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF69 /* BackupServiceTests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF67 /* NotificationServiceTests.swift in Sources */,
+				AA11BB22CC33DD44EE55FF6A /* PDFBuilderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

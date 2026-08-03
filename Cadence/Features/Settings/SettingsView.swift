@@ -266,10 +266,10 @@ struct SettingsView: View {
             .foregroundStyle(CadenceColor.accent)
 
             Button {
-                Task { await generateDoctorPDF(daysBack: 30) }
+                Task { await generateDebugReport(daysBack: 30) }
             } label: {
                 HStack {
-                    Text("Generate 30 Day Trends report")
+                    Text("Generate 30 Day report")
                     Spacer()
                     if isGeneratingPDF { ProgressView() }
                 }
@@ -278,10 +278,10 @@ struct SettingsView: View {
             .foregroundStyle(CadenceColor.accent)
 
             Button {
-                Task { await generateDoctorPDF(daysBack: 90) }
+                Task { await generateDebugReport(daysBack: 90) }
             } label: {
                 HStack {
-                    Text("Generate 90 Day Trends report")
+                    Text("Generate 90 Day report")
                     Spacer()
                     if isGeneratingPDF { ProgressView() }
                 }
@@ -291,11 +291,11 @@ struct SettingsView: View {
         } header: {
             Label("Debug", systemImage: "hammer.fill")
         } footer: {
-            Text("Seed actions skip dates that already have a log, so they're additive. PDF actions build a doctor report from the last N days of logs (whatever is in the store) and open the share sheet — bypasses the Pro gate in DEBUG.")
+            Text("Seed actions skip dates that already have a log, so they're additive. PDF actions build an In Rhythm report from the last N days of logs (whatever is in the store) and open the share sheet — bypasses the Pro gate in DEBUG.")
         }
     }
 
-    private func generateDoctorPDF(daysBack: Int) async {
+    private func generateDebugReport(daysBack: Int) async {
         isGeneratingPDF = true
         defer { isGeneratingPDF = false }
         let cal = Calendar.current
@@ -304,8 +304,7 @@ struct SettingsView: View {
             .filter { $0.date >= cutoff }
             .sorted { $0.date > $1.date }
             .map(DailyLogSnapshot.init)
-        let title = "Cadence — \(daysBack) Day Trends"
-        let url = await PDFBuilder.build(type: .doctor, logs: snapshots, reviews: [], headerTitle: title)
+        let url = await PDFBuilder.build(logs: snapshots, reviews: [])
         if let url {
             pdfShareURL = url
             showingPDFShare = true
