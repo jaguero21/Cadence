@@ -11,7 +11,6 @@ struct ExportView: View {
     @Environment(StoreService.self) private var store
     @Environment(AppState.self) private var appState
     @AppStorage(UserDefaultsKey.lastVisitDate) private var lastVisitInterval: Double = 0
-    @State private var reportType: ReportType = .doctor
     @State private var startDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: .now) ?? .now
     @State private var endDate: Date = .now
     @State private var isGenerating = false
@@ -23,15 +22,6 @@ struct ExportView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Report Type") {
-                    Picker("Type", selection: $reportType) {
-                        ForEach(ReportType.allCases, id: \.self) { t in
-                            Text(t.rawValue).tag(t)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
                 Section("Date Range") {
                     DatePicker("From", selection: $startDate, in: ...endDate, displayedComponents: .date)
                     DatePicker("To",   selection: $endDate,   in: startDate..., displayedComponents: .date)
@@ -115,18 +105,12 @@ struct ExportView: View {
 
     @ViewBuilder
     private var includes: some View {
-        switch reportType {
-        case .doctor:
-            Label("Trend charts",             systemImage: "checkmark")
-            Label("Symptom frequency & severity", systemImage: "checkmark")
-            Label("Medication list",          systemImage: "checkmark")
-            Label("Pattern flags",            systemImage: "checkmark")
-            Label("HealthKit objective data", systemImage: "checkmark")
-        case .personal:
-            Label("Trend charts",             systemImage: "checkmark")
-            Label("Weekly reviews",           systemImage: "checkmark")
-            Label("Win/miss/intention history",systemImage: "checkmark")
-        }
+        Label("Trend charts",                 systemImage: "checkmark")
+        Label("Symptom frequency & severity", systemImage: "checkmark")
+        Label("Medication list",              systemImage: "checkmark")
+        Label("Pattern flags",                systemImage: "checkmark")
+        Label("HealthKit objective data",     systemImage: "checkmark")
+        Label("Weekly reflections",           systemImage: "checkmark")
     }
 
     private var proPrompt: some View {
@@ -195,7 +179,6 @@ struct ExportView: View {
         generationTask?.cancel()
         generationTask = Task.detached {
             let url = await PDFBuilder.build(
-                type: reportType,
                 logs: logSnapshots,
                 reviews: reviewSnapshots,
                 medications: medicationSnapshots,

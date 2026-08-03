@@ -304,8 +304,7 @@ struct SettingsView: View {
             .filter { $0.date >= cutoff }
             .sorted { $0.date > $1.date }
             .map(DailyLogSnapshot.init)
-        let title = "Cadence — \(daysBack) Day Trends"
-        let url = await PDFBuilder.build(type: .doctor, logs: snapshots, reviews: [], headerTitle: title)
+        let url = await PDFBuilder.build(logs: snapshots, reviews: [])
         if let url {
             pdfShareURL = url
             showingPDFShare = true

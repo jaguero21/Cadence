@@ -2,31 +2,20 @@ import SwiftUI
 import PDFKit
 import Charts
 
-enum ReportType: String, CaseIterable {
-    case doctor   = "Cadence Trend"
-    case personal = "Personal Summary"
-}
-
 enum PDFBuilder {
-    static func build(type: ReportType, logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = [], headerTitle: String? = nil) async -> URL? {
+    static func build(logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = []) async -> URL? {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
         let uid = UUID().uuidString
-        let filename = type == .doctor ? "cadence-doctor-report-\(uid).pdf" : "cadence-personal-summary-\(uid).pdf"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("in-rhythm-cadence-report-\(uid).pdf")
 
-        // Insights run once here so the renderer doesn't need to know about
-        // PatternEngine — and personal-summary builds don't pay the cost.
-        let insights = type == .doctor ? PatternEngine.allInsights(from: logs, medications: medications, flares: flares, trackers: customTrackers) : []
+        let insights = PatternEngine.allInsights(from: logs, medications: medications, flares: flares, trackers: customTrackers)
         // Chart images render on the main actor (ImageRenderer requirement),
         // before the PDF context opens.
         let charts = await trendChartImages(logs: logs)
 
         do {
             try renderer.writePDF(to: url) { ctx in
-                switch type {
-                case .doctor:   renderDoctorReport(ctx: ctx, logs: logs, charts: charts, insights: insights, medications: medications, flares: flares, customTrackers: customTrackers, headerTitle: headerTitle)
-                case .personal: renderPersonalSummary(ctx: ctx, logs: logs, charts: charts, reviews: reviews)
-                }
+                renderReport(ctx: ctx, logs: logs, charts: charts, insights: insights, medications: medications, flares: flares, customTrackers: customTrackers)
             }
             return url
         } catch {
@@ -216,12 +205,12 @@ enum PDFBuilder {
         }
     }
 
-    // MARK: - Doctor report
+    // MARK: - Report
 
-    private static func renderDoctorReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot], headerTitle: String?) {
+    private static func renderReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot]) {
         let cursor = Cursor(ctx: ctx)
         cursor.beginPage()
-        drawReportHeader(cursor: cursor, title: headerTitle ?? "Cadence Trend", logs: logs)
+        drawReportHeader(cursor: cursor, title: "In Rhythm: Your Cadence Report", logs: logs)
 
         drawChartGrid(charts, cursor: cursor)
 
@@ -373,54 +362,6 @@ enum PDFBuilder {
                 cursor.line("\(insight.title) — \(Int(insight.confidence * 100))% confidence",
                             font: .systemFont(ofSize: 11, weight: .semibold), spacing: 2)
                 cursor.line(insight.detail, font: bodyFont, color: inkSecondary, x: 60, width: 495, spacing: 10)
-            }
-        }
-    }
-
-    // MARK: - Personal summary
-
-    private static func renderPersonalSummary(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], reviews: [WeeklyReviewSnapshot]) {
-        let cursor = Cursor(ctx: ctx)
-        cursor.beginPage()
-        drawReportHeader(cursor: cursor, title: "Personal Summary", logs: logs)
-        drawChartGrid(charts, cursor: cursor)
-
-        let bodyFont = UIFont.systemFont(ofSize: 11)
-        if reviews.isEmpty {
-            cursor.section("Weekly Reviews")
-            cursor.line("No weekly reviews in this period.", font: bodyFont, color: inkSecondary)
-        }
-        for review in reviews {
-            // Each week keeps its own page — this report reads as a journal.
-            cursor.beginPage()
-            cursor.line(review.weekLabel, font: .systemFont(ofSize: 17, weight: .bold), x: 40, width: 515, spacing: 10)
-
-            // The closing star rating and the auto-populated Week at a Glance
-            // stats, mirroring what the review flow itself shows.
-            var glanceLines: [String] = []
-            if review.overallRating > 0 {
-                let stars = String(repeating: "★", count: review.overallRating)
-                    + String(repeating: "☆", count: 5 - review.overallRating)
-                glanceLines.append("Overall week: \(stars) (\(review.overallRating)/5)")
-            }
-            if review.avgMood > 0 || review.avgEnergy > 0 || review.avgSleep > 0 {
-                glanceLines.append("Averages — mood \(String(format: "%.1f", review.avgMood))/5, energy \(String(format: "%.1f", review.avgEnergy))/10, sleep \(String(format: "%.1f", review.avgSleep)) hrs")
-            }
-            if !review.topSymptoms.isEmpty {
-                glanceLines.append("Top symptoms: \(review.topSymptoms.joined(separator: ", "))")
-            }
-            for line in glanceLines {
-                cursor.line(line, font: bodyFont, x: 40, width: 515, spacing: 4)
-            }
-
-            for response in review.promptResponses {
-                cursor.section(response.section)
-                cursor.line(response.response.isEmpty ? "—" : response.response, font: bodyFont)
-            }
-
-            if !review.intentionsForTomorrow.isEmpty {
-                cursor.section("Intentions for Tomorrow")
-                cursor.line(review.intentionsForTomorrow, font: bodyFont)
             }
         }
     }
