@@ -41,7 +41,6 @@ enum UserDefaultsKey {
     static let dailyReminderHour    = "dailyReminderHour"
     static let dailyReminderMinute  = "dailyReminderMinute"
     static let weeklyReminderEnabled = "weeklyReminderEnabled"
-    static let lastVisitDate          = "lastVisitDate"   // timeIntervalSinceReferenceDate; 0 = unset
     static let lastInsightCheckDay    = "lastInsightCheckDay"   // startOfDay interval; foreground insight check runs once per day
 }
 
