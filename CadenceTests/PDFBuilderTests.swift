@@ -70,4 +70,29 @@ import PDFKit
         let document = try #require(PDFDocument(url: resolved))
         #expect(document.pageCount == 1)
     }
+
+    // Weekly reflections fold the retired Personal Summary's review content
+    // (star rating, prompt responses, weekly intentions) into the report. A
+    // page-count comparison is too weak a guard once this content actually
+    // renders, so assert the extracted PDF text directly carries the section
+    // header and the review's own distinctive content.
+    @Test("weekly reviews render as a Weekly reflections section")
+    func build_withReviews_rendersContent() async throws {
+        let day = Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .now
+        let log = DailyLog(date: day)
+        log.mood = 3
+        let logs = [DailyLogSnapshot(log)]
+
+        let review = WeeklyReview(weekStartDate: .now)
+        review.overallRating = 5
+        review.intentionsForTomorrow = "Distinctive weekly intentions marker XYZZY-42."
+        let withReview = await PDFBuilder.build(logs: logs, reviews: [WeeklyReviewSnapshot(review)])
+
+        let resolved = try #require(withReview)
+        let document = try #require(PDFDocument(url: resolved))
+        #expect(document.pageCount >= 1)
+        let text = (0..<document.pageCount).compactMap { document.page(at: $0)?.string }.joined()
+        #expect(text.contains("Weekly reflections"))
+        #expect(text.contains("Distinctive weekly intentions marker XYZZY-42."))
+    }
 }
