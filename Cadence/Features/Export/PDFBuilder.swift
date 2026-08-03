@@ -15,7 +15,7 @@ enum PDFBuilder {
 
         do {
             try renderer.writePDF(to: url) { ctx in
-                renderReport(ctx: ctx, logs: logs, charts: charts, insights: insights, medications: medications, flares: flares, customTrackers: customTrackers)
+                renderReport(ctx: ctx, logs: logs, charts: charts, insights: insights, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers)
             }
             return url
         } catch {
@@ -205,9 +205,34 @@ enum PDFBuilder {
         }
     }
 
+    // Weekly reflections folded in from the retired Personal Summary: per week,
+    // the star rating, prompt responses, and weekly intentions. Rendered
+    // compactly inline (not a page-per-week). `reviews` arrive newest-first from
+    // the caller; the snapshot carries no date, so we keep that order as given.
+    private static func drawWeeklyReflections(_ reviews: [WeeklyReviewSnapshot], cursor: Cursor) {
+        guard !reviews.isEmpty else { return }
+        let bodyFont = UIFont.systemFont(ofSize: 11)
+        cursor.section("Weekly reflections")
+        for review in reviews {
+            cursor.line(review.weekLabel, font: .systemFont(ofSize: 12, weight: .semibold), spacing: 2)
+            if review.overallRating > 0 {
+                let stars = String(repeating: "★", count: review.overallRating)
+                    + String(repeating: "☆", count: 5 - review.overallRating)
+                cursor.line("Overall: \(stars) (\(review.overallRating)/5)", font: bodyFont, color: inkSecondary, spacing: 3)
+            }
+            for response in review.promptResponses where !response.response.isEmpty {
+                cursor.line(response.section, font: .systemFont(ofSize: 10.5, weight: .medium), color: inkSecondary, spacing: 1)
+                cursor.line(response.response, font: bodyFont, x: 60, width: 495, spacing: 4)
+            }
+            if !review.intentionsForTomorrow.isEmpty {
+                cursor.line("Intentions: \(review.intentionsForTomorrow)", font: bodyFont, spacing: 8)
+            }
+        }
+    }
+
     // MARK: - Report
 
-    private static func renderReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot]) {
+    private static func renderReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot]) {
         let cursor = Cursor(ctx: ctx)
         cursor.beginPage()
         drawReportHeader(
@@ -238,7 +263,7 @@ enum PDFBuilder {
         // Your rhythm at a glance (Trends). drawChartGrid draws its own section header.
         drawChartGrid(charts, cursor: cursor)
 
-        // Weekly reflections — folded in from the retired Personal Summary (Task 3 wires this in).
+        drawWeeklyReflections(reviews, cursor: cursor)
 
         // Moments you marked (Peaks & Valleys).
         let dayFmt = Date.FormatStyle().month(.abbreviated).day()
