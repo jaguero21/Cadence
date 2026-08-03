@@ -57,7 +57,7 @@ import PDFKit
         let document = try #require(PDFDocument(url: resolved))
         #expect(document.pageCount >= 1)
         let text = (0..<document.pageCount).compactMap { document.page(at: $0)?.string }.joined()
-        #expect(text.contains("Symptom Frequency"))
+        #expect(text.contains("Symptoms"))
         #expect(text.contains("avg severity"))          // severity rides the frequency bars
         #expect(text.contains("days logged"))           // header adherence line
         #expect(text.contains("Page 1"))                // per-page footer
