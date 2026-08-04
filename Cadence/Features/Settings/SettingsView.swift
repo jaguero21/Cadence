@@ -153,7 +153,7 @@ struct SettingsView: View {
         } header: {
             Label("Symptoms", systemImage: "tag.fill")
         } footer: {
-            Text("Choose which symptoms appear in the daily log's picker — the full library is free; custom ones require Pro.")
+            Text("Choose which symptoms appear in the daily log's picker, including custom ones you add yourself.")
         }
     }
 
