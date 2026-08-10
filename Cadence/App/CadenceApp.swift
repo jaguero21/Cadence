@@ -84,6 +84,14 @@ struct CadenceApp: App {
                 .environment(store)
                 .modelContainer(container)
                 .task {
+                    // Load the Pro entitlement before any gated surface reads
+                    // `store.isPro`. Its own `.task` (not folded into the one
+                    // below) so a slow StoreKit round-trip can't delay starting
+                    // the HealthKit observers.
+                    guard !AppLaunch.isUITesting else { return }
+                    await store.refreshEntitlements()
+                }
+                .task {
                     PhoneConnectivityManager.shared.start(container: container)
                     guard !AppLaunch.isUITesting else { return }
                     // Discoverability tips (hold-to-rate, step jumping). Not

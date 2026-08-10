@@ -43,13 +43,29 @@ final class StoreService {
         }
     }
 
-    func restorePurchases() async {
+    // Rebuilds the entitlement set from StoreKit's authoritative
+    // `currentEntitlements`. This must run at launch: StoreKit caches nothing
+    // for us across launches and `Transaction.updates` only delivers NEW
+    // transactions, so without it a returning Pro user (reinstall, new device,
+    // or just a cold start) reads as free.
+    //
+    // REBUILDS rather than unions: `currentEntitlements` omits expired
+    // subscriptions and revoked purchases, so assigning the whole set is what
+    // makes Pro actually lapse. Unioning would make every grant permanent for
+    // the life of the process.
+    func refreshEntitlements() async {
+        var owned: Set<String> = []
         for await result in Transaction.currentEntitlements {
-            if let transaction = try? checkVerified(result) {
-                purchasedProductIDs.insert(transaction.productID)
-                await transaction.finish()
-            }
+            guard let transaction = try? checkVerified(result),
+                  transaction.revocationDate == nil else { continue }
+            owned.insert(transaction.productID)
+            await transaction.finish()
         }
+        purchasedProductIDs = owned
+    }
+
+    func restorePurchases() async {
+        await refreshEntitlements()
     }
 
     var isPro: Bool {
@@ -71,7 +87,15 @@ final class StoreService {
             for await result in Transaction.updates {
                 guard let self else { return }
                 guard let transaction = try? self.checkVerified(result) else { continue }
-                self.purchasedProductIDs.insert(transaction.productID)
+                // `Transaction.updates` also delivers a transaction when it is
+                // REVOKED (refund, family-sharing removal). Inserting on that
+                // would re-grant Pro to a refunded user, so branch on
+                // revocationDate rather than treating every update as a grant.
+                if transaction.revocationDate == nil {
+                    self.purchasedProductIDs.insert(transaction.productID)
+                } else {
+                    self.purchasedProductIDs.remove(transaction.productID)
+                }
                 await transaction.finish()
             }
         }
