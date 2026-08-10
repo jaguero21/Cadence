@@ -273,17 +273,17 @@ struct LogInputFlow: View {
         VStack(alignment: .leading, spacing: 20) {
             LogSectionHeader(icon: "waveform.path.ecg", title: "BODY METRICS", time: "~60 sec")
             VStack(spacing: 16) {
-                BodyMetricRow(label: "Energy",        value: $energy)
+                BodyMetricRow(label: "Energy",        value: $energy,        onEdit: markMetricsEdited)
                 Divider()
-                SleepHoursRow(hours: $sleepHours)
+                SleepHoursRow(hours: $sleepHours, onEdit: markMetricsEdited)
                 Divider()
-                BodyMetricRow(label: "Sleep quality", value: $sleepQuality)
+                BodyMetricRow(label: "Sleep quality", value: $sleepQuality,  onEdit: markMetricsEdited)
                 Divider()
-                BodyMetricRow(label: "Pain / ache",   value: $painLevel)
+                BodyMetricRow(label: "Pain / ache",   value: $painLevel,     onEdit: markMetricsEdited)
                 Divider()
-                BodyMetricRow(label: "Brain fog",     value: $brainFogLevel)
+                BodyMetricRow(label: "Brain fog",     value: $brainFogLevel, onEdit: markMetricsEdited)
                 Divider()
-                BodyMetricRow(label: "Anxiety",       value: $stressLevel)
+                BodyMetricRow(label: "Anxiety",       value: $stressLevel,   onEdit: markMetricsEdited)
                 ForEach(customTrackers) { tracker in
                     Divider()
                     CustomMetricRow(
@@ -299,12 +299,18 @@ struct LogInputFlow: View {
             }
         }
         .cadenceCard()
-        .onChange(of: energy)        { _, _ in didEditMetrics = true }
-        .onChange(of: sleepHours)    { _, _ in didEditMetrics = true }
-        .onChange(of: sleepQuality)  { _, _ in didEditMetrics = true }
-        .onChange(of: painLevel)     { _, _ in didEditMetrics = true }
-        .onChange(of: brainFogLevel) { _, _ in didEditMetrics = true }
-        .onChange(of: stressLevel)   { _, _ in didEditMetrics = true }
+    }
+
+    // Marks the metrics as user-entered. Driven from each row's slider-set
+    // callback rather than an .onChange on the values, because .onChange can't
+    // tell a drag from a programmatic write: applyHealthKitData() assigns
+    // sleepHours/sleepQuality, and if it lands while this step is on screen the
+    // observers would fire and flag HealthKit's prefill as a user edit — the
+    // exact thing that function's own `if !didEditMetrics` guard is protecting.
+    // That flag is load-bearing (completionScore, and PatternEngine's
+    // moodSleepCorrelation gates on it), so it has to mean what it says.
+    private func markMetricsEdited() {
+        didEditMetrics = true
     }
 
     // MARK: - Basics Step
@@ -907,6 +913,10 @@ private struct LogSectionHeader: View {
 
 private struct SleepHoursRow: View {
     @Binding var hours: Double
+    // Fires only when the SLIDER moves. A programmatic write to `hours` (the
+    // HealthKit prefill) never routes through this binding, so it can't be
+    // mistaken for a user edit — see LogInputFlow.markMetricsEdited.
+    var onEdit: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 14) {
@@ -918,7 +928,7 @@ private struct SleepHoursRow: View {
                     get: { hours },
                     set: { newVal in
                         let snapped = (newVal * 2).rounded() / 2
-                        if snapped != hours { hours = snapped }
+                        if snapped != hours { hours = snapped; onEdit() }
                     }
                 ),
                 in: 0...12,
@@ -976,6 +986,9 @@ private struct CustomMetricRow: View {
 private struct BodyMetricRow: View {
     let label: String
     @Binding var value: Int
+    // Slider-only edit callback — same rationale as SleepHoursRow.onEdit, and
+    // the same shape CustomMetricRow's caller already uses for its binding.
+    var onEdit: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 14) {
@@ -987,7 +1000,7 @@ private struct BodyMetricRow: View {
                     get: { Double(value) },
                     set: { newVal in
                         let rounded = Int(newVal.rounded())
-                        if rounded != value { value = rounded }
+                        if rounded != value { value = rounded; onEdit() }
                     }
                 ),
                 in: 0...10,
