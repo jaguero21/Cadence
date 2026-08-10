@@ -47,11 +47,14 @@ final class InsightsViewModel {
         var voiceLabel: String { "\(days) days" }
     }
 
-    func refresh(logs: [DailyLog], medications: [Medication] = [], flares: [Flare] = [], trackers: [CustomTracker] = []) {
+    // `health` are the HealthSnapshot rows from the view's @Query, joined to
+    // each log by date — the hk*-reading detectors need them, and they live in
+    // a separate local-only store since the CloudKit split.
+    func refresh(logs: [DailyLog], health: [HealthSnapshot], medications: [Medication] = [], flares: [Flare] = [], trackers: [CustomTracker] = []) {
         // Snapshot @Model values on the main actor before handing them to PatternEngine,
         // which is otherwise isolation-agnostic.
         insights = PatternEngine.allInsights(
-            from: logs.map(DailyLogSnapshot.init),
+            from: DailyLogSnapshot.build(from: logs, health: health),
             medications: medications.map(MedicationSnapshot.init),
             flares: flares.map(FlareSnapshot.init),
             trackers: trackers.map(CustomTrackerSnapshot.init)

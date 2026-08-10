@@ -27,19 +27,11 @@ final class DailyLog {
     var didEditMood: Bool = false
     var didEditMetrics: Bool = false
 
-    // HealthKit-pulled data
-    var hkSteps: Int?
-    var hkRestingHR: Double?
-    var hkHRV: Double?
-    var hkSleepHours: Double?
-    var hkActiveEnergy: Double?
-    var hkMindfulMinutes: Double?
-    var hkWristTemp: Double?   // °C, overnight wrist temperature (Watch Series 8+)
-    var hkRespiratoryRate: Double?   // breaths/min, overnight average
-    var hkBloodOxygen: Double?       // %, overnight average SpO2
-    var hkDaylightMinutes: Double?   // minutes of daylight today (iOS 17 / watchOS 10)
-    var hkDaytimeHR: Double?         // bpm, today's average heart rate (all samples)
-    var hkWorkoutMinutes: Double?    // total workout duration today; nil = no workouts
+    // HealthKit-pulled data USED to live here. It now lives on HealthSnapshot,
+    // in a separate local-only store, because this model is mirrored to
+    // CloudKit and Guideline 5.1.3(ii) forbids storing personal health
+    // information in iCloud. Join by date via DailyLogSnapshot.build(from:in:);
+    // do not add an hk* field back to this model.
 
     init(date: Date = .now) {
         self.date = Calendar.current.startOfDay(for: date)
@@ -123,7 +115,13 @@ struct DailyLogSnapshot: Sendable {
     let hkDaytimeHR: Double?
     let hkWorkoutMinutes: Double?
 
-    init(_ log: DailyLog) {
+    // `health` carries the day's objective HealthKit values, which live in a
+    // separate local-only store (see HealthSnapshot) and therefore cannot be
+    // reached through `log`. Defaulted to nil so the quick-log paths that only
+    // need the user-entered half — watch, widget, Siri, Health write-back —
+    // stay one-liners; every hk* field simply reads as "no data" there, which
+    // is what all downstream consumers already handle.
+    init(_ log: DailyLog, health: HealthSnapshot? = nil) {
         date           = log.date
         mood           = log.mood
         energy         = log.energy
@@ -145,18 +143,18 @@ struct DailyLogSnapshot: Sendable {
             || log.attachments.contains { $0.section == Attachment.peaksAndValleysSection && $0.kind == .audio }
         intentionsForTomorrow = log.intentionsForTomorrow
         freeNote       = log.freeNote
-        hkSteps        = log.hkSteps
-        hkRestingHR    = log.hkRestingHR
-        hkHRV          = log.hkHRV
-        hkSleepHours   = log.hkSleepHours
-        hkActiveEnergy = log.hkActiveEnergy
-        hkMindfulMinutes = log.hkMindfulMinutes
-        hkWristTemp    = log.hkWristTemp
-        hkRespiratoryRate = log.hkRespiratoryRate
-        hkBloodOxygen  = log.hkBloodOxygen
-        hkDaylightMinutes = log.hkDaylightMinutes
-        hkDaytimeHR    = log.hkDaytimeHR
-        hkWorkoutMinutes = log.hkWorkoutMinutes
+        hkSteps        = health?.hkSteps
+        hkRestingHR    = health?.hkRestingHR
+        hkHRV          = health?.hkHRV
+        hkSleepHours   = health?.hkSleepHours
+        hkActiveEnergy = health?.hkActiveEnergy
+        hkMindfulMinutes = health?.hkMindfulMinutes
+        hkWristTemp    = health?.hkWristTemp
+        hkRespiratoryRate = health?.hkRespiratoryRate
+        hkBloodOxygen  = health?.hkBloodOxygen
+        hkDaylightMinutes = health?.hkDaylightMinutes
+        hkDaytimeHR    = health?.hkDaytimeHR
+        hkWorkoutMinutes = health?.hkWorkoutMinutes
     }
 
     init(
@@ -221,6 +219,49 @@ struct DailyLogSnapshot: Sendable {
         self.hkDaylightMinutes = hkDaylightMinutes
         self.hkDaytimeHR = hkDaytimeHR
         self.hkWorkoutMinutes = hkWorkoutMinutes
+    }
+}
+
+extension DailyLogSnapshot {
+
+    // THE join. DailyLog (CloudKit-mirrored) and HealthSnapshot (local-only)
+    // live in different stores, so SwiftData cannot relate them — they are
+    // matched on midnight-normalized `date` here, once, with a single fetch of
+    // the health rows rather than a query per log.
+    //
+    // Every consumer that needs hk* values (PatternEngine, PDFBuilder,
+    // CSVBuilder, the trend charts) takes DailyLogSnapshot and is unchanged by
+    // the split; they just need their snapshots built through this instead of
+    // `map(DailyLogSnapshot.init)`. A log with no health row for its day yields
+    // nil hk* fields, which is exactly what a day without Health access already
+    // produced before the split.
+    static func build(from logs: [DailyLog], in context: ModelContext) -> [DailyLogSnapshot] {
+        build(from: logs, health: HealthSnapshot.byDate(in: context))
+    }
+
+    // Preferred inside SwiftUI. Views must feed this from a `@Query` over
+    // HealthSnapshot rather than calling the ModelContext overload: an
+    // imperative `context.fetch` performed during a view update — or inside a
+    // refresh that is itself driven by `.onChange(of:)` on a @Query — can
+    // re-enter the update it was called from and spin the main thread. That
+    // showed up as an app that stayed alive but stopped responding, and it hung
+    // the UI smoke test rather than failing an assertion.
+    static func build(from logs: [DailyLog], health: [HealthSnapshot]) -> [DailyLogSnapshot] {
+        build(from: logs, health: Dictionary(
+            health.map { (Calendar.current.startOfDay(for: $0.date), $0) },
+            uniquingKeysWith: { first, _ in first }
+        ))
+    }
+
+    private static func build(from logs: [DailyLog], health: [Date: HealthSnapshot]) -> [DailyLogSnapshot] {
+        logs.map { log in
+            DailyLogSnapshot(log, health: health[Calendar.current.startOfDay(for: log.date)])
+        }
+    }
+
+    // Single-log convenience for the detail/edit paths.
+    static func build(from log: DailyLog, in context: ModelContext) -> DailyLogSnapshot {
+        DailyLogSnapshot(log, health: HealthSnapshot.row(for: log.date, in: context))
     }
 }
 

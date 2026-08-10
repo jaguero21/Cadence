@@ -52,6 +52,7 @@
 		AABBCCDD0000000000000201 /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000101 /* Medication.swift */; };
 		AABBCCDD0000000000000202 /* MedicationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000102 /* MedicationsView.swift */; };
 		AABBCCDD0000000000000203 /* Flare.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000103 /* Flare.swift */; };
+		AABBCCDD0000000000000290 /* HealthSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000190 /* HealthSnapshot.swift */; };
 		AABBCCDD0000000000000204 /* FlaresView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000104 /* FlaresView.swift */; };
 		AABBCCDD0000000000000205 /* CustomTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000105 /* CustomTracker.swift */; };
 		AABBCCDD0000000000000206 /* CustomTrackersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000106 /* CustomTrackersView.swift */; };
@@ -200,6 +201,7 @@
 		AABBCCDD0000000000000101 /* Medication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Medication.swift; path = ./Cadence/Models/Medication.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000102 /* MedicationsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MedicationsView.swift; path = ./Cadence/Features/Settings/MedicationsView.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000103 /* Flare.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Flare.swift; path = ./Cadence/Models/Flare.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000190 /* HealthSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthSnapshot.swift; path = ./Cadence/Models/HealthSnapshot.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000104 /* FlaresView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FlaresView.swift; path = ./Cadence/Features/Settings/FlaresView.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000105 /* CustomTracker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomTracker.swift; path = ./Cadence/Models/CustomTracker.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000106 /* CustomTrackersView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomTrackersView.swift; path = ./Cadence/Features/Settings/CustomTrackersView.swift; sourceTree = "<absolute>"; };
@@ -416,6 +418,7 @@
 				990D941EB5FC46F95C213CEE /* DailyLog.swift */,
 				AABBCCDD0000000000000101 /* Medication.swift */,
 				AABBCCDD0000000000000103 /* Flare.swift */,
+				AABBCCDD0000000000000190 /* HealthSnapshot.swift */,
 				AABBCCDD0000000000000105 /* CustomTracker.swift */,
 				AABBCCDD0000000000000108 /* InsightRecord.swift */,
 				AABBCCDD000000000000010B /* Attachment.swift */,
@@ -795,6 +798,7 @@
 				AABBCCDD0000000000000201 /* Medication.swift in Sources */,
 				AABBCCDD0000000000000202 /* MedicationsView.swift in Sources */,
 				AABBCCDD0000000000000203 /* Flare.swift in Sources */,
+				AABBCCDD0000000000000290 /* HealthSnapshot.swift in Sources */,
 				AABBCCDD0000000000000204 /* FlaresView.swift in Sources */,
 				AABBCCDD0000000000000205 /* CustomTracker.swift in Sources */,
 				AABBCCDD0000000000000206 /* CustomTrackersView.swift in Sources */,

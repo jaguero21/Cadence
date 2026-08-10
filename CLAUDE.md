@@ -95,17 +95,37 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `daylightMoodCorrelation` (`daylight-mood`) mirrors mood-sleep for
   HealthKit's time-in-daylight — only the actionable direction (more daylight
   → better mood) surfaces.
-- **Workout detail:** `DailyLog.hkWorkoutMinutes` (total workout duration; nil
-  = no workouts, so a "workout day" is inferable but missing-data never is) is
-  fetched by `fetchWorkoutDetail` alongside the `intenseWorkout` gate that
+- **HealthKit data lives in a SEPARATE LOCAL-ONLY STORE — IMPORTANT.** All
+  twelve `hk*` values live on `HealthSnapshot` (`Models/HealthSnapshot.swift`),
+  not on `DailyLog`. `CadenceApp.sharedModelContainer` builds ONE container from
+  TWO configurations: an unnamed CloudKit-mirrored one holding the user-entered
+  models, and a `"LocalHealth"` one with `cloudKitDatabase: .none`. The reason is
+  App Review Guideline 5.1.3(ii) — "may not store personal health information in
+  iCloud" — and HealthKit-sourced values are the least defensible thing to put
+  there. **Never add an `hk*` field back to `DailyLog`, and never move
+  `HealthSnapshot` into the synced schema.** The synced configuration stays
+  UNNAMED on purpose: naming it changes the store filename off `default.store`
+  and reads as total data loss on upgrade.
+  SwiftData cannot relate models across stores, so the two are joined by
+  midnight-normalized `date` in exactly one place —
+  `DailyLogSnapshot.build(from:in:)`. Every consumer of `hk*` data
+  (`PatternEngine`, `PDFBuilder`, `CSVBuilder`, the trend charts) still takes
+  `DailyLogSnapshot` and is otherwise unchanged; they just need snapshots built
+  through that helper instead of `map(DailyLogSnapshot.init)`. Writes go through
+  `HealthSnapshot.upsert(_:on:in:)` (save-time dedup by date, never blanks a
+  value on nil, refuses to create an empty row).
+- **Workout detail:** `HealthSnapshot.hkWorkoutMinutes` (total workout duration;
+  nil = no workouts, so a "workout day" is inferable but missing-data never is)
+  is fetched by `fetchWorkoutDetail` alongside the `intenseWorkout` gate that
   auto-selects the "Intense exercise" factor chip. Two one-direction-only
   detectors: `workoutMoodCorrelation` (`workout-mood`, workout days → better
   mood) and `workoutRecoveryPattern` (`workout-recovery`, MORE symptoms the
   day after a workout, consecutive-day pairs only — the "fewer symptoms"
   direction is suppressed because it reads as exercise advice). Charted via
-  `ChartSeries.workoutMinutes(longestSession:)` (neutral badge, shown only
-  when the window has a workout); in LogDetailView, doctor PDF, CSV, backup
-  like every `hk*` field.
+  `ChartSeries.workoutMinutes(longestSession:minutesByDay:)` (neutral badge,
+  shown only when the window has a workout; the per-day map is passed in and
+  scoped to the visible range, since a log no longer carries the value); in
+  LogDetailView, doctor PDF, CSV, backup like every `hk*` field.
 - **HealthKit is always optional.** HK values only prefill or supplement —
   the sleep sliders, the "Menstrual cycle" factor chip (auto-selected via
   `LogInputFlow.menstrualCycleFactorName` when Health has a flow entry today),
@@ -126,10 +146,11 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   honest mappings — a Cadence symptom with no real HK counterpart (e.g.
   "Brain Fog") simply doesn't sync.
 - **HealthKit freshness:** `HealthDataRefresher.refreshToday` tops up TODAY's
-  existing log's `hk*` fields (via the shared
-  `DailyLog.applyObjectiveHealthData`, which never blanks a value on nil and
-  never touches user-entered fields) — it **never creates a log** (no phantom
-  entries from background data). Driven by `HealthKitService
+  `HealthSnapshot` row (via `HealthSnapshot.apply`, which never blanks a value
+  on nil and never touches user-entered fields) — it **never creates a log**
+  (no phantom entries from background data), and for the same reason writes no
+  health row for a day with no log at all. The `DailyLog` fetch survives purely
+  as that gate. Driven by `HealthKitService
   .startObservingChanges` (HKObserverQuery + hourly background delivery;
   entitlement `com.apple.developer.healthkit.background-delivery`) started in
   `CadenceApp`, with a foreground fallback in `ContentView`'s scenePhase
@@ -188,10 +209,13 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   tables (`SymptomTag`, `CustomTracker`, `Medication`, `Flare`) or
   DEBUG-only tooling, not log/review data.
 - **Persistence resilience.** `sharedModelContainer` tries a **CloudKit-mirrored**
-  store first (`cloudKitDatabase: .automatic`), then a local-only persistent
-  store (used when the iCloud entitlement is absent), then in-memory, then
-  `StorageFatalErrorView`. `save()` methods return `Bool`, revert mutated state
-  on failure, and surface a `saveError`; orphan/rollback cleanup at `.onDisappear`.
+  synced store first (`cloudKitDatabase: .automatic`), then a local-only
+  persistent one (used when the iCloud entitlement is absent), then in-memory,
+  then `StorageFatalErrorView`. The `"LocalHealth"` configuration is paired into
+  every tier — health data is already local, so only the synced half changes
+  behaviour across the fallbacks. `save()` methods return `Bool`, revert mutated
+  state on failure, and surface a `saveError`; orphan/rollback cleanup at
+  `.onDisappear`.
 - **CloudKit constraints.** Because of CloudKit mirroring, models carry **no
   `@Attribute(.unique)`** and every non-optional attribute has an **inline default
   value** (both are hard CloudKit requirements). Uniqueness/dedup is enforced in
@@ -465,8 +489,23 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   gives the app an in-memory store, fresh onboarding, and no permission
   prompts (`AppLaunch.isUITesting`) — keep new UI-affecting launch behavior
   behind that flag so UI runs stay deterministic.
-- SwiftData tests use an **in-memory `ModelContainer`** built from the same
-  `Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self])`.
+- SwiftData tests use an **in-memory `ModelContainer`**, and every one of them
+  passes a **unique configuration name**:
+  `ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)`.
+  This is not cosmetic. Unnamed in-memory configurations all resolve to the same
+  store identity, so with Swift Testing running suites in parallel several
+  containers end up sharing one store while declaring different schemas —
+  inserting an entity the sharing container doesn't declare then throws
+  `NSInvalidArgumentException: Can't assign an object to a store that does not
+  contain the object's entity`, which is an **uncaught ObjC exception that kills
+  the whole test bundle**. The symptom is maddening: every test passes when run
+  alone, and the full run reports "0 tests" plus "Restarting after unexpected
+  exit". Any new suite that builds a container must use a unique name too.
+- Test containers should include **`HealthSnapshot.self`** whenever the code
+  under test can reach a write path that upserts one (backup restore, the
+  health refresher, the log-flow save). The exception is
+  `SchemaMigrationTests.schema_containsExpectedModelTypes`, which asserts an
+  exact `entities.count` and deliberately builds a narrow schema.
 - Any suite that calls a `@MainActor` singleton (e.g. `NotificationService.shared`)
   must itself be annotated `@MainActor`, or it won't compile.
 - Inject fakes that conform to the service protocols; use `ThrowingPersistence`

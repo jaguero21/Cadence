@@ -15,7 +15,7 @@ import SwiftData
 @MainActor
 private func makeContext() throws -> ModelContext {
     let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-    let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+    let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
     let container = try ModelContainer(for: schema, configurations: [config])
     return ModelContext(container)
 }
