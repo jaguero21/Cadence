@@ -17,15 +17,17 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Cadence reads your sleep, heart rate, and activity data to automatically fill in your daily log and surface health patterns.</string>
+	<string>Cadence reads your sleep, heart rate and heart rate variability, workouts and activity, respiratory rate, blood oxygen, wrist temperature, time in daylight, mindful minutes, caffeine and water intake, cycle tracking, and any symptoms or moods recorded in Health. It uses them to prefill your daily log and to find patterns in how you feel. Health access is optional — every value can be entered by hand and nothing in Cadence is gated on it.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Cadence can optionally write your mood log as a HealthKit entry so it appears alongside your other health data.</string>
+	<string>Cadence can write the symptoms you log and your daily mood back to Health, so they sit alongside the rest of your health record. This is optional, only ever adds entries Cadence itself created, and declining it never affects logging in Cadence.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Cadence uses the microphone so you can attach short voice notes to a daily log.</string>
 	<key>UIApplicationSceneManifest</key>
@@ -35,10 +37,6 @@
 		<key>UISceneConfigurations</key>
 		<dict/>
 	</dict>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
