@@ -26,30 +26,62 @@ struct CadenceApp: App {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
-        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self])
+        // TWO stores, on purpose.
+        //
+        // `syncedModels` carry what the USER entered and are mirrored to
+        // CloudKit. `localModels` hold the objective HealthKit measurements and
+        // are NEVER mirrored: App Review Guideline 5.1.3(ii) says an app "may
+        // not store personal health information in iCloud", and HealthKit-
+        // sourced values are the least defensible thing to put there. Splitting
+        // keeps cross-device sync for the diary while HealthKit data stays on
+        // the device that read it.
+        //
+        // SwiftData cannot relate models across stores, so DailyLog and
+        // HealthSnapshot are joined by date — see DailyLogSnapshot.build(from:in:).
+        let syncedModels: [any PersistentModel.Type] = [
+            DailyLog.self, WeeklyReview.self, SymptomTag.self,
+            Medication.self, Flare.self, CustomTracker.self, InsightRecord.self,
+        ]
+        let localModels: [any PersistentModel.Type] = [HealthSnapshot.self]
+        let syncedSchema = Schema(syncedModels)
+        let localSchema  = Schema(localModels)
+        let fullSchema   = Schema(syncedModels + localModels)
+
         // UI tests get an isolated in-memory store so runs are deterministic.
         if AppLaunch.isUITesting {
-            let testConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-            return try? ModelContainer(for: schema, configurations: [testConfig])
+            let testConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
+            return try? ModelContainer(for: fullSchema, configurations: [testConfig])
         }
+
+        // Named, so it lands in its own file alongside the main store. The
+        // synced configuration below stays UNNAMED on purpose: that keeps it on
+        // "default.store", where every existing install's data already lives —
+        // naming it would point the app at an empty new file and read as total
+        // data loss on upgrade.
+        let healthConfig = ModelConfiguration(
+            "LocalHealth", schema: localSchema,
+            isStoredInMemoryOnly: false, cloudKitDatabase: .none
+        )
+
         // CloudKit mirroring: syncs across the user's devices once the iCloud +
         // CloudKit capability is enabled on the target. If the entitlement is
         // absent (e.g. a build without iCloud), this init fails and we fall back
         // to a local-only store below, so the app still works offline.
-        let cloudConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
-        if let container = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
+        let cloudConfig = ModelConfiguration(schema: syncedSchema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
+        if let container = try? ModelContainer(for: fullSchema, configurations: [cloudConfig, healthConfig]) {
             CadenceApp.usingCloudKitStore = true
             return container
         }
         // Local-only persistent store (no CloudKit) — used when the iCloud
-        // entitlement isn't present or CloudKit setup fails.
-        let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        if let container = try? ModelContainer(for: schema, configurations: [localConfig]) {
+        // entitlement isn't present or CloudKit setup fails. Health data is
+        // already local; only the synced half changes behaviour here.
+        let localOnlyConfig = ModelConfiguration(schema: syncedSchema, isStoredInMemoryOnly: false)
+        if let container = try? ModelContainer(for: fullSchema, configurations: [localOnlyConfig, healthConfig]) {
             return container
         }
         CadenceApp.usingFallbackStorage = true
-        let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        if let fallback = try? ModelContainer(for: schema, configurations: [fallbackConfig]) {
+        let fallbackConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
+        if let fallback = try? ModelContainer(for: fullSchema, configurations: [fallbackConfig]) {
             return fallback
         }
         CadenceApp.containerFailed = true
@@ -291,7 +323,7 @@ struct ContentView: View {
             WidgetCenter.shared.reloadTimelines(ofKind: WidgetData.widgetKind)
             // Mirror the applied days' moods into Health's State of Mind —
             // a widget tap is still a check-in. Best-effort, fire-and-forget.
-            let snapshots = logs.filter { appliedDays.contains($0.date) }.map(DailyLogSnapshot.init)
+            let snapshots = logs.filter { appliedDays.contains($0.date) }.map { DailyLogSnapshot($0) }
             let service = healthKitService
             Task {
                 for snapshot in snapshots {

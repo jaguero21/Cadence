@@ -6,6 +6,9 @@ struct InsightsView: View {
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
     @Query(sort: \Flare.startDate, order: .reverse) private var flares: [Flare]
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
+    // Objective HealthKit values (local-only store), observed rather than
+    // fetched so neither body evaluation nor refresh re-enters an update.
+    @Query private var healthRows: [HealthSnapshot]
     @State private var vm = InsightsViewModel()
     // Day opened by scrubbing a chart and tapping "View day".
     @State private var detailLog: DailyLog?
@@ -34,42 +37,51 @@ struct InsightsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: CadenceLayout.sectionSpacing) {
-                    rangeSelector
-                    chartsSection
-                    if store.isPro {
-                        insightsSection
-                    } else {
-                        proGate
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 32)
-                .readableColumn(maxWidth: CadenceLayout.insightsColumnWidth)
-            }
-            .background(CadenceColor.background)
-            .navigationTitle("Insights")
-            .toolbar {
+            content
+                // Same split as DashboardView: five onChange modifiers, each
+                // generic over a different Equatable query type, on top of this
+                // tree is enough to make the type checker give up with "unable
+                // to type-check in reasonable time" when inlined into `body`.
+                .onAppear { refreshAndRecord() }
+                .onChange(of: logs)           { _, _ in refreshAndRecord() }
+                .onChange(of: healthRows)     { _, _ in refreshAndRecord() }
+                .onChange(of: medications)    { _, _ in refreshAndRecord() }
+                .onChange(of: flares)         { _, _ in refreshAndRecord() }
+                .onChange(of: customTrackers) { _, _ in refreshAndRecord() }
+        }
+    }
+
+    private var content: some View {
+        ScrollView {
+            VStack(spacing: CadenceLayout.sectionSpacing) {
+                rangeSelector
+                chartsSection
                 if store.isPro {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        NavigationLink {
-                            InsightHistoryView()
-                        } label: {
-                            Image(systemName: "clock.arrow.circlepath")
-                        }
-                        .accessibilityLabel("Insight history")
-                    }
+                    insightsSection
+                } else {
+                    proGate
                 }
             }
-            .sheet(item: $detailLog) { log in
-                LogDetailView(log: log)
+            .padding(.horizontal)
+            .padding(.bottom, 32)
+            .readableColumn(maxWidth: CadenceLayout.insightsColumnWidth)
+        }
+        .background(CadenceColor.background)
+        .navigationTitle("Insights")
+        .toolbar {
+            if store.isPro {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        InsightHistoryView()
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath")
+                    }
+                    .accessibilityLabel("Insight history")
+                }
             }
-            .onAppear { refreshAndRecord() }
-            .onChange(of: logs) { _, _ in refreshAndRecord() }
-            .onChange(of: medications) { _, _ in refreshAndRecord() }
-            .onChange(of: flares) { _, _ in refreshAndRecord() }
-            .onChange(of: customTrackers) { _, _ in refreshAndRecord() }
+        }
+        .sheet(item: $detailLog) { log in
+            LogDetailView(log: log)
         }
     }
 
@@ -87,7 +99,7 @@ struct InsightsView: View {
     }
 
     private func refreshAndRecord() {
-        vm.refresh(logs: insightLogs, medications: medications, flares: flares, trackers: customTrackers)
+        vm.refresh(logs: insightLogs, health: healthRows, medications: medications, flares: flares, trackers: customTrackers)
         if store.isPro {
             InsightRecorder.record(vm.insights, context: modelContext)
         }
@@ -137,11 +149,16 @@ struct InsightsView: View {
                     TrendChartView(logs: filtered, series: .custom(tracker), range: vm.chartRange,
                                    previousLogs: previous, onOpenDay: openDay)
                 }
-                // Workout minutes from HealthKit — only once any day in the
-                // window actually carries one (no empty chart for users
-                // without Health access or workouts).
-                if let longest = filtered.compactMap(\.hkWorkoutMinutes).max() {
-                    TrendChartView(logs: filtered, series: .workoutMinutes(longestSession: longest),
+                // Workout minutes from HealthKit — only once a day IN THE
+                // SELECTED RANGE actually carries one (no empty chart for users
+                // without Health access or workouts). Sourced from the
+                // local-only health store and scoped to `filtered`, so neither
+                // the chart's presence nor its y-domain can be driven by a
+                // workout outside the range currently on screen.
+                let workoutMinutes = workoutMinutes(for: filtered)
+                if let longest = workoutMinutes.values.max() {
+                    TrendChartView(logs: filtered,
+                                   series: .workoutMinutes(longestSession: longest, minutesByDay: workoutMinutes),
                                    range: vm.chartRange, previousLogs: previous, onOpenDay: openDay)
                 }
             }
@@ -157,6 +174,20 @@ struct InsightsView: View {
             Text("Complete a few daily logs and your trends will appear here — mood, energy, sleep, and more.")
         }
         .cadenceCard()
+    }
+
+    // Workout minutes keyed by day for exactly the given logs, read from the
+    // local-only HealthSnapshot store. Empty when none of those days has a
+    // workout, which is what keeps the chart from appearing at all.
+    private func workoutMinutes(for logs: [DailyLog]) -> [Date: Double] {
+        let days = Set(logs.map { Calendar.current.startOfDay(for: $0.date) })
+        var result: [Date: Double] = [:]
+        for row in healthRows {
+            let day = Calendar.current.startOfDay(for: row.date)
+            guard days.contains(day), let minutes = row.hkWorkoutMinutes else { continue }
+            result[day] = minutes
+        }
+        return result
     }
 
     private var filteredLogs: [DailyLog] {

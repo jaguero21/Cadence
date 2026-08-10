@@ -693,7 +693,10 @@ struct LogInputFlow: View {
         log.freeNote        = freeNote
         log.didEditMetrics  = didEditMetrics
         if let snapshot = hkSnapshot {
-            log.applyObjectiveHealthData(snapshot)
+            // Objective HealthKit values go to the local-only HealthSnapshot
+            // store, keyed by the log's day — they are deliberately not fields
+            // on `log`, which is mirrored to CloudKit (Guideline 5.1.3(ii)).
+            HealthSnapshot.upsert(snapshot, on: log.date, in: modelContext)
         }
     }
 

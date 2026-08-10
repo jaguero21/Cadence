@@ -30,7 +30,7 @@ struct SchemaMigrationTests {
     @Test("In-memory ModelContainer initialises without throwing")
     func inMemoryContainer_initialisesSuccessfully() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         #expect(container.configurations.isEmpty == false)
     }
@@ -38,7 +38,7 @@ struct SchemaMigrationTests {
     @Test("In-memory container accepts DailyLog insert and fetch")
     func inMemoryContainer_acceptsDailyLogInsertAndFetch() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
 
@@ -53,7 +53,7 @@ struct SchemaMigrationTests {
     @Test("In-memory container accepts WeeklyReview insert and fetch")
     func inMemoryContainer_acceptsWeeklyReviewInsertAndFetch() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
 
@@ -68,7 +68,7 @@ struct SchemaMigrationTests {
     @Test("In-memory container accepts SymptomTag insert and fetch")
     func inMemoryContainer_acceptsSymptomTagInsertAndFetch() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
 
@@ -86,7 +86,7 @@ struct SchemaMigrationTests {
     @Test("DailyLog didEditMood defaults to false")
     func dailyLog_didEditMood_defaultsFalse() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
 
@@ -98,21 +98,62 @@ struct SchemaMigrationTests {
         #expect(fetched.first?.didEditMood == false)
     }
 
-    @Test("DailyLog hkSleepHours and sleepHours persist correctly")
-    func dailyLog_sleepFields_persistRoundTrip() throws {
-        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [config])
+    // The user-entered sleep figure and the HealthKit-measured one deliberately
+    // live in DIFFERENT stores now: DailyLog is mirrored to CloudKit, and
+    // Guideline 5.1.3(ii) forbids putting personal health information there, so
+    // every hk* value moved to HealthSnapshot on a local-only configuration.
+    // This pins both halves round-tripping and, crucially, that they rejoin by
+    // date — the join is what every consumer of hk* data depends on.
+    @Test("User sleepHours and HealthKit hkSleepHours persist in separate stores and rejoin by date")
+    func sleepFields_persistAcrossSplitStores() throws {
+        let syncedSchema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
+        let localSchema  = Schema([HealthSnapshot.self])
+        let fullSchema   = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, HealthSnapshot.self])
+        let synced = ModelConfiguration("Synced", schema: syncedSchema, isStoredInMemoryOnly: true)
+        let local  = ModelConfiguration("Local",  schema: localSchema,  isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: fullSchema, configurations: [synced, local])
         let context = ModelContext(container)
 
-        let log = DailyLog()
-        log.hkSleepHours = 7.5
+        let day = Calendar.current.startOfDay(for: .now)
+        let log = DailyLog(date: day)
         log.sleepHours = 7.5
+        context.insert(log)
+
+        let health = HealthSnapshot(date: day)
+        health.hkSleepHours = 6.25
+        context.insert(health)
+        try context.save()
+
+        let fetchedLog = try #require(try context.fetch(FetchDescriptor<DailyLog>()).first)
+        #expect(fetchedLog.sleepHours == 7.5)
+
+        let fetchedHealth = try #require(HealthSnapshot.row(for: day, in: context))
+        #expect(fetchedHealth.hkSleepHours == 6.25)
+
+        // The join is what puts them back together for PatternEngine, the PDF,
+        // the CSV and the charts.
+        let joined = DailyLogSnapshot.build(from: [fetchedLog], in: context)
+        #expect(joined.count == 1)
+        #expect(joined.first?.sleepHours == 7.5)
+        #expect(joined.first?.hkSleepHours == 6.25)
+    }
+
+    @Test("A log with no health row for its day joins to nil hk* values, not zeros")
+    func joinWithoutHealthRow_yieldsNilNotZero() throws {
+        let fullSchema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, HealthSnapshot.self])
+        let config = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: fullSchema, configurations: [config])
+        let context = ModelContext(container)
+
+        let log = DailyLog(date: .now)
         context.insert(log)
         try context.save()
 
-        let fetched = try context.fetch(FetchDescriptor<DailyLog>())
-        #expect(fetched.first?.hkSleepHours == 7.5)
-        #expect(fetched.first?.sleepHours == 7.5)
+        let joined = try #require(DailyLogSnapshot.build(from: [log], in: context).first)
+        // nil, never 0 — a zero would read as "measured no steps / no sleep"
+        // and would be charted and averaged as real data.
+        #expect(joined.hkSteps == nil)
+        #expect(joined.hkSleepHours == nil)
+        #expect(joined.hkWorkoutMinutes == nil)
     }
 }

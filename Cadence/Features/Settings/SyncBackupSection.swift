@@ -103,7 +103,8 @@ struct SyncBackupSection: View {
     private func exportBackup() {
         let document = BackupService.document(
             logs: logs, reviews: reviews, tags: tags,
-            medications: medications, flares: flares, trackers: trackers
+            medications: medications, flares: flares, trackers: trackers,
+            health: HealthSnapshot.byDate(in: modelContext)
         )
         do {
             backupURL = try BackupService.writeBackupFile(document)

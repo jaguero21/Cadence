@@ -25,14 +25,19 @@ struct ChartSeries {
     // drawn as zero — nil can't distinguish "rest day" from "no Health
     // access". The badge is neutral: more exercise isn't unconditionally
     // better for someone pacing around symptoms.
-    static func workoutMinutes(longestSession: Double) -> ChartSeries {
+    //
+    // `minutesByDay` is passed in rather than read off the log: workout minutes
+    // are HealthKit-sourced and live in the separate local-only HealthSnapshot
+    // store since the CloudKit split, so a DailyLog no longer carries them.
+    // Keyed by midnight-normalized day, matching how the two stores are joined.
+    static func workoutMinutes(longestSession: Double, minutesByDay: [Date: Double]) -> ChartSeries {
         ChartSeries(
             label: String(localized: "Workout Minutes"),
             icon: "figure.run",
             color: CadenceColor.successGreen,
             yDomain: 0...max(60, longestSession),
             higherIsBetter: nil,
-            value: { $0.hkWorkoutMinutes }
+            value: { minutesByDay[Calendar.current.startOfDay(for: $0.date)] }
         )
     }
 

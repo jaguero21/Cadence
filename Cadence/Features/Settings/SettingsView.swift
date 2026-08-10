@@ -368,10 +368,10 @@ struct SettingsView: View {
         defer { isGeneratingPDF = false }
         let cal = Calendar.current
         let cutoff = cal.date(byAdding: .day, value: -daysBack, to: .now) ?? .now
-        let snapshots = existingLogs
-            .filter { $0.date >= cutoff }
-            .sorted { $0.date > $1.date }
-            .map(DailyLogSnapshot.init)
+        let snapshots = DailyLogSnapshot.build(
+            from: existingLogs.filter { $0.date >= cutoff }.sorted { $0.date > $1.date },
+            in: modelContext
+        )
         let url = await PDFBuilder.build(logs: snapshots, reviews: [])
         if let url {
             pdfShareURL = url

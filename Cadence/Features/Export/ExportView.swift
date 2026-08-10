@@ -8,6 +8,7 @@ struct ExportView: View {
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
     @Query(sort: \Flare.startDate, order: .reverse) private var flares: [Flare]
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
+    @Environment(\.modelContext) private var modelContext
     @Environment(StoreService.self) private var store
     @Environment(AppState.self) private var appState
     @State private var startDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: .now) ?? .now
@@ -128,8 +129,10 @@ struct ExportView: View {
     }
 
     private func exportCSV() {
-        let logSnapshots = dedupedByDay(logs.filter { $0.date >= rangeStart && $0.date <= endDate })
-            .map(DailyLogSnapshot.init)
+        let logSnapshots = DailyLogSnapshot.build(
+            from: dedupedByDay(logs.filter { $0.date >= rangeStart && $0.date <= endDate }),
+            in: modelContext
+        )
         let trackerSnapshots = customTrackers.map(CustomTrackerSnapshot.init)
         if let url = CSVBuilder.build(logs: logSnapshots, trackers: trackerSnapshots) {
             shareItem = url
@@ -139,8 +142,10 @@ struct ExportView: View {
 
     private func generate() {
         isGenerating = true
-        let logSnapshots = dedupedByDay(logs.filter { $0.date >= rangeStart && $0.date <= endDate })
-            .map(DailyLogSnapshot.init)
+        let logSnapshots = DailyLogSnapshot.build(
+            from: dedupedByDay(logs.filter { $0.date >= rangeStart && $0.date <= endDate }),
+            in: modelContext
+        )
         let reviewSnapshots = reviews
             .filter { $0.weekStartDate <= endDate && $0.weekEndDate >= rangeStart }
             .map(WeeklyReviewSnapshot.init)
