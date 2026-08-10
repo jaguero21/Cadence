@@ -54,14 +54,39 @@ jobs:
       - name: Build and run tests
         run: |
           set -o pipefail
+          # -testPlan is explicit on purpose. The scheme's Testables list once
+          # held only CadenceUITests, so this command ran ONE test and still
+          # printed "** TEST SUCCEEDED **" — the unit suites never executed and
+          # CI was green on nothing. Naming the plan makes the intent
+          # independent of the scheme's Testables ordering.
           xcodebuild test \
             -project Cadence.xcodeproj \
             -scheme Cadence \
+            -testPlan Cadence \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             2>&1 | tee xcodebuild.log | grep -E "^(Test Suite|Test Case|✔|✘)|error:|warning: main actor|\*\* (BUILD|TEST)" || true
           # Fail the job on the real xcodebuild exit code, not the grep's.
           tail -5 xcodebuild.log
           grep -q "\*\* TEST SUCCEEDED \*\*" xcodebuild.log
+
+      # "TEST SUCCEEDED" alone is not a gate — it is equally true when almost
+      # nothing ran. Assert the unit suite actually executed at roughly its
+      # real size, so a scheme/test-plan regression fails loudly instead of
+      # silently shrinking coverage to a green checkmark.
+      - name: Assert the unit suite actually ran
+        run: |
+          MIN_TESTS=200
+          SUMMARY=$(grep -oE "Test run with [0-9]+ tests? in [0-9]+ suites? passed" xcodebuild.log | tail -1 || true)
+          if [ -z "$SUMMARY" ]; then
+            echo "::error::No Swift Testing summary found — the CadenceTests target did not run."
+            exit 1
+          fi
+          COUNT=$(echo "$SUMMARY" | grep -oE "[0-9]+" | head -1)
+          echo "Swift Testing reported: $SUMMARY"
+          if [ "$COUNT" -lt "$MIN_TESTS" ]; then
+            echo "::error::Only $COUNT unit tests ran, expected at least $MIN_TESTS. Coverage regressed."
+            exit 1
+          fi
 
       - name: Upload full build log on failure
         if: failure()
