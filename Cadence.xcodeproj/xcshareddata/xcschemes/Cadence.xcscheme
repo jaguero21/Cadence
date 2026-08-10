@@ -51,6 +51,17 @@
       <Testables>
          <TestableReference
             skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "AA11BB22CC33DD44EE55FFA0"
+               BuildableName = "CadenceTests.xctest"
+               BlueprintName = "CadenceTests"
+               ReferencedContainer = "container:Cadence.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
             parallelizable = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
