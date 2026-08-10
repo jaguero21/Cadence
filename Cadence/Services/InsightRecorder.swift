@@ -21,7 +21,10 @@ enum InsightRecorder {
         let flares = (try? context.fetch(FetchDescriptor<Flare>())) ?? []
         let trackers = (try? context.fetch(FetchDescriptor<CustomTracker>())) ?? []
         return PatternEngine.allInsights(
-            from: logs.map(DailyLogSnapshot.init),
+            // Built through the join, not map(DailyLogSnapshot.init) — the
+            // flare-precursor and daylight/workout detectors read hk* values,
+            // which now live in the separate local-only HealthSnapshot store.
+            from: DailyLogSnapshot.build(from: logs, in: context),
             medications: medications.map(MedicationSnapshot.init),
             flares: flares.map(FlareSnapshot.init),
             trackers: trackers.map(CustomTrackerSnapshot.init)

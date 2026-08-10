@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import StoreKit
 #if DEBUG
 import OSLog
 #endif
@@ -14,6 +15,10 @@ struct SettingsView: View {
     @AppStorage(UserDefaultsKey.dailyReminderHour)    private var dailyHour: Int = 20
     @AppStorage(UserDefaultsKey.dailyReminderMinute)  private var dailyMinute: Int = 0
     @AppStorage(UserDefaultsKey.weeklyReminderEnabled) private var weeklyEnabled: Bool = true
+
+    @State private var isPurchasing = false
+    @State private var purchaseError: String?
+    @State private var showingManageSubscriptions = false
 
     #if DEBUG
     @Query private var existingLogs: [DailyLog]
@@ -58,6 +63,31 @@ struct SettingsView: View {
         .task { await store.loadProducts() }
         .task { appState.notificationsAuthorized = await notificationService.checkAuthorizationStatus() }
         .task { appState.healthKitAuthorized = healthKitService.isAuthorized }
+        .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
+        .alert("Purchase Error", isPresented: .init(
+            get: { purchaseError != nil },
+            set: { if !$0 { purchaseError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(purchaseError ?? "")
+        }
+    }
+
+    // A failed purchase used to be swallowed by `Task { try? await ... }`, so a
+    // tap that errored looked identical to a tap that did nothing. Mirrors the
+    // paywall's own handling: surface the failure, stay put on success (the
+    // section re-renders as Pro on its own).
+    private func buy(_ product: Product) {
+        Task {
+            isPurchasing = true
+            defer { isPurchasing = false }
+            do {
+                _ = try await store.purchase(product)
+            } catch {
+                purchaseError = String(localized: "Something went wrong. Please try again.")
+            }
+        }
     }
 
     // MARK: - Sections
@@ -76,6 +106,16 @@ struct SettingsView: View {
                 } label: {
                     Label("Export Report", systemImage: "doc.richtext.fill")
                 }
+                // Only meaningful for the auto-renewing plan — a lifetime
+                // purchase has nothing to manage, and showing the sheet to
+                // someone with no subscription just presents an empty list.
+                if store.purchasedProductIDs.contains(StoreKitID.proMonthly) {
+                    Button {
+                        showingManageSubscriptions = true
+                    } label: {
+                        Label("Manage Subscription", systemImage: "creditcard")
+                    }
+                }
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Upgrade to Pro").font(.headline)
@@ -85,17 +125,43 @@ struct SettingsView: View {
 
                     if let product = store.lifetimeProduct {
                         Button("Buy Once — \(product.displayPrice)") {
-                            Task { try? await store.purchase(product) }
+                            buy(product)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(CadenceColor.sleepPurple)
+                        .disabled(isPurchasing)
                     }
 
-                    Button("Restore Purchases") {
-                        Task { await store.restorePurchases() }
+                    Button("See all Pro options") {
+                        appState.showingProPaywall = true
                     }
                     .font(.caption)
                     .foregroundStyle(CadenceColor.accent)
+
+                    Button("Restore Purchases") {
+                        Task {
+                            isPurchasing = true
+                            await store.restorePurchases()
+                            isPurchasing = false
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(CadenceColor.accent)
+                    .disabled(isPurchasing)
+
+                    // Guideline 3.1.2 again: this block sells a product, so the
+                    // two legal links have to be reachable from here as well,
+                    // not only from About further down the same screen.
+                    HStack(spacing: 14) {
+                        if let terms = CadenceURL.terms {
+                            Link("Terms of Use", destination: terms)
+                        }
+                        if let privacy = CadenceURL.privacyPolicy {
+                            Link("Privacy Policy", destination: privacy)
+                        }
+                    }
+                    .font(.caption2)
+                    .tint(CadenceColor.accent)
                 }
             }
         } header: {
@@ -232,13 +298,15 @@ struct SettingsView: View {
     private var aboutSection: some View {
         Section("About") {
             LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-            if let privacyURL = URL(string: "https://jaguero21.github.io/Cadence/privacy-policy.html") {
+            if let privacyURL = CadenceURL.privacyPolicy {
                 Link("Privacy Policy", destination: privacyURL)
             }
-            if let termsURL = URL(string: "https://jaguero21.github.io/Cadence/eula.html") {
-                Link("Terms of Service", destination: termsURL)
+            // "Terms of Use", matching the wording Apple's own subscription
+            // guidance and the paywall use — one name for one document.
+            if let termsURL = CadenceURL.terms {
+                Link("Terms of Use", destination: termsURL)
             }
-            if let learnMoreURL = URL(string: "https://jaguero21.github.io/Cadence/") {
+            if let learnMoreURL = CadenceURL.site {
                 Link("Learn More About Cadence", destination: learnMoreURL)
             }
         }
@@ -300,10 +368,10 @@ struct SettingsView: View {
         defer { isGeneratingPDF = false }
         let cal = Calendar.current
         let cutoff = cal.date(byAdding: .day, value: -daysBack, to: .now) ?? .now
-        let snapshots = existingLogs
-            .filter { $0.date >= cutoff }
-            .sorted { $0.date > $1.date }
-            .map(DailyLogSnapshot.init)
+        let snapshots = DailyLogSnapshot.build(
+            from: existingLogs.filter { $0.date >= cutoff }.sorted { $0.date > $1.date },
+            in: modelContext
+        )
         let url = await PDFBuilder.build(logs: snapshots, reviews: [])
         if let url {
             pdfShareURL = url

@@ -52,6 +52,7 @@
 		AABBCCDD0000000000000201 /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000101 /* Medication.swift */; };
 		AABBCCDD0000000000000202 /* MedicationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000102 /* MedicationsView.swift */; };
 		AABBCCDD0000000000000203 /* Flare.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000103 /* Flare.swift */; };
+		AABBCCDD0000000000000290 /* HealthSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000190 /* HealthSnapshot.swift */; };
 		AABBCCDD0000000000000204 /* FlaresView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000104 /* FlaresView.swift */; };
 		AABBCCDD0000000000000205 /* CustomTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000105 /* CustomTracker.swift */; };
 		AABBCCDD0000000000000206 /* CustomTrackersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000106 /* CustomTrackersView.swift */; };
@@ -83,6 +84,7 @@
 		C7A67B11D453A48F3C8FD239 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C644D07CF96C2AFA00637E3B /* SettingsView.swift */; };
 		C7F20E34EA5B3C5F84042DA4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91AC27A765654C1A1DFFBD5 /* AppState.swift */; };
 		CCAADDEE00000000000000B1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CCAADDEE00000000000000F1 /* Localizable.xcstrings */; };
+		CCAADDEE00000000000000B2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CCAADDEE00000000000000F2 /* PrivacyInfo.xcprivacy */; };
 		D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0989CA66FE09F78B729A4E /* PatternEngine.swift */; };
 		AABBCCDD0000000000000301 /* MascotPoseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000302 /* MascotPoseEngine.swift */; };
 		D45ECE5968E07CA77E8B26D5 /* StoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F51B62D7D39FC0309276D9D /* StoreService.swift */; };
@@ -199,6 +201,7 @@
 		AABBCCDD0000000000000101 /* Medication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Medication.swift; path = ./Cadence/Models/Medication.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000102 /* MedicationsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MedicationsView.swift; path = ./Cadence/Features/Settings/MedicationsView.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000103 /* Flare.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Flare.swift; path = ./Cadence/Models/Flare.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000190 /* HealthSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthSnapshot.swift; path = ./Cadence/Models/HealthSnapshot.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000104 /* FlaresView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FlaresView.swift; path = ./Cadence/Features/Settings/FlaresView.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000105 /* CustomTracker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomTracker.swift; path = ./Cadence/Models/CustomTracker.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000106 /* CustomTrackersView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomTrackersView.swift; path = ./Cadence/Features/Settings/CustomTrackersView.swift; sourceTree = "<absolute>"; };
@@ -229,6 +232,7 @@
 		C7E81365F433003269081917 /* WeeklyReviewViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WeeklyReviewViewModel.swift; path = ./Cadence/Features/WeeklyReview/WeeklyReviewViewModel.swift; sourceTree = "<absolute>"; };
 		C91AC27A765654C1A1DFFBD5 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = ./Cadence/App/AppState.swift; sourceTree = "<absolute>"; };
 		CCAADDEE00000000000000F1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = Cadence/Localizable.xcstrings; sourceTree = "<group>"; };
+		CCAADDEE00000000000000F2 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Cadence/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D55E0D4A1C0EC289C9F389C4 /* Constants.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Constants.swift; path = ./Cadence/Shared/Constants.swift; sourceTree = "<absolute>"; };
 		D6A78715684ABBEB502D55E2 /* Charts */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
 		DCD1D6BAE9337E36C2D398B6 /* InsightsViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightsViewModel.swift; path = ./Cadence/Features/Insights/InsightsViewModel.swift; sourceTree = "<absolute>"; };
@@ -414,6 +418,7 @@
 				990D941EB5FC46F95C213CEE /* DailyLog.swift */,
 				AABBCCDD0000000000000101 /* Medication.swift */,
 				AABBCCDD0000000000000103 /* Flare.swift */,
+				AABBCCDD0000000000000190 /* HealthSnapshot.swift */,
 				AABBCCDD0000000000000105 /* CustomTracker.swift */,
 				AABBCCDD0000000000000108 /* InsightRecord.swift */,
 				AABBCCDD000000000000010B /* Attachment.swift */,
@@ -450,6 +455,7 @@
 				25762D602FEDDCD400A132C8 /* CadenceWidgetExtension.entitlements */,
 				2549A45B2FC8EF0A006CD546 /* Assets.xcassets */,
 				CCAADDEE00000000000000F1 /* Localizable.xcstrings */,
+				CCAADDEE00000000000000F2 /* PrivacyInfo.xcprivacy */,
 				25762D1A2FEDD6A000A132C8 /* CadenceWidget */,
 				25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */,
 				2523F5F22FFEEB0F00F3F0A5 /* CadenceUITests */,
@@ -750,6 +756,7 @@
 			files = (
 				2549A45C2FC8EF0A006CD546 /* Assets.xcassets in Resources */,
 				CCAADDEE00000000000000B1 /* Localizable.xcstrings in Resources */,
+				CCAADDEE00000000000000B2 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -791,6 +798,7 @@
 				AABBCCDD0000000000000201 /* Medication.swift in Sources */,
 				AABBCCDD0000000000000202 /* MedicationsView.swift in Sources */,
 				AABBCCDD0000000000000203 /* Flare.swift in Sources */,
+				AABBCCDD0000000000000290 /* HealthSnapshot.swift in Sources */,
 				AABBCCDD0000000000000204 /* FlaresView.swift in Sources */,
 				AABBCCDD0000000000000205 /* CustomTracker.swift in Sources */,
 				AABBCCDD0000000000000206 /* CustomTrackersView.swift in Sources */,
@@ -1149,6 +1157,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Cadence/App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -1262,6 +1271,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Cadence/App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -1289,6 +1299,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 4NWCR79S38;
 				ENABLE_PREVIEWS = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Cadence/App/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -1319,6 +1330,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 4NWCR79S38;
 				ENABLE_PREVIEWS = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Cadence/App/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

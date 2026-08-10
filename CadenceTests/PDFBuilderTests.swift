@@ -42,14 +42,17 @@ import PDFKit
             let day = Calendar.current.date(byAdding: .day, value: -i, to: .now) ?? .now
             let log = DailyLog(date: day)
             log.mood = 3 + i % 3
-            log.hkSteps = 8000
             if i % 2 == 0 {
                 log.symptoms = [SymptomEntry(name: "Headache", severity: 6, emoji: "🤕")]
             }
             if i % 3 == 0 {
                 log.factors = ["Travel"]
             }
-            logs.append(DailyLogSnapshot(log))
+            // hk* moved off DailyLog into the local-only HealthSnapshot store;
+            // the snapshot joins them, so supply one directly here.
+            let health = HealthSnapshot(date: day)
+            health.hkSteps = 8000
+            logs.append(DailyLogSnapshot(log, health: health))
         }
 
         let url = await PDFBuilder.build(logs: logs, reviews: [])

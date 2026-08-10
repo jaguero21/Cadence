@@ -321,7 +321,19 @@ struct HistoryView: View {
 struct LogDetailView: View {
     let log: DailyLog
     @Environment(\.dismiss) private var dismiss
+    // Objective HealthKit values live in a separate local-only store since the
+    // CloudKit split, so they can't be reached through `log`. Observed via
+    // @Query rather than fetched imperatively in the body — a fetch during a
+    // view update can re-enter that update and wedge the main thread.
+    @Query private var healthRows: [HealthSnapshot]
     private let attachmentStore = AttachmentStore()
+
+    // The day's row, matched to the log by midnight-normalized date. Resolved
+    // here so every presenter of this sheet (calendar tap, search result,
+    // insight drill-in) gets it for free.
+    private var health: HealthSnapshot? {
+        healthRows.first { Calendar.current.startOfDay(for: $0.date) == Calendar.current.startOfDay(for: log.date) }
+    }
 
     var body: some View {
         NavigationStack {
@@ -383,46 +395,42 @@ struct LogDetailView: View {
                     }
                 }
 
-                if log.hkSteps != nil || log.hkHRV != nil || log.hkRestingHR != nil
-                    || log.hkSleepHours != nil || log.hkActiveEnergy != nil || log.hkMindfulMinutes != nil
-                    || log.hkWristTemp != nil || log.hkRespiratoryRate != nil || log.hkBloodOxygen != nil
-                    || log.hkDaylightMinutes != nil || log.hkDaytimeHR != nil
-                    || log.hkWorkoutMinutes != nil {
+                if let health, !health.isEmpty {
                     Section("HealthKit Data") {
-                        if let steps = log.hkSteps {
+                        if let steps = health.hkSteps {
                             Label("\(steps) steps", systemImage: "figure.walk")
                         }
-                        if let hrv = log.hkHRV {
+                        if let hrv = health.hkHRV {
                             Label(String(format: "HRV: %.0f ms", hrv), systemImage: "waveform.path.ecg")
                         }
-                        if let hr = log.hkRestingHR {
+                        if let hr = health.hkRestingHR {
                             Label(String(format: "Resting HR: %.0f bpm", hr), systemImage: "heart.fill")
                         }
-                        if let sleep = log.hkSleepHours {
+                        if let sleep = health.hkSleepHours {
                             Label(String(format: "Sleep (measured): %.1f hrs", sleep), systemImage: "moon.zzz.fill")
                         }
-                        if let energy = log.hkActiveEnergy {
+                        if let energy = health.hkActiveEnergy {
                             Label(String(format: "Active energy: %.0f kcal", energy), systemImage: "flame.fill")
                         }
-                        if let mindful = log.hkMindfulMinutes {
+                        if let mindful = health.hkMindfulMinutes {
                             Label(String(format: "Mindful minutes: %.0f min", mindful), systemImage: "brain.head.profile")
                         }
-                        if let temp = log.hkWristTemp {
+                        if let temp = health.hkWristTemp {
                             Label(String(format: "Wrist temp: %.1f °C", temp), systemImage: "thermometer.medium")
                         }
-                        if let resp = log.hkRespiratoryRate {
+                        if let resp = health.hkRespiratoryRate {
                             Label(String(format: "Respiratory rate: %.1f/min", resp), systemImage: "lungs.fill")
                         }
-                        if let spo2 = log.hkBloodOxygen {
+                        if let spo2 = health.hkBloodOxygen {
                             Label(String(format: "Blood oxygen: %.0f%%", spo2), systemImage: "drop.circle")
                         }
-                        if let daylight = log.hkDaylightMinutes {
+                        if let daylight = health.hkDaylightMinutes {
                             Label(String(format: "Daylight: %.0f min", daylight), systemImage: "sun.max")
                         }
-                        if let daytimeHR = log.hkDaytimeHR {
+                        if let daytimeHR = health.hkDaytimeHR {
                             Label(String(format: "Daytime HR: %.0f bpm", daytimeHR), systemImage: "heart.circle")
                         }
-                        if let workout = log.hkWorkoutMinutes {
+                        if let workout = health.hkWorkoutMinutes {
                             Label(String(format: "Workouts: %.0f min", workout), systemImage: "figure.run")
                         }
                     }

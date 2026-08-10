@@ -612,43 +612,26 @@ final class HealthKitService: HealthKitServiceProtocol {
     }
 }
 
-extension DailyLog {
-    // Applies a snapshot's OBJECTIVE measurements to the log — hk* fields
-    // only, each written only when present so a partial fetch can't blank an
-    // earlier value. User-entered fields are never touched: this is safe to
-    // run against an existing log long after the user finished editing it
-    // (log-flow save, foreground refresh, background delivery all share it).
-    func applyObjectiveHealthData(_ snapshot: HealthKitSnapshot) {
-        if let steps   = snapshot.steps            { hkSteps          = steps }
-        if let hr      = snapshot.restingHR        { hkRestingHR      = hr }
-        if let hrv     = snapshot.hrv              { hkHRV            = hrv }
-        if let sleep   = snapshot.sleepHours       { hkSleepHours     = sleep }
-        if let energy  = snapshot.activeEnergy     { hkActiveEnergy   = energy }
-        if let mindful = snapshot.mindfulMinutes   { hkMindfulMinutes = mindful }
-        if let temp    = snapshot.wristTemperature { hkWristTemp      = temp }
-        if let resp    = snapshot.respiratoryRate  { hkRespiratoryRate = resp }
-        if let spo2    = snapshot.bloodOxygen      { hkBloodOxygen    = spo2 }
-        if let daylight = snapshot.daylightMinutes { hkDaylightMinutes = daylight }
-        if let hr      = snapshot.daytimeHR        { hkDaytimeHR      = hr }
-        if let workout = snapshot.workoutMinutes   { hkWorkoutMinutes = workout }
-    }
-}
-
-// Tops up TODAY's already-created log with fresh HealthKit data. Never creates
-// a log — a day the user didn't start must not grow a phantom entry from
-// background data alone.
+// Tops up TODAY's HealthKit measurements with a fresh fetch. Never creates a
+// DailyLog — a day the user didn't start must not grow a phantom entry from
+// background data alone — and, for the same reason, writes no HealthSnapshot
+// row for a day that has no log: an untouched day should leave no trace at all.
 @MainActor
 enum HealthDataRefresher {
     private static let log = Logger(subsystem: "com.carpecadence", category: "HealthRefresh")
 
     // Pure-ish core, snapshot-injected so tests don't need HealthKit.
-    // Returns whether an existing log was updated.
+    // Returns whether today's health row was updated.
+    //
+    // Since the store split this writes to HealthSnapshot (local-only) rather
+    // than to the CloudKit-mirrored DailyLog; the DailyLog fetch remains as the
+    // gate that decides whether the day counts as started at all.
     @discardableResult
     static func refreshToday(context: ModelContext, snapshot: HealthKitSnapshot) -> Bool {
         let today = Calendar.current.startOfDay(for: .now)
         let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == today })
-        guard let todayLog = try? context.fetch(descriptor).first else { return false }
-        todayLog.applyObjectiveHealthData(snapshot)
+        guard ((try? context.fetch(descriptor))?.first) != nil else { return false }
+        guard HealthSnapshot.upsert(snapshot, on: today, in: context) != nil else { return false }
         do {
             try context.save()
             return true
