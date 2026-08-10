@@ -63,10 +63,21 @@ struct CadenceApp: App {
                     if appState.hasCompletedOnboarding {
                         ContentView()
                             .task {
-                                // No system permission prompts during UI tests.
+                                // READS permission state; never requests it.
+                                // Onboarding is the only place that prompts, so
+                                // that "Skip" actually skips — this task used to
+                                // call requestAuthorization() unconditionally,
+                                // which fired both system prompts moments after
+                                // the user declined them, stripped of the screens
+                                // that explained why. Settings re-offers Health,
+                                // and iOS's own Settings re-offers notifications.
                                 guard !AppLaunch.isUITesting else { return }
-                                appState.notificationsAuthorized = await NotificationService.shared.requestAuthorization()
-                                appState.healthKitAuthorized = (try? await HealthKitService.shared.requestAuthorization()) ?? HealthKitService.shared.isAuthorized
+                                appState.notificationsAuthorized = await NotificationService.shared.checkAuthorizationStatus()
+                                appState.healthKitAuthorized = HealthKitService.shared.isAuthorized
+                                // Re-arm the recurring reminders on every launch
+                                // when permission is in place — including when it
+                                // was granted later in iOS Settings rather than
+                                // during onboarding.
                                 if appState.notificationsAuthorized {
                                     let ud     = UserDefaults.standard
                                     let hour   = ud.object(forKey: UserDefaultsKey.dailyReminderHour)   as? Int  ?? 20

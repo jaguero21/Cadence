@@ -165,11 +165,28 @@ struct ProPaywallView: View {
         .disabled(isPurchasing)
     }
 
+    // App Review Guideline 3.1.2 requires functional Terms of Use and Privacy
+    // Policy links reachable from the purchase screen itself — having them only
+    // in Settings → About does not satisfy it and is a routine rejection. Keep
+    // both links on this screen for as long as it sells a subscription.
     private var legal: some View {
-        Text("Payment charged to your Apple ID at purchase confirmation. Subscriptions auto-renew unless cancelled at least 24 hours before the renewal date.")
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-            .multilineTextAlignment(.center)
+        VStack(spacing: 10) {
+            Text("Payment charged to your Apple ID at purchase confirmation. Subscriptions auto-renew unless cancelled at least 24 hours before the renewal date. Manage or cancel in your Apple ID settings.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 18) {
+                if let terms = CadenceURL.terms {
+                    Link("Terms of Use", destination: terms)
+                }
+                if let privacy = CadenceURL.privacyPolicy {
+                    Link("Privacy Policy", destination: privacy)
+                }
+            }
+            .font(.caption.weight(.medium))
+            .tint(CadenceColor.accent)
+        }
     }
 
     // MARK: - Actions
