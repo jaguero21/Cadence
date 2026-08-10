@@ -11,7 +11,11 @@ final class DashboardViewModel {
     var latestInsight: InsightCard?
     var mascotPose: WidgetData.MascotPose = .welcoming
 
-    func refresh(logs: [DailyLog], reviews: [WeeklyReview], medications: [Medication] = [], flares: [Flare] = [], customTrackers: [CustomTracker] = [], notifications: (any NotificationServiceProtocol)? = nil) {
+    // `health` are the HealthSnapshot rows from the view's @Query, joined to
+    // each log by date (separate local-only store since the CloudKit split) so
+    // the dashboard headline is computed from the same inputs as the Insights
+    // tab. Passed in rather than fetched here — see DailyLogSnapshot.build.
+    func refresh(logs: [DailyLog], health: [HealthSnapshot], reviews: [WeeklyReview], medications: [Medication] = [], flares: [Flare] = [], customTrackers: [CustomTracker] = [], notifications: (any NotificationServiceProtocol)? = nil) {
         let notifications = notifications ?? NotificationService.shared
         todayLog = logs.first { Calendar.current.isDateInToday($0.date) }
         thisWeekReview = reviews.first { $0.weekStartDate.isThisWeek }
@@ -21,7 +25,7 @@ final class DashboardViewModel {
         // dashboard headline agrees with the Insights tab / notifications
         // about the top pattern (all three run off the same input set).
         latestInsight = PatternEngine.allInsights(
-            from: logs.map(DailyLogSnapshot.init),
+            from: DailyLogSnapshot.build(from: logs, health: health),
             medications: medications.map(MedicationSnapshot.init),
             flares: flares.map(FlareSnapshot.init),
             trackers: customTrackers.map(CustomTrackerSnapshot.init)
@@ -50,7 +54,7 @@ final class DashboardViewModel {
     // identical set and produce the identical pose.
     private static func resolvePose(logs: [DailyLog], activeFlare: Flare?, streakDays: Int) -> WidgetData.MascotPose {
         MascotPoseEngine.pose(
-            for: logs.map(DailyLogSnapshot.init),
+            for: logs.map { DailyLogSnapshot($0) },
             activeFlare: activeFlare.map(FlareSnapshot.init),
             streakDays: streakDays
         )

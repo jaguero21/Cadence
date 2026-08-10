@@ -35,6 +35,20 @@ enum StoreKitID {
     static let proMonthly = "com.carpecadence.pro.monthly"
 }
 
+// Public-facing URLs, centralized because App Review Guideline 3.1.2 requires
+// the Terms and Privacy Policy links to be reachable from the PURCHASE screen,
+// not just from Settings — so the same two URLs now appear in more than one
+// place and must not drift apart.
+//
+// Left optional rather than force-unwrapped (house rule: no `!`), and covered
+// by a unit test that asserts all three parse — so a typo fails the suite
+// instead of silently dropping a legally required link at runtime.
+enum CadenceURL {
+    static let privacyPolicy = URL(string: "https://jaguero21.github.io/Cadence/privacy-policy.html")
+    static let terms         = URL(string: "https://jaguero21.github.io/Cadence/eula.html")
+    static let site          = URL(string: "https://jaguero21.github.io/Cadence/")
+}
+
 enum UserDefaultsKey {
     static let onboarded            = "cadence.onboarded"
     static let symptomTagsSeeded    = "cadence.symptomTagsSeeded"

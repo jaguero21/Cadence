@@ -277,19 +277,29 @@ struct IntenseExerciseGateTests {
 @Suite("HealthDataRefresher – refreshToday")
 struct HealthDataRefresherTests {
 
+    // Both models, since the refresher now gates on DailyLog but writes to
+    // HealthSnapshot. One in-memory configuration is enough here — the
+    // CloudKit/local split is a storage concern, not a behavioural one, and is
+    // covered directly in SchemaMigrationTests.
     private func makeContext() throws -> ModelContext {
-        let schema = Schema([DailyLog.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let schema = Schema([DailyLog.self, HealthSnapshot.self])
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
-    @Test("Updates only objective fields on an existing today log")
+    private func health(on date: Date = .now, in context: ModelContext) -> HealthSnapshot? {
+        HealthSnapshot.row(for: date, in: context)
+    }
+
+    @Test("Updates only objective fields, leaving the user's log untouched")
     func updatesExistingLog() throws {
         let context = try makeContext()
         let log = DailyLog(date: .now)
         log.mood = 4
-        log.hkSteps = 1200   // morning value
         context.insert(log)
+        let morning = HealthSnapshot(date: .now)
+        morning.hkSteps = 1200   // morning value
+        context.insert(morning)
         try context.save()
 
         let updated = HealthDataRefresher.refreshToday(
@@ -298,13 +308,14 @@ struct HealthDataRefresherTests {
         )
 
         #expect(updated)
-        #expect(log.hkSteps == 9800)          // topped up
-        #expect(log.hkActiveEnergy == 300)
-        #expect(log.hkWorkoutMinutes == 52)   // evening workout lands on the morning log
+        let row = try #require(health(in: context))
+        #expect(row.hkSteps == 9800)          // topped up
+        #expect(row.hkActiveEnergy == 300)
+        #expect(row.hkWorkoutMinutes == 52)   // evening workout lands on the morning row
         #expect(log.mood == 4)                // user data untouched
     }
 
-    @Test("Never creates a log for a day the user didn't start")
+    @Test("Never creates a log — or a health row — for a day the user didn't start")
     func neverCreatesLog() throws {
         let context = try makeContext()
 
@@ -315,20 +326,38 @@ struct HealthDataRefresherTests {
 
         #expect(updated == false)
         #expect(try context.fetch(FetchDescriptor<DailyLog>()).isEmpty)
+        // An untouched day leaves no trace in either store.
+        #expect(try context.fetch(FetchDescriptor<HealthSnapshot>()).isEmpty)
     }
 
     @Test("A nil snapshot value never blanks an earlier measurement")
     func nilNeverBlanks() throws {
         let context = try makeContext()
-        let log = DailyLog(date: .now)
-        log.hkWristTemp = 35.1
-        context.insert(log)
+        context.insert(DailyLog(date: .now))
+        let row = HealthSnapshot(date: .now)
+        row.hkWristTemp = 35.1
+        context.insert(row)
         try context.save()
 
         HealthDataRefresher.refreshToday(context: context, snapshot: HealthKitSnapshot(steps: 500))
 
-        #expect(log.hkWristTemp == 35.1)
-        #expect(log.hkSteps == 500)
+        let fetched = try #require(health(in: context))
+        #expect(fetched.hkWristTemp == 35.1)
+        #expect(fetched.hkSteps == 500)
+    }
+
+    @Test("Refreshing twice in a day updates one row rather than adding a second")
+    func upsertDoesNotDuplicate() throws {
+        let context = try makeContext()
+        context.insert(DailyLog(date: .now))
+        try context.save()
+
+        HealthDataRefresher.refreshToday(context: context, snapshot: HealthKitSnapshot(steps: 100))
+        HealthDataRefresher.refreshToday(context: context, snapshot: HealthKitSnapshot(steps: 4200))
+
+        let rows = try context.fetch(FetchDescriptor<HealthSnapshot>())
+        #expect(rows.count == 1)
+        #expect(rows.first?.hkSteps == 4200)
     }
 }
 

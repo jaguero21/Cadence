@@ -17,7 +17,7 @@ struct QuickLogSeamTests {
 
     private func makeContext() throws -> ModelContext {
         let schema = Schema([DailyLog.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
@@ -275,7 +275,7 @@ struct PendingQuickLogTests {
         WidgetData.stashPendingQuickLog(mood: 2, date: yesterday, defaults: defaults)
 
         let schema = Schema([DailyLog.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
         let context = ModelContext(try ModelContainer(for: schema, configurations: [config]))
 
         for entry in WidgetData.consumePendingQuickLogs(defaults: defaults) {
@@ -286,5 +286,31 @@ struct PendingQuickLogTests {
         #expect(logs.count == 1)
         #expect(logs.first?.date == Calendar.current.startOfDay(for: yesterday))
         #expect(logs.first?.mood == 2)
+    }
+}
+
+// MARK: Legally required links
+
+// App Review Guideline 3.1.2 requires functional Terms of Use and Privacy
+// Policy links on the purchase screen. Both call sites (ProPaywallView and
+// SettingsView.proSection) render them behind `if let`, so a malformed URL
+// would not crash — it would silently omit a link Apple requires and reject
+// the build for. These parse checks make that failure loud and local.
+@Suite("CadenceURL – required links parse")
+struct CadenceURLTests {
+
+    @Test("Every public URL parses")
+    func allURLsParse() {
+        #expect(CadenceURL.privacyPolicy != nil)
+        #expect(CadenceURL.terms != nil)
+        #expect(CadenceURL.site != nil)
+    }
+
+    @Test("The two links Guideline 3.1.2 requires are absolute https URLs")
+    func legalLinksAreAbsoluteHTTPS() throws {
+        for url in [try #require(CadenceURL.terms), try #require(CadenceURL.privacyPolicy)] {
+            #expect(url.scheme == "https")
+            #expect(url.host?.isEmpty == false)
+        }
     }
 }

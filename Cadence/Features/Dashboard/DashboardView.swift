@@ -9,6 +9,9 @@ struct DashboardView: View {
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
     @Query(sort: \Flare.startDate, order: .reverse) private var flares: [Flare]
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
+    // Objective HealthKit values (local-only store), observed rather than
+    // fetched so refreshes never re-enter a SwiftUI update.
+    @Query private var healthRows: [HealthSnapshot]
     @State private var vm = DashboardViewModel()
     @State private var showingDailyLog = false
     @State private var showingWeeklyReview = false
@@ -28,6 +31,7 @@ struct DashboardView: View {
             content
                 .onAppear { scheduleRefresh() }
                 .onChange(of: logs)           { _, _ in scheduleRefresh() }
+                .onChange(of: healthRows)     { _, _ in scheduleRefresh() }
                 .onChange(of: reviews)        { _, _ in scheduleRefresh() }
                 .onChange(of: medications)    { _, _ in scheduleRefresh() }
                 .onChange(of: flares)         { _, _ in scheduleRefresh() }
@@ -85,7 +89,7 @@ struct DashboardView: View {
         refreshTask?.cancel()
         refreshTask = Task {
             guard !Task.isCancelled else { return }
-            vm.refresh(logs: logs, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService)
+            vm.refresh(logs: logs, health: healthRows, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService)
         }
     }
 

@@ -86,7 +86,7 @@ struct ReviewFlowView: View {
         let weekEnd = cal.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
         return logs
             .filter { $0.date >= weekStart && $0.date < weekEnd }
-            .map(DailyLogSnapshot.init)
+            .map { DailyLogSnapshot($0) }
     }
 
     private var progressBar: some View {

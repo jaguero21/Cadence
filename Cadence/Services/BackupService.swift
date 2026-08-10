@@ -109,17 +109,25 @@ enum BackupService {
 
     // MARK: - Build
 
+    // `health` maps midnight-normalized day -> that day's HealthSnapshot. Passed
+    // in rather than fetched here because those rows live in a separate
+    // local-only store (see HealthSnapshot); the backup format is unchanged and
+    // still carries hk* per day, so files written before the store split still
+    // restore. Defaulted so callers that only want the user-entered half — and
+    // the tests — need not build the map.
     static func document(
         logs: [DailyLog],
         reviews: [WeeklyReview],
         tags: [SymptomTag],
         medications: [Medication],
         flares: [Flare],
-        trackers: [CustomTracker]
+        trackers: [CustomTracker],
+        health: [Date: HealthSnapshot] = [:]
     ) -> Document {
         Document(
             dailyLogs: logs.map { log in
-                DailyLogBackup(
+                let dayHealth = health[Calendar.current.startOfDay(for: log.date)]
+                return DailyLogBackup(
                     date: log.date, symptoms: log.symptoms, mood: log.mood, energy: log.energy,
                     painLevel: log.painLevel, brainFogLevel: log.brainFogLevel,
                     sleepHours: log.sleepHours, sleepQuality: log.sleepQuality,
@@ -129,12 +137,12 @@ enum BackupService {
                     intentionsForTomorrow: log.intentionsForTomorrow,
                     freeNote: log.freeNote, isComplete: log.isComplete,
                     didEditMood: log.didEditMood, didEditMetrics: log.didEditMetrics,
-                    hkSteps: log.hkSteps, hkRestingHR: log.hkRestingHR, hkHRV: log.hkHRV,
-                    hkSleepHours: log.hkSleepHours, hkActiveEnergy: log.hkActiveEnergy,
-                    hkMindfulMinutes: log.hkMindfulMinutes, hkWristTemp: log.hkWristTemp,
-                    hkRespiratoryRate: log.hkRespiratoryRate, hkBloodOxygen: log.hkBloodOxygen,
-                    hkDaylightMinutes: log.hkDaylightMinutes, hkDaytimeHR: log.hkDaytimeHR,
-                    hkWorkoutMinutes: log.hkWorkoutMinutes
+                    hkSteps: dayHealth?.hkSteps, hkRestingHR: dayHealth?.hkRestingHR, hkHRV: dayHealth?.hkHRV,
+                    hkSleepHours: dayHealth?.hkSleepHours, hkActiveEnergy: dayHealth?.hkActiveEnergy,
+                    hkMindfulMinutes: dayHealth?.hkMindfulMinutes, hkWristTemp: dayHealth?.hkWristTemp,
+                    hkRespiratoryRate: dayHealth?.hkRespiratoryRate, hkBloodOxygen: dayHealth?.hkBloodOxygen,
+                    hkDaylightMinutes: dayHealth?.hkDaylightMinutes, hkDaytimeHR: dayHealth?.hkDaytimeHR,
+                    hkWorkoutMinutes: dayHealth?.hkWorkoutMinutes
                 )
             },
             weeklyReviews: reviews.map { review in
@@ -242,19 +250,27 @@ enum BackupService {
             log.isComplete = backup.isComplete
             log.didEditMood = backup.didEditMood
             log.didEditMetrics = backup.didEditMetrics
-            log.hkSteps = backup.hkSteps
-            log.hkRestingHR = backup.hkRestingHR
-            log.hkHRV = backup.hkHRV
-            log.hkSleepHours = backup.hkSleepHours
-            log.hkActiveEnergy = backup.hkActiveEnergy
-            log.hkMindfulMinutes = backup.hkMindfulMinutes
-            log.hkWristTemp = backup.hkWristTemp
-            log.hkRespiratoryRate = backup.hkRespiratoryRate
-            log.hkBloodOxygen = backup.hkBloodOxygen
-            log.hkDaylightMinutes = backup.hkDaylightMinutes
-            log.hkDaytimeHR = backup.hkDaytimeHR
-            log.hkWorkoutMinutes = backup.hkWorkoutMinutes
             context.insert(log)
+            // hk* values restore into the local-only health store, keyed by the
+            // same day. Only written when the backup actually carried a
+            // measurement, so restoring a file made before Health access was
+            // granted doesn't create an empty row.
+            let restoredHealth = HealthSnapshot(date: day)
+            restoredHealth.hkSteps = backup.hkSteps
+            restoredHealth.hkRestingHR = backup.hkRestingHR
+            restoredHealth.hkHRV = backup.hkHRV
+            restoredHealth.hkSleepHours = backup.hkSleepHours
+            restoredHealth.hkActiveEnergy = backup.hkActiveEnergy
+            restoredHealth.hkMindfulMinutes = backup.hkMindfulMinutes
+            restoredHealth.hkWristTemp = backup.hkWristTemp
+            restoredHealth.hkRespiratoryRate = backup.hkRespiratoryRate
+            restoredHealth.hkBloodOxygen = backup.hkBloodOxygen
+            restoredHealth.hkDaylightMinutes = backup.hkDaylightMinutes
+            restoredHealth.hkDaytimeHR = backup.hkDaytimeHR
+            restoredHealth.hkWorkoutMinutes = backup.hkWorkoutMinutes
+            if !restoredHealth.isEmpty, HealthSnapshot.row(for: day, in: context) == nil {
+                context.insert(restoredHealth)
+            }
             summary.insertedLogs += 1
         }
 
