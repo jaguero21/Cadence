@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Privacy manifest for the Cadence app target.
+
+     NSPrivacyAccessedAPITypes is the part App Store Connect enforces
+     (ITMS-91053): every "required reason" API the binary calls must be
+     declared here or the upload is rejected.
+
+     Cadence calls exactly one such API — UserDefaults — from AppState,
+     CadenceApp, SettingsView, OnboardingView, Constants, and WidgetData
+     (which is a member of both the app and widget targets and reads the
+     shared App Group suite). Reason CA92.1 covers reading/writing defaults
+     for this app and for app-group members from the same developer, which
+     is what group.com.carpecadence.app is.
+
+     No other required-reason category applies: the app reads no file
+     timestamps, no free disk space, no system boot time, and does not query
+     the active keyboard.
+
+     NSPrivacyCollectedDataTypes is empty and NSPrivacyTracking is false
+     because the app makes no network calls, embeds no third-party SDKs, and
+     runs no analytics — the only data leaving the device goes to the user's
+     own private CloudKit database, which the developer cannot read. See the
+     App Store Connect privacy questionnaire for the store-facing answer. -->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

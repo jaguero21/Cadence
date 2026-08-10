@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Privacy manifest for CadenceWidgetExtension. Each bundle in the app needs
+     its own — the host app's manifest does not cover its extensions.
+
+     The widget reads and writes the shared App Group defaults suite via
+     WidgetData (summary, pending quick logs, the Control Center check-in
+     request), so it calls the same single required-reason API as the app.
+     Reason CA92.1: app-group access between bundles from the same developer.
+
+     This file lives in the CadenceWidget synchronized file-system group, so
+     it is picked up by the widget target automatically — unlike the app
+     target's copy, which needs explicit project.pbxproj entries.
+
+     The watch app target has no manifest because it calls no required-reason
+     API: it talks to the phone over WatchConnectivity and never touches
+     UserDefaults. -->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
