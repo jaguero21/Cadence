@@ -18,6 +18,7 @@ struct ExportView: View {
     @State private var showingShare = false
     @State private var previewItem: ReportPreviewItem?
     @State private var generationTask: Task<Void, Never>?
+    @State private var exportError: String?
 
     var body: some View {
         NavigationStack {
@@ -78,6 +79,17 @@ struct ExportView: View {
                 ReportPreviewSheet(url: item.url)
             }
             .onDisappear { generationTask?.cancel() }
+            // Both builders return nil on failure. Without this the spinner
+            // just stopped and no sheet appeared, which reads as the button
+            // being broken rather than the export failing.
+            .alert("Export Failed", isPresented: .init(
+                get: { exportError != nil },
+                set: { if !$0 { exportError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(exportError ?? "")
+            }
         }
     }
 
@@ -134,13 +146,24 @@ struct ExportView: View {
             in: modelContext
         )
         let trackerSnapshots = customTrackers.map(CustomTrackerSnapshot.init)
+        guard !logSnapshots.isEmpty else {
+            exportError = String(localized: "There are no logs in the selected date range.")
+            return
+        }
         if let url = CSVBuilder.build(logs: logSnapshots, trackers: trackerSnapshots) {
             shareItem = url
             showingShare = true
+        } else {
+            exportError = String(localized: "Couldn't create the spreadsheet. Please try again.")
         }
     }
 
     private func generate() {
+        let inRange = dedupedByDay(logs.filter { $0.date >= rangeStart && $0.date <= endDate })
+        guard !inRange.isEmpty else {
+            exportError = String(localized: "There are no logs in the selected date range.")
+            return
+        }
         isGenerating = true
         let logSnapshots = DailyLogSnapshot.build(
             from: dedupedByDay(logs.filter { $0.date >= rangeStart && $0.date <= endDate }),
@@ -171,7 +194,11 @@ struct ExportView: View {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 isGenerating = false
-                previewItem = url.map(ReportPreviewItem.init)
+                if let url {
+                    previewItem = ReportPreviewItem(url: url)
+                } else {
+                    exportError = String(localized: "Couldn't create the report. Please try again.")
+                }
             }
         }
     }
