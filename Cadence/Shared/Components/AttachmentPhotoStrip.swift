@@ -40,6 +40,10 @@ private struct AttachmentThumbnail: View {
     let filename: String
     let tileSize: CGFloat
     @State private var image: UIImage?
+    // nil while the decode is still in flight; true once it has run and come
+    // back empty. Distinguishing the two is what lets the missing-file case
+    // show an explanation instead of an indefinite blank tile.
+    @State private var isMissing = false
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
@@ -48,15 +52,29 @@ private struct AttachmentThumbnail: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+            } else if isMissing {
+                // The Attachment record synced via CloudKit but its binary did
+                // not — binaries live on disk (AttachmentStore) and are
+                // deliberately excluded from both the synced store and the JSON
+                // backup. Without this the tile is simply blank, which reads as
+                // data loss rather than a device-local file.
+                ZStack {
+                    Rectangle().fill(Color(.systemFill))
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.system(size: tileSize * 0.34))
+                        .foregroundStyle(.secondary)
+                }
             } else {
                 Rectangle().fill(Color(.systemFill))
             }
         }
         .frame(width: tileSize, height: tileSize)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .accessibilityLabel("Attached photo")
+        .accessibilityLabel(isMissing ? "Photo added on another device — not available here" : "Attached photo")
         .task(id: filename) {
-            image = store.thumbnail(for: filename, maxPixel: tileSize * displayScale)
+            let decoded = store.thumbnail(for: filename, maxPixel: tileSize * displayScale)
+            image = decoded
+            isMissing = decoded == nil
         }
     }
 }
