@@ -20,7 +20,13 @@ struct DashboardView: View {
     // referenceDate anchors the query window. The parent passes the current day
     // so that when it rolls over at midnight this view re-inits with a fresh
     // cutoff — updating the @Query without destroying its view state.
+    // Retained (not just used for the cutoff) so the 7-Day Snapshot windows
+    // against the same day the parent considers "today" — including after a
+    // midnight rollover, which re-inits this view with a new reference date.
+    private let referenceDate: Date
+
     init(referenceDate: Date = .now) {
+        self.referenceDate = referenceDate
         let day = Calendar.current.startOfDay(for: referenceDate)
         let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: day) ?? .distantPast
         _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
@@ -236,23 +242,32 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var quickStats: some View {
-        let recent = Array(logs.prefix(7))
-        let count = Double(recent.count)
-        if count > 0 {
-            let avgMood   = Int((Double(recent.map(\.mood).reduce(0, +)) / count).rounded())
-            let avgEnergy = Int((Double(recent.map(\.energy).reduce(0, +)) / count).rounded())
-            let avgSleep  = recent.map(\.sleepHours).reduce(0, +) / count
+        // Computed by the pure helper, which windows to the real trailing seven
+        // days and averages only over values the user actually entered — see
+        // DashboardViewModel.sevenDayStats.
+        let stats = DashboardViewModel.sevenDayStats(from: logs.map { DailyLogSnapshot($0) }, referenceDate: referenceDate)
+        if stats.loggedDays > 0 {
             VStack(alignment: .leading, spacing: 12) {
                 Text("7-Day Snapshot")
                     .font(.headline)
                 HStack(spacing: 10) {
-                    statPill(label: "Mood", value: "\(avgMood)", color: CadenceColor.moodBlue, suffix: "/ 5")
-                    statPill(label: "Energy", value: "\(avgEnergy)", color: CadenceColor.energyOrange)
-                    statPill(label: "Sleep", value: String(format: "%.1f", avgSleep), color: CadenceColor.sleepPurple, suffix: "hrs")
-                    statPill(label: "Logs", value: "\(recent.count)", color: CadenceColor.successGreen, suffix: "/ 7")
+                    statPill(label: "Mood", value: rounded(stats.averageMood), color: CadenceColor.moodBlue, suffix: "/ 5")
+                    statPill(label: "Energy", value: rounded(stats.averageEnergy), color: CadenceColor.energyOrange)
+                    statPill(label: "Sleep", value: oneDecimal(stats.averageSleepHours), color: CadenceColor.sleepPurple, suffix: "hrs")
+                    statPill(label: "Logs", value: "\(stats.loggedDays)", color: CadenceColor.successGreen, suffix: "/ 7")
                 }
             }
         }
+    }
+
+    // An em dash, not a zero: a week with no mood entered has no average, and
+    // printing "0" would be inventing one.
+    private func rounded(_ value: Double?) -> String {
+        value.map { "\(Int($0.rounded()))" } ?? "—"
+    }
+
+    private func oneDecimal(_ value: Double?) -> String {
+        value.map { String(format: "%.1f", $0) } ?? "—"
     }
 
     private func statPill(label: String, value: String, color: Color, suffix: String = "/ 10") -> some View {

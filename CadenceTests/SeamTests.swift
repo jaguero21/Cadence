@@ -314,3 +314,84 @@ struct CadenceURLTests {
         }
     }
 }
+
+// MARK: - Dashboard 7-Day Snapshot
+
+// The first card a user sees. It previously took `logs.prefix(7)` out of a
+// 90-day query (so a month-old week still read "7 / 7") and averaged over
+// DailyLog's DEFAULTS for days the user never edited (mood 3, energy 5,
+// sleep 7.0) — inventing numbers nobody entered.
+@Suite("DashboardViewModel – sevenDayStats")
+struct SevenDayStatsTests {
+
+    private let today = Calendar.current.startOfDay(for: .now)
+
+    private func day(_ daysAgo: Int) -> Date {
+        Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) ?? today
+    }
+
+    private func log(_ daysAgo: Int, mood: Int = 3, energy: Int = 5, sleep: Double = 7.0,
+                     editedMood: Bool = true, editedMetrics: Bool = true) -> DailyLogSnapshot {
+        DailyLogSnapshot(date: day(daysAgo), mood: mood, energy: energy, sleepHours: sleep,
+                         didEditMetrics: editedMetrics, didEditMood: editedMood)
+    }
+
+    @Test("Logs older than the trailing seven days are excluded")
+    func excludesLogsOutsideTheWindow() {
+        // Seven real logs, but all of them three weeks ago — the exact shape
+        // that used to report a perfect week.
+        let stale = (21...27).map { log($0) }
+        let stats = DashboardViewModel.sevenDayStats(from: stale, referenceDate: today)
+        #expect(stats.loggedDays == 0)
+        #expect(stats.averageMood == nil)
+        #expect(stats.averageSleepHours == nil)
+    }
+
+    @Test("The window is seven calendar days including today")
+    func windowIsInclusiveOfToday() {
+        let stats = DashboardViewModel.sevenDayStats(
+            from: [log(0), log(6), log(7)],   // today, the edge, and one day past it
+            referenceDate: today
+        )
+        #expect(stats.loggedDays == 2)
+    }
+
+    @Test("Unedited days never contribute their model defaults to an average")
+    func unEditedDaysDoNotSkewAverages() {
+        let stats = DashboardViewModel.sevenDayStats(
+            from: [
+                log(0, mood: 5, energy: 9, sleep: 9.0),
+                // A widget mood tap: mood is real, the sliders were never touched.
+                log(1, mood: 1, energy: 5, sleep: 7.0, editedMood: true, editedMetrics: false),
+            ],
+            referenceDate: today
+        )
+        #expect(stats.loggedDays == 2)
+        #expect(stats.averageMood == 3.0)          // (5 + 1) / 2 — both moods are real
+        #expect(stats.averageEnergy == 9.0)        // only the edited day counts
+        #expect(stats.averageSleepHours == 9.0)    // not 8.0, which the 7.0 default would give
+    }
+
+    @Test("A week with logs but no edited values reports days without inventing averages")
+    func loggedButUneditedReportsNilAverages() {
+        let stats = DashboardViewModel.sevenDayStats(
+            from: [log(0, editedMood: false, editedMetrics: false)],
+            referenceDate: today
+        )
+        #expect(stats.loggedDays == 1)
+        #expect(stats.averageMood == nil)
+        #expect(stats.averageEnergy == nil)
+        #expect(stats.averageSleepHours == nil)
+    }
+
+    @Test("Duplicate logs for one day count once (CloudKit can create them)")
+    func duplicateDaysCountOnce() {
+        let stats = DashboardViewModel.sevenDayStats(from: [log(2), log(2)], referenceDate: today)
+        #expect(stats.loggedDays == 1)
+    }
+
+    @Test("No logs at all yields an empty snapshot")
+    func emptyInputIsEmpty() {
+        #expect(DashboardViewModel.sevenDayStats(from: [], referenceDate: today) == DashboardViewModel.SevenDayStats())
+    }
+}
