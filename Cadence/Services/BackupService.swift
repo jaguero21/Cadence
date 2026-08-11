@@ -349,9 +349,8 @@ enum BackupService {
     static func writeBackupFile(_ document: Document) throws -> URL {
         let data = try encode(document)
         let stamp = document.exportDate.formatted(.iso8601.year().month().day().dateSeparator(.dash))
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Cadence-Backup-\(stamp).json")
-        try data.write(to: url, options: .atomic)
+        let url = ExportScratch.url(for: "Cadence-Backup-\(stamp).json")
+        try data.write(to: url, options: ExportScratch.writeOptions)
         return url
     }
 }
