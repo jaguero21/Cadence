@@ -87,6 +87,7 @@ private struct MedicationEditSheet: View {
     @Environment(\.notificationService) private var notificationService
 
     let medication: Medication?
+    @State private var saveError: String?
 
     @State private var name: String = ""
     @State private var dosage: String = ""
@@ -149,6 +150,14 @@ private struct MedicationEditSheet: View {
                     Button("Save") { save() }.disabled(!isValid)
                 }
             }
+            .alert("Couldn't Save", isPresented: .init(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "")
+            }
             .onAppear(perform: load)
         }
     }
@@ -179,6 +188,15 @@ private struct MedicationEditSheet: View {
             medication.reminderMinutes = minutes
         } else {
             modelContext.insert(Medication(name: trimmedName, dosage: dosage, startDate: startDate, endDate: resolvedEnd, notes: notes, reminderMinutes: minutes))
+        }
+        // Explicit save, dismiss only on success — same reason as the flare and
+        // tracker editors. Done BEFORE the reconcile so the snapshot below can't
+        // schedule reminders for a medication that never persisted.
+        do {
+            try modelContext.save()
+        } catch {
+            saveError = String(localized: "Couldn't save this medication. Please try again.")
+            return
         }
         // Reconcile scheduled notifications with the whole store (this med's
         // times may have changed, another's course may have ended). Asking for

@@ -93,6 +93,7 @@ private struct FlareEditSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let flare: Flare?
+    @State private var saveError: String?
 
     @State private var startDate: Date = .now
     @State private var isOngoing: Bool = true
@@ -129,6 +130,14 @@ private struct FlareEditSheet: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save() } }
             }
             .onAppear(perform: load)
+            .alert("Couldn't Save", isPresented: .init(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "")
+            }
         }
     }
 
@@ -153,6 +162,14 @@ private struct FlareEditSheet: View {
         } else {
             modelContext.insert(Flare(startDate: startDate, endDate: resolvedEnd, peakSeverity: Int(peakSeverity), note: note))
         }
-        dismiss()
+        // Explicit save rather than relying on autosave: a failure here used to
+        // dismiss the sheet anyway, so the flare simply wasn't there next launch
+        // with nothing having told the user.
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            saveError = String(localized: "Couldn't save this flare. Please try again.")
+        }
     }
 }
