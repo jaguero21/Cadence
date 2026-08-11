@@ -66,10 +66,12 @@ enum CSVBuilder {
     }
 
     static func build(logs: [DailyLogSnapshot], trackers: [CustomTrackerSnapshot] = []) -> URL? {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cadence-export-\(UUID().uuidString).csv")
+        let url = ExportScratch.url(for: "cadence-export-\(UUID().uuidString).csv")
         do {
-            try csvString(from: logs, trackers: trackers).write(to: url, atomically: true, encoding: .utf8)
+            // Written as Data so the file gets ExportScratch's protection
+            // options; String.write(to:atomically:) offers no equivalent.
+            guard let data = csvString(from: logs, trackers: trackers).data(using: .utf8) else { return nil }
+            try data.write(to: url, options: ExportScratch.writeOptions)
             return url
         } catch {
             return nil

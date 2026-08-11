@@ -135,6 +135,12 @@ struct CadenceApp: App {
                     await store.refreshEntitlements()
                 }
                 .task {
+                    // Clear generated reports/CSV/backups left in scratch by
+                    // earlier sessions — a full health history in plain text
+                    // should not outlive the share that produced it. Done at
+                    // launch rather than after each share, because the share
+                    // sheet hands the URL to another process.
+                    ExportScratch.purge()
                     PhoneConnectivityManager.shared.start(container: container)
                     guard !AppLaunch.isUITesting else { return }
                     // Discoverability tips (hold-to-rate, step jumping). Not
