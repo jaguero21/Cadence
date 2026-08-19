@@ -27,11 +27,18 @@ struct AttachmentStore {
     }
 
     // Writes data with a fresh unique filename and returns that filename (nil on failure).
+    //
+    // `.completeFileProtectionUnlessOpen` rather than the container default
+    // (`completeUntilFirstUserAuthentication`): these are photos of symptoms and
+    // voice notes describing them — the most sensitive bytes the app holds — and
+    // the default leaves them readable on a device that has been booted once and
+    // then locked. "UnlessOpen" rather than "complete" so a recording already in
+    // progress keeps writing if the screen locks mid-take.
     func save(_ data: Data, fileExtension: String) -> String? {
         try? FileManager.default.createDirectory(at: baseURL, withIntermediateDirectories: true)
         let filename = "\(UUID().uuidString).\(fileExtension)"
         do {
-            try data.write(to: url(for: filename), options: .atomic)
+            try data.write(to: url(for: filename), options: [.atomic, .completeFileProtectionUnlessOpen])
             return filename
         } catch {
             Self.log.error("Failed to write attachment \(filename): \(error.localizedDescription)")

@@ -28,18 +28,34 @@ final class StoreService {
         }
     }
 
-    func purchase(_ product: Product) async throws -> Bool {
+    // Distinguishes the three outcomes StoreKit reports. A `Bool` collapsed
+    // `.pending` into `.userCancelled`, so a family-sharing child hitting Ask
+    // to Buy — or a European card triggering SCA — saw the tap do nothing at
+    // all, then got Pro silently later when approval landed via
+    // Transaction.updates.
+    enum PurchaseOutcome {
+        case purchased
+        case cancelled
+        case pending
+    }
+
+    func purchase(_ product: Product) async throws -> PurchaseOutcome {
         let result = try await product.purchase()
         switch result {
         case .success(let verification):
             let transaction = try checkVerified(verification)
             await transaction.finish()
             purchasedProductIDs.insert(product.id)
-            return true
-        case .userCancelled, .pending:
-            return false
+            return .purchased
+        case .userCancelled:
+            return .cancelled
+        case .pending:
+            return .pending
         @unknown default:
-            return false
+            // Unknown future cases are reported as cancelled, never as
+            // purchased: entitlement is granted by refreshEntitlements and
+            // Transaction.updates, both of which verify.
+            return .cancelled
         }
     }
 

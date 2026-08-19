@@ -8,6 +8,7 @@ struct ProPaywallView: View {
 
     @State private var isPurchasing = false
     @State private var errorMessage: String?
+    @State private var pendingMessage: String?
 
     private let features: [(icon: String, title: String, detail: String)] = [
         ("sparkles",              "Pattern Insights",    "Correlation detection across sleep, mood, stress, and symptoms."),
@@ -44,6 +45,14 @@ struct ProPaywallView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage ?? "")
+            }
+            .alert("Waiting for Approval", isPresented: .init(
+                get: { pendingMessage != nil },
+                set: { if !$0 { pendingMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) { dismiss() }
+            } message: {
+                Text(pendingMessage ?? "")
             }
         }
     }
@@ -195,8 +204,17 @@ struct ProPaywallView: View {
         isPurchasing = true
         defer { isPurchasing = false }
         do {
-            let purchased = try await store.purchase(product)
-            if purchased { dismiss() }
+            switch try await store.purchase(product) {
+            case .purchased:
+                dismiss()
+            case .pending:
+                // Ask to Buy or a bank approval step. Say so — otherwise the
+                // tap looks like it did nothing, and Pro appears later with no
+                // explanation once approval lands.
+                pendingMessage = String(localized: "Your purchase needs approval before it can finish. Cadence Pro will unlock automatically once it's approved.")
+            case .cancelled:
+                break
+            }
         } catch {
             errorMessage = String(localized: "Something went wrong. Please try again.")
         }

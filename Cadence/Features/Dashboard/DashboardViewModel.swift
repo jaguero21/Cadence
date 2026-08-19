@@ -60,6 +60,62 @@ final class DashboardViewModel {
         )
     }
 
+    // MARK: - 7-Day Snapshot
+
+    // What the dashboard's "7-Day Snapshot" row shows. Averages are optional
+    // because "no data" and "an average that happens to be low" are different
+    // statements, and the card must not make the second one up.
+    struct SevenDayStats: Equatable {
+        var loggedDays: Int = 0
+        var averageMood: Double?
+        var averageEnergy: Double?
+        var averageSleepHours: Double?
+    }
+
+    // Pure and unit-tested. Two rules this fixes, both of which had the card
+    // reporting numbers the user never entered:
+    //
+    // 1. WINDOW. The old version took `logs.prefix(7)` — the seven most recent
+    //    logs out of the Dashboard's NINETY-day query, with no date filter. Log
+    //    a week, stop for a month, and it still read "Logs 7 / 7". The stat that
+    //    exists to say how this week went could not express a bad week.
+    //
+    // 2. DEFAULTS. It averaged mood/energy/sleepHours across every log in that
+    //    slice regardless of didEditMood / didEditMetrics. DailyLog defaults
+    //    those to 3, 5 and 7.0, so a day created by a widget mood tap — where no
+    //    slider was ever touched — contributed a fabricated 7.0-hour night to
+    //    the sleep average. PatternEngine has always gated on didEditMetrics;
+    //    the first screen in the app did not.
+    //
+    // Days are deduped: CloudKit can leave two logs for one day (no
+    // @Attribute(.unique)), and both would otherwise count toward "N of 7".
+    // nonisolated: it touches nothing on the view model and takes Sendable
+    // snapshots, so tests (and any future off-main caller) can use it directly —
+    // same shape as NotificationService.medicationReminderID.
+    nonisolated static func sevenDayStats(from logs: [DailyLogSnapshot], referenceDate: Date = .now) -> SevenDayStats {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: referenceDate)
+        // Seven calendar days INCLUDING today, so the window is today-6...today.
+        guard let cutoff = calendar.date(byAdding: .day, value: -6, to: today) else { return SevenDayStats() }
+
+        let window = logs.filter {
+            let day = calendar.startOfDay(for: $0.date)
+            return day >= cutoff && day <= today
+        }
+        guard !window.isEmpty else { return SevenDayStats() }
+
+        func mean(_ values: [Double]) -> Double? {
+            values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
+        }
+
+        return SevenDayStats(
+            loggedDays: Set(window.map { calendar.startOfDay(for: $0.date) }).count,
+            averageMood: mean(window.filter(\.didEditMood).map { Double($0.mood) }),
+            averageEnergy: mean(window.filter(\.didEditMetrics).map { Double($0.energy) }),
+            averageSleepHours: mean(window.filter(\.didEditMetrics).map(\.sleepHours))
+        )
+    }
+
     // The single active flare (endDate == nil), fetched predicate-scoped so
     // the store returns just the 0–1 ongoing rows rather than materializing
     // the whole flare history. For the save/quick-log paths that publish a

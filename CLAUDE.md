@@ -215,7 +215,31 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   every tier — health data is already local, so only the synced half changes
   behaviour across the fallbacks. `save()` methods return `Bool`, revert mutated
   state on failure, and surface a `saveError`; orphan/rollback cleanup at
-  `.onDisappear`.
+  `.onDisappear`. Each tier is **`do`/`catch`, never `try?`** — the thrown error
+  is the only account of why the store didn't open, and discarding it made a
+  failed migration and a corrupt file indistinguishable from a first run. The
+  CloudKit tier failing is routine (no entitlement/account) and logs at
+  `.notice`; the local-only tier failing is not (both point at the same file)
+  and logs at `.error`.
+- **Never tell the user to reinstall.** Falling back to in-memory means their
+  entries are still on disk and usually recoverable by a fixed build — deleting
+  the app is the one action that makes the loss permanent. `UserDefaultsKey
+  .persistentStoreOpened` is latched the first time a persistent store opens, so
+  `CadenceApp.hadPersistentStore` can tell "nothing saved here yet, reinstalling
+  is harmless" from "your history is on this device, don't delete it"; the
+  storage alert and `StorageFatalErrorView` word themselves off that. Both
+  previously advised reinstalling while also saying the data was safe.
+- **Removing a `@Model`'s stored property silently destroys its data.** There is
+  no `SchemaMigrationPlan`, so SwiftData's implicit lightweight migration drops
+  the column on first launch of the new build — nothing throws, and there is no
+  hook at which the old values could be read first. This already cost real data
+  once: moving the twelve `hk*` attributes off `DailyLog` was correct, but on a
+  pre-split install every historical HealthKit value went with them (the JSON
+  backup is the only manual route across that upgrade, and it restores health
+  rows correctly now). `SchemaShapeTests` in `CadenceTests/SchemaMigrationTests
+  .swift` pins every entity's exact attribute set so the next such change fails
+  in CI instead of on a device; a new `@Model` needs a pin too. When a pin
+  failure is intentional, decide what happens to the existing data **first**.
 - **CloudKit constraints.** Because of CloudKit mirroring, models carry **no
   `@Attribute(.unique)`** and every non-optional attribute has an **inline default
   value** (both are hard CloudKit requirements). Uniqueness/dedup is enforced in
@@ -226,6 +250,21 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   review, `seedSymptomTagsIfNeeded` dedupes by name against the store, and
   `InsightRecorder` dedupes by key. Don't reintroduce `.unique`, drop the inline
   defaults, or add an insert path without a save-time dedup check.
+- **The push capability belongs to CloudKit — don't "clean it up".** Cadence
+  ships no push feature and no `registerForRemoteNotifications` call, so the
+  `aps-environment` entitlement (`Cadence/Cadence.entitlements`) and
+  `UIBackgroundModes: remote-notification` (`Cadence/App/Info.plist`) both look
+  unused from a grep of the Swift sources. They aren't:
+  `NSPersistentCloudKitContainer` — which SwiftData's mirroring is built on, and
+  which `CloudSyncMonitor` already observes directly — registers for remote
+  notifications itself, and CloudKit announces "another device wrote something"
+  with a silent push. Remove either key and remote changes stop importing until
+  the next launch, with no error surfaced anywhere. This is the configuration
+  Apple's Core Data + CloudKit setup prescribes, so it is an intended background
+  use under Guideline 2.5.4, not a 2.5.4 risk. Both were dropped in `3786b68` on
+  exactly that reasoning and restored afterwards; keep Push Notifications
+  enabled on the App ID too, and note that HealthKit background delivery is a
+  separate entitlement that needs neither key.
 
 ## Conventions
 
@@ -448,6 +487,19 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   tags by name, meds by name+start, flares by start, trackers by `id`).
   `CustomTracker.id` must round-trip: `DailyLog.customMetrics` is keyed by it.
   Restore republishes the widget summary (it can change today's streak).
+  **`HealthSnapshot` rows are the exception to that identity rule**, and must
+  stay one: they restore for EVERY backed-up day regardless of whether that
+  day's `DailyLog` already exists, and they merge per FIELD via
+  `HealthSnapshot.backfill(from:)` (the row's own measurements win; the file
+  only fills nils) rather than being skipped whole. The reason is the store
+  split — `DailyLog` is CloudKit-mirrored and `HealthSnapshot` deliberately
+  isn't, so on a new device the diary arrives on its own and the backup file is
+  the *only* route back for the health half. Gating the health write on "the log
+  was missing" — as the first version of this code did — made restore recover
+  nothing in exactly that case. `RestoreSummary.restoredHealthDays` is counted
+  and surfaced separately from `insertedTotal` for the same reason: "0 records,
+  N health days" is the normal new-device outcome, and reporting only
+  `insertedTotal` would announce that restore as a no-op.
 - **Sync status**: `CloudSyncMonitor` (@MainActor singleton) folds
   `NSPersistentCloudKitContainer.eventChangedNotification` events (SwiftData's
   mirroring is built on that container) plus the CloudKit account status into

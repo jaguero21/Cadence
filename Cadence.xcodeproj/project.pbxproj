@@ -62,6 +62,7 @@
 		AABBCCDD000000000000020A /* InsightHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010A /* InsightHistoryView.swift */; };
 		AABBCCDD000000000000020B /* Attachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010B /* Attachment.swift */; };
 		AABBCCDD000000000000020C /* AttachmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010C /* AttachmentStore.swift */; };
+		AABBCCDD0000000000000291 /* ExportScratch.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000191 /* ExportScratch.swift */; };
 		AABBCCDD000000000000020D /* VoiceNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010D /* VoiceNote.swift */; };
 		AABBCCDD000000000000020E /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010E /* WidgetData.swift */; };
 		AABBCCDD000000000000020F /* PhoneConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */; };
@@ -211,6 +212,7 @@
 		AABBCCDD000000000000010A /* InsightHistoryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightHistoryView.swift; path = ./Cadence/Features/Insights/InsightHistoryView.swift; sourceTree = "<absolute>"; };
 		AABBCCDD000000000000010B /* Attachment.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Attachment.swift; path = ./Cadence/Models/Attachment.swift; sourceTree = "<absolute>"; };
 		AABBCCDD000000000000010C /* AttachmentStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AttachmentStore.swift; path = ./Cadence/Services/AttachmentStore.swift; sourceTree = "<absolute>"; };
+		AABBCCDD0000000000000191 /* ExportScratch.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExportScratch.swift; path = ./Cadence/Services/ExportScratch.swift; sourceTree = "<absolute>"; };
 		AABBCCDD000000000000010D /* VoiceNote.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VoiceNote.swift; path = ./Cadence/Features/DailyLog/VoiceNote.swift; sourceTree = "<absolute>"; };
 		AABBCCDD000000000000010E /* WidgetData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WidgetData.swift; path = ./CadenceWidget/WidgetData.swift; sourceTree = "<absolute>"; };
 		AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PhoneConnectivityManager.swift; path = ./Cadence/Services/PhoneConnectivityManager.swift; sourceTree = "<absolute>"; };
@@ -553,6 +555,7 @@
 				AABBCCDD0000000000000113 /* BackupService.swift */,
 				AABBCCDD000000000000011A /* WeekReflectionService.swift */,
 				AABBCCDD000000000000010C /* AttachmentStore.swift */,
+				AABBCCDD0000000000000191 /* ExportScratch.swift */,
 				493F590706A348D0857DA49A /* ServiceProtocols.swift */,
 				7F51B62D7D39FC0309276D9D /* StoreService.swift */,
 			);
@@ -848,6 +851,7 @@
 				AABBCCDD000000000000020A /* InsightHistoryView.swift in Sources */,
 				AABBCCDD000000000000020B /* Attachment.swift in Sources */,
 				AABBCCDD000000000000020C /* AttachmentStore.swift in Sources */,
+				AABBCCDD0000000000000291 /* ExportScratch.swift in Sources */,
 				D45ECE5968E07CA77E8B26D5 /* StoreService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
