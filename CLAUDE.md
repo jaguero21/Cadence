@@ -226,6 +226,21 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   review, `seedSymptomTagsIfNeeded` dedupes by name against the store, and
   `InsightRecorder` dedupes by key. Don't reintroduce `.unique`, drop the inline
   defaults, or add an insert path without a save-time dedup check.
+- **The push capability belongs to CloudKit — don't "clean it up".** Cadence
+  ships no push feature and no `registerForRemoteNotifications` call, so the
+  `aps-environment` entitlement (`Cadence/Cadence.entitlements`) and
+  `UIBackgroundModes: remote-notification` (`Cadence/App/Info.plist`) both look
+  unused from a grep of the Swift sources. They aren't:
+  `NSPersistentCloudKitContainer` — which SwiftData's mirroring is built on, and
+  which `CloudSyncMonitor` already observes directly — registers for remote
+  notifications itself, and CloudKit announces "another device wrote something"
+  with a silent push. Remove either key and remote changes stop importing until
+  the next launch, with no error surfaced anywhere. This is the configuration
+  Apple's Core Data + CloudKit setup prescribes, so it is an intended background
+  use under Guideline 2.5.4, not a 2.5.4 risk. Both were dropped in `3786b68` on
+  exactly that reasoning and restored afterwards; keep Push Notifications
+  enabled on the App ID too, and note that HealthKit background delivery is a
+  separate entitlement that needs neither key.
 
 ## Conventions
 

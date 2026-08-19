@@ -37,6 +37,20 @@
 		<key>UISceneConfigurations</key>
 		<dict/>
 	</dict>
+	<!-- Paired with the aps-environment entitlement, and required for the same
+	     reason: SwiftData's CloudKit mirroring runs on
+	     NSPersistentCloudKitContainer, which imports remote changes when a
+	     silent CloudKit push wakes the app. Without this background mode the
+	     push is not delivered while backgrounded, so a log written on another
+	     device does not appear until Cadence is launched again. This is the
+	     setup Apple's own Core Data + CloudKit configuration prescribes, so it
+	     is an "intended purpose" under Guideline 2.5.4 — it is not the unused
+	     push capability it can look like from a grep of the Swift sources.
+	     HealthKit background delivery is separate and does NOT need this key. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
