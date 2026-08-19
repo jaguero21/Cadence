@@ -56,6 +56,10 @@ enum UserDefaultsKey {
     static let dailyReminderMinute  = "dailyReminderMinute"
     static let weeklyReminderEnabled = "weeklyReminderEnabled"
     static let lastInsightCheckDay    = "lastInsightCheckDay"   // startOfDay interval; foreground insight check runs once per day
+    // Latched the first time a PERSISTENT store opens. Read only when the app
+    // has fallen back to in-memory storage, to decide whether "reinstalling is
+    // safe" is true advice or the thing that destroys the user's history.
+    static let persistentStoreOpened  = "cadence.persistentStoreOpened"
 }
 
 enum PatternThreshold {

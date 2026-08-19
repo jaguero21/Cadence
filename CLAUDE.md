@@ -215,7 +215,31 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   every tier — health data is already local, so only the synced half changes
   behaviour across the fallbacks. `save()` methods return `Bool`, revert mutated
   state on failure, and surface a `saveError`; orphan/rollback cleanup at
-  `.onDisappear`.
+  `.onDisappear`. Each tier is **`do`/`catch`, never `try?`** — the thrown error
+  is the only account of why the store didn't open, and discarding it made a
+  failed migration and a corrupt file indistinguishable from a first run. The
+  CloudKit tier failing is routine (no entitlement/account) and logs at
+  `.notice`; the local-only tier failing is not (both point at the same file)
+  and logs at `.error`.
+- **Never tell the user to reinstall.** Falling back to in-memory means their
+  entries are still on disk and usually recoverable by a fixed build — deleting
+  the app is the one action that makes the loss permanent. `UserDefaultsKey
+  .persistentStoreOpened` is latched the first time a persistent store opens, so
+  `CadenceApp.hadPersistentStore` can tell "nothing saved here yet, reinstalling
+  is harmless" from "your history is on this device, don't delete it"; the
+  storage alert and `StorageFatalErrorView` word themselves off that. Both
+  previously advised reinstalling while also saying the data was safe.
+- **Removing a `@Model`'s stored property silently destroys its data.** There is
+  no `SchemaMigrationPlan`, so SwiftData's implicit lightweight migration drops
+  the column on first launch of the new build — nothing throws, and there is no
+  hook at which the old values could be read first. This already cost real data
+  once: moving the twelve `hk*` attributes off `DailyLog` was correct, but on a
+  pre-split install every historical HealthKit value went with them (the JSON
+  backup is the only manual route across that upgrade, and it restores health
+  rows correctly now). `SchemaShapeTests` in `CadenceTests/SchemaMigrationTests
+  .swift` pins every entity's exact attribute set so the next such change fails
+  in CI instead of on a device; a new `@Model` needs a pin too. When a pin
+  failure is intentional, decide what happens to the existing data **first**.
 - **CloudKit constraints.** Because of CloudKit mirroring, models carry **no
   `@Attribute(.unique)`** and every non-optional attribute has an **inline default
   value** (both are hard CloudKit requirements). Uniqueness/dedup is enforced in
