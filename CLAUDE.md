@@ -463,6 +463,19 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   tags by name, meds by name+start, flares by start, trackers by `id`).
   `CustomTracker.id` must round-trip: `DailyLog.customMetrics` is keyed by it.
   Restore republishes the widget summary (it can change today's streak).
+  **`HealthSnapshot` rows are the exception to that identity rule**, and must
+  stay one: they restore for EVERY backed-up day regardless of whether that
+  day's `DailyLog` already exists, and they merge per FIELD via
+  `HealthSnapshot.backfill(from:)` (the row's own measurements win; the file
+  only fills nils) rather than being skipped whole. The reason is the store
+  split — `DailyLog` is CloudKit-mirrored and `HealthSnapshot` deliberately
+  isn't, so on a new device the diary arrives on its own and the backup file is
+  the *only* route back for the health half. Gating the health write on "the log
+  was missing" — as the first version of this code did — made restore recover
+  nothing in exactly that case. `RestoreSummary.restoredHealthDays` is counted
+  and surfaced separately from `insertedTotal` for the same reason: "0 records,
+  N health days" is the normal new-device outcome, and reporting only
+  `insertedTotal` would announce that restore as a no-op.
 - **Sync status**: `CloudSyncMonitor` (@MainActor singleton) folds
   `NSPersistentCloudKitContainer.eventChangedNotification` events (SwiftData's
   mirroring is built on that container) plus the CloudKit account status into

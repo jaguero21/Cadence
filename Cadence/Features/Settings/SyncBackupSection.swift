@@ -130,10 +130,19 @@ struct SyncBackupSection: View {
             // Restored medications can carry reminders; reconcile now instead
             // of waiting for the next foreground pass to silence/schedule them.
             notificationService.reconcileMedicationReminders(context: modelContext)
-            if summary.insertedTotal == 0 {
+            // Health days are reported separately from records. On a new device
+            // CloudKit brings the diary back by itself but never the HealthKit
+            // half, so "0 records, N health days" is the normal outcome there —
+            // reporting only `insertedTotal` would call that restore a no-op.
+            switch (summary.insertedTotal, summary.restoredHealthDays) {
+            case (0, 0):
                 resultMessage = String(localized: "Everything in that backup is already on this device.")
-            } else {
-                resultMessage = String(localized: "Restored \(summary.insertedTotal) record(s); skipped \(summary.skipped) already on this device.")
+            case (0, let healthDays):
+                resultMessage = String(localized: "Restored Health data for \(healthDays) day(s); every other record in that backup was already on this device.")
+            case (let records, 0):
+                resultMessage = String(localized: "Restored \(records) record(s); skipped \(summary.skipped) already on this device.")
+            case (let records, let healthDays):
+                resultMessage = String(localized: "Restored \(records) record(s) and Health data for \(healthDays) day(s); skipped \(summary.skipped) already on this device.")
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {

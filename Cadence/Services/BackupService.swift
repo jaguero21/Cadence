@@ -213,6 +213,12 @@ enum BackupService {
         var insertedFlares = 0
         var insertedTrackers = 0
         var skipped = 0
+        // Days whose HealthKit row gained at least one value. Deliberately NOT
+        // part of `insertedTotal`: a health row isn't a record the user created,
+        // it's the objective half of a day that may already exist. It still has
+        // to be reported separately, because on a new device it is routinely the
+        // ONLY thing a restore recovers (see the daily-log loop below).
+        var restoredHealthDays = 0
 
         var insertedTotal: Int {
             insertedLogs + insertedReviews + insertedTags + insertedMedications + insertedFlares + insertedTrackers
@@ -222,14 +228,57 @@ enum BackupService {
     // Inserts anything the store doesn't already have; existing records win.
     // Identity: logs by day, reviews by week start, tags by name, medications by
     // (name, start date), flares by start date, trackers by id.
+    //
+    // HealthSnapshot rows are the one exception to the all-or-nothing identity
+    // rule: they merge per FIELD (`backfill`) rather than being skipped whole,
+    // and they restore for every backed-up day whether or not that day's log
+    // already existed. They have to — they are the only part of a backup
+    // CloudKit never delivers on its own.
     @MainActor
     static func restore(_ document: Document, context: ModelContext) throws -> RestoreSummary {
         let cal = Calendar.current
         var summary = RestoreSummary()
 
         var existingDays = Set(try context.fetch(FetchDescriptor<DailyLog>()).map { cal.startOfDay(for: $0.date) })
+        // One fetch for the whole health store, not a query per day: the loop
+        // below now consults it for EVERY backed-up day, not just new ones.
+        var healthByDay = HealthSnapshot.byDate(in: context)
         for backup in document.dailyLogs {
             let day = cal.startOfDay(for: backup.date)
+
+            // hk* values restore into the local-only health store, keyed by the
+            // same day — and they restore INDEPENDENTLY of whether the DailyLog
+            // is new. That independence is the whole point: DailyLog is mirrored
+            // to CloudKit and HealthSnapshot deliberately is not, so on a new
+            // device the diary arrives on its own and this file is the only way
+            // the health half can ever come back. Gating it on "the log was
+            // missing" made the restore a no-op in exactly that case.
+            let backedUpHealth = HealthSnapshot(date: day)
+            backedUpHealth.hkSteps = backup.hkSteps
+            backedUpHealth.hkRestingHR = backup.hkRestingHR
+            backedUpHealth.hkHRV = backup.hkHRV
+            backedUpHealth.hkSleepHours = backup.hkSleepHours
+            backedUpHealth.hkActiveEnergy = backup.hkActiveEnergy
+            backedUpHealth.hkMindfulMinutes = backup.hkMindfulMinutes
+            backedUpHealth.hkWristTemp = backup.hkWristTemp
+            backedUpHealth.hkRespiratoryRate = backup.hkRespiratoryRate
+            backedUpHealth.hkBloodOxygen = backup.hkBloodOxygen
+            backedUpHealth.hkDaylightMinutes = backup.hkDaylightMinutes
+            backedUpHealth.hkDaytimeHR = backup.hkDaytimeHR
+            backedUpHealth.hkWorkoutMinutes = backup.hkWorkoutMinutes
+            if let storedHealth = healthByDay[day] {
+                // Merge, same contract as everything else here: the device's own
+                // measurements win, the file only fills gaps.
+                if storedHealth.backfill(from: backedUpHealth) { summary.restoredHealthDays += 1 }
+            } else if !backedUpHealth.isEmpty {
+                // Empty rows are never created — a backup written before Health
+                // access was granted must not litter the store (same rule as
+                // HealthSnapshot.upsert).
+                context.insert(backedUpHealth)
+                healthByDay[day] = backedUpHealth
+                summary.restoredHealthDays += 1
+            }
+
             guard !existingDays.contains(day) else { summary.skipped += 1; continue }
             existingDays.insert(day)
             let log = DailyLog(date: day)
@@ -251,26 +300,6 @@ enum BackupService {
             log.didEditMood = backup.didEditMood
             log.didEditMetrics = backup.didEditMetrics
             context.insert(log)
-            // hk* values restore into the local-only health store, keyed by the
-            // same day. Only written when the backup actually carried a
-            // measurement, so restoring a file made before Health access was
-            // granted doesn't create an empty row.
-            let restoredHealth = HealthSnapshot(date: day)
-            restoredHealth.hkSteps = backup.hkSteps
-            restoredHealth.hkRestingHR = backup.hkRestingHR
-            restoredHealth.hkHRV = backup.hkHRV
-            restoredHealth.hkSleepHours = backup.hkSleepHours
-            restoredHealth.hkActiveEnergy = backup.hkActiveEnergy
-            restoredHealth.hkMindfulMinutes = backup.hkMindfulMinutes
-            restoredHealth.hkWristTemp = backup.hkWristTemp
-            restoredHealth.hkRespiratoryRate = backup.hkRespiratoryRate
-            restoredHealth.hkBloodOxygen = backup.hkBloodOxygen
-            restoredHealth.hkDaylightMinutes = backup.hkDaylightMinutes
-            restoredHealth.hkDaytimeHR = backup.hkDaytimeHR
-            restoredHealth.hkWorkoutMinutes = backup.hkWorkoutMinutes
-            if !restoredHealth.isEmpty, HealthSnapshot.row(for: day, in: context) == nil {
-                context.insert(restoredHealth)
-            }
             summary.insertedLogs += 1
         }
 
@@ -334,7 +363,7 @@ enum BackupService {
         }
 
         try context.save()
-        log.info("Restore merged \(summary.insertedTotal) record(s), skipped \(summary.skipped) existing")
+        log.info("Restore merged \(summary.insertedTotal) record(s), health for \(summary.restoredHealthDays) day(s), skipped \(summary.skipped) existing")
         return summary
     }
 

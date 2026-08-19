@@ -71,6 +71,38 @@ final class HealthSnapshot {
         if let hr       = snapshot.daytimeHR        { hkDaytimeHR       = hr }
         if let workout  = snapshot.workoutMinutes   { hkWorkoutMinutes  = workout }
     }
+
+    // The mirror of `apply`, for merges where THIS row is authoritative: each
+    // value is copied only where this row is missing one, so nothing already
+    // measured is overwritten. Returns whether anything was actually filled.
+    //
+    // Backup restore is the caller. Its contract is "insert what the store
+    // lacks, never overwrite" (see BackupService), and the rows here are the
+    // half CloudKit never carries — a device can hold a partial row that
+    // HealthDataRefresher topped up after the backup was written, and that
+    // fresher value has to win over the file's copy of the same day.
+    @discardableResult
+    func backfill(from other: HealthSnapshot) -> Bool {
+        var filled = false
+        func fill<T>(_ keyPath: ReferenceWritableKeyPath<HealthSnapshot, T?>) {
+            guard self[keyPath: keyPath] == nil, let value = other[keyPath: keyPath] else { return }
+            self[keyPath: keyPath] = value
+            filled = true
+        }
+        fill(\.hkSteps)
+        fill(\.hkRestingHR)
+        fill(\.hkHRV)
+        fill(\.hkSleepHours)
+        fill(\.hkActiveEnergy)
+        fill(\.hkMindfulMinutes)
+        fill(\.hkWristTemp)
+        fill(\.hkRespiratoryRate)
+        fill(\.hkBloodOxygen)
+        fill(\.hkDaylightMinutes)
+        fill(\.hkDaytimeHR)
+        fill(\.hkWorkoutMinutes)
+        return filled
+    }
 }
 
 // MARK: - Fetching & upsert

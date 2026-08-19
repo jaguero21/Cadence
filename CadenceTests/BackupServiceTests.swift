@@ -100,6 +100,10 @@ import SwiftData
         #expect(trackers.first?.id == trackerID)
         let reviews = try context.fetch(FetchDescriptor<WeeklyReview>())
         #expect(reviews.first?.intentionsForTomorrow == "Start the week with a plan")
+        // hk* values land in the separate local-only health store, keyed by day.
+        #expect(summary.restoredHealthDays == 1)
+        let health = try #require(HealthSnapshot.row(for: day(3), in: context))
+        #expect(health.hkSteps == 8200)
     }
 
     @Test("Restore merges: existing records win, missing ones are added")
@@ -122,6 +126,85 @@ import SwiftData
         let logs = try context.fetch(FetchDescriptor<DailyLog>())
         #expect(logs.count == 1)
         #expect(logs.first?.freeNote == "device copy")
+    }
+
+    // MARK: - Health rows
+
+    // The case that matters most, and the one that used to be skipped entirely:
+    // HealthSnapshot lives on the local-only store, so on a new device CloudKit
+    // delivers the diary by itself and the backup file is the ONLY route back
+    // for the health half. Restoring health only when the log was also missing
+    // made restore a no-op in exactly that situation.
+    @Test("Health data restores for a day whose log already exists")
+    func restoreRecoversHealthForExistingLog() throws {
+        let context = try makeContext()
+        let existing = DailyLog(date: day(3))
+        existing.freeNote = "arrived via CloudKit"
+        context.insert(existing)
+        try context.save()
+
+        let summary = try BackupService.restore(sampleDocument(), context: context)
+
+        #expect(summary.insertedLogs == 0)
+        #expect(summary.skipped == 1)
+        #expect(summary.restoredHealthDays == 1)
+        let health = try #require(HealthSnapshot.row(for: day(3), in: context))
+        #expect(health.hkSteps == 8200)
+        #expect(health.hkWorkoutMinutes == 52)
+        // The log itself is untouched — the device's copy still wins.
+        let logs = try context.fetch(FetchDescriptor<DailyLog>())
+        #expect(logs.count == 1)
+        #expect(logs.first?.freeNote == "arrived via CloudKit")
+    }
+
+    @Test("Restore fills gaps in an existing health row without overwriting it")
+    func restoreBackfillsHealthRow() throws {
+        let context = try makeContext()
+        // A row this device measured itself after the backup was written.
+        let stored = HealthSnapshot(date: day(3))
+        stored.hkSteps = 111
+        context.insert(stored)
+        try context.save()
+
+        let summary = try BackupService.restore(sampleDocument(), context: context)
+
+        #expect(summary.restoredHealthDays == 1)
+        let health = try #require(HealthSnapshot.row(for: day(3), in: context))
+        #expect(health.hkSteps == 111)          // device value kept, not the file's 8200
+        #expect(health.hkWorkoutMinutes == 52)  // gap filled from the file
+        let rows = try context.fetch(FetchDescriptor<HealthSnapshot>())
+        #expect(rows.count == 1)                // merged, not duplicated
+    }
+
+    @Test("Restoring health that is already present reports nothing recovered")
+    func restoreHealthIsIdempotent() throws {
+        let context = try makeContext()
+        let document = sampleDocument()
+
+        let first = try BackupService.restore(document, context: context)
+        let second = try BackupService.restore(document, context: context)
+
+        #expect(first.restoredHealthDays == 1)
+        #expect(second.restoredHealthDays == 0)
+        let rows = try context.fetch(FetchDescriptor<HealthSnapshot>())
+        #expect(rows.count == 1)
+    }
+
+    // Mirrors HealthSnapshot.upsert's rule: a backup written before Health
+    // access was granted must not litter the store with empty rows.
+    @Test("A backup carrying no health values creates no health row")
+    func restoreWithoutHealthCreatesNoRow() throws {
+        let context = try makeContext()
+        var document = sampleDocument()
+        document.dailyLogs[0].hkSteps = nil
+        document.dailyLogs[0].hkWorkoutMinutes = nil
+
+        let summary = try BackupService.restore(document, context: context)
+
+        #expect(summary.insertedLogs == 1)
+        #expect(summary.restoredHealthDays == 0)
+        let rows = try context.fetch(FetchDescriptor<HealthSnapshot>())
+        #expect(rows.isEmpty)
     }
 
     @Test("Restoring the same backup twice is a no-op the second time")
