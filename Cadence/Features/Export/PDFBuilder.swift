@@ -6,7 +6,7 @@ enum PDFBuilder {
     static func build(logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = []) async -> URL? {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
         let uid = UUID().uuidString
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("in-rhythm-cadence-report-\(uid).pdf")
+        let url = ExportScratch.url(for: "in-rhythm-cadence-report-\(uid).pdf")
 
         let insights = PatternEngine.allInsights(from: logs, medications: medications, flares: flares, trackers: customTrackers)
         // Chart images render on the main actor (ImageRenderer requirement),

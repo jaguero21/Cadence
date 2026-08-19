@@ -2,6 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Required by CloudKit mirroring, NOT by any push feature Cadence itself
+	     ships. CadenceApp.sharedModelContainer builds its synced store with
+	     `cloudKitDatabase: .automatic`, and SwiftData mirrors through
+	     NSPersistentCloudKitContainer, which registers for remote notifications
+	     itself — there is no registerForRemoteNotifications call to grep for.
+	     CloudKit signals "another device wrote something" with a silent push;
+	     without this entitlement that push never arrives and remote changes
+	     only import on the next launch. Keep it, and keep Push Notifications
+	     enabled on the App ID. Value stays "development": automatic signing
+	     rewrites it to "production" at archive time from the distribution
+	     profile. Paired with UIBackgroundModes/remote-notification in
+	     Cadence/App/Info.plist — the two only work together. -->
+	<key>aps-environment</key>
+	<string>development</string>
 	<key>com.apple.developer.healthkit</key>
 	<true/>
 	<key>com.apple.developer.healthkit.background-delivery</key>

@@ -49,6 +49,7 @@ private struct CustomTrackerEditSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let tracker: CustomTracker?
+    @State private var saveError: String?
     let nextSortOrder: Int
 
     @State private var name = ""
@@ -82,6 +83,14 @@ private struct CustomTrackerEditSheet: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(!isValid) }
             }
             .onAppear(perform: load)
+            .alert("Couldn't Save", isPresented: .init(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "")
+            }
         }
     }
 
@@ -103,6 +112,15 @@ private struct CustomTrackerEditSheet: View {
         } else {
             modelContext.insert(CustomTracker(name: trimmed, minValue: minValue, maxValue: maxValue, unit: unit, sortOrder: nextSortOrder))
         }
-        dismiss()
+        // See FlaresView.save — explicit save, dismiss only on success. A
+        // tracker matters more than most: DailyLog.customMetrics is keyed by
+        // its id, so a silently-dropped tracker orphans every value logged
+        // against it.
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            saveError = String(localized: "Couldn't save this tracker. Please try again.")
+        }
     }
 }

@@ -83,7 +83,9 @@ struct SettingsView: View {
             isPurchasing = true
             defer { isPurchasing = false }
             do {
-                _ = try await store.purchase(product)
+                if case .pending = try await store.purchase(product) {
+                    purchaseError = String(localized: "Your purchase needs approval before it can finish. Cadence Pro will unlock automatically once it's approved.")
+                }
             } catch {
                 purchaseError = String(localized: "Something went wrong. Please try again.")
             }
