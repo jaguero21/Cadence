@@ -18,6 +18,17 @@ struct CadenceApp: App {
     // Set when the CloudKit-mirrored store initialised (vs the local-only
     // fallback). CloudSyncMonitor uses this to show a truthful sync status.
     static private(set) var usingCloudKitStore = false
+    // Whether a PERSISTENT store has ever opened on this device. Recorded the
+    // first time one does, and read only when we've fallen back to in-memory:
+    // it's the difference between "you have nothing saved yet, reinstalling is
+    // harmless" and "your entries are on disk, deleting the app destroys them".
+    // Getting that advice backwards is how a recoverable failure becomes
+    // permanent data loss, so it is worth one UserDefaults flag.
+    static var hadPersistentStore: Bool {
+        UserDefaults.standard.bool(forKey: UserDefaultsKey.persistentStoreOpened)
+    }
+
+    private static let log = Logger(subsystem: "com.carpecadence", category: "Storage")
 
     // Static so App Intents (which run outside the SwiftUI scene) reach the
     // same container the UI uses; `static let` keeps it single-init even if
@@ -67,26 +78,58 @@ struct CadenceApp: App {
         // CloudKit capability is enabled on the target. If the entitlement is
         // absent (e.g. a build without iCloud), this init fails and we fall back
         // to a local-only store below, so the app still works offline.
+        //
+        // Each tier is do/catch rather than `try?` ON PURPOSE. The store either
+        // opening or not is the single highest-stakes thing that happens at
+        // launch, and the thrown error is the ONLY description of why it didn't
+        // — there is no second chance to ask. Discarding it (as `try?` did) left
+        // a failed schema migration and a corrupt file looking identical, and
+        // both looking like an ordinary first run.
         let cloudConfig = ModelConfiguration(schema: syncedSchema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
-        if let container = try? ModelContainer(for: fullSchema, configurations: [cloudConfig, healthConfig]) {
+        do {
+            let container = try ModelContainer(for: fullSchema, configurations: [cloudConfig, healthConfig])
             CadenceApp.usingCloudKitStore = true
+            CadenceApp.recordPersistentStoreOpened()
             return container
+        } catch {
+            // Routine: no iCloud entitlement, or no account signed in. The tier
+            // below opens the SAME file, so this costs sync, not data.
+            log.notice("CloudKit store unavailable, trying local-only: \(error.localizedDescription, privacy: .public)")
         }
         // Local-only persistent store (no CloudKit) — used when the iCloud
         // entitlement isn't present or CloudKit setup fails. Health data is
         // already local; only the synced half changes behaviour here.
         let localOnlyConfig = ModelConfiguration(schema: syncedSchema, isStoredInMemoryOnly: false)
-        if let container = try? ModelContainer(for: fullSchema, configurations: [localOnlyConfig, healthConfig]) {
+        do {
+            let container = try ModelContainer(for: fullSchema, configurations: [localOnlyConfig, healthConfig])
+            CadenceApp.recordPersistentStoreOpened()
             return container
+        } catch {
+            // NOT routine. Both persistent tiers point at the same file, so
+            // reaching here means the store itself would not open — a failed
+            // schema migration or a damaged file — and the user is about to be
+            // dropped onto volatile storage. Log it at error level; it is the
+            // only diagnostic that will exist.
+            log.error("Persistent store failed to open, falling back to in-memory: \(error.localizedDescription, privacy: .public)")
         }
         CadenceApp.usingFallbackStorage = true
         let fallbackConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
-        if let fallback = try? ModelContainer(for: fullSchema, configurations: [fallbackConfig]) {
-            return fallback
+        do {
+            return try ModelContainer(for: fullSchema, configurations: [fallbackConfig])
+        } catch {
+            log.error("In-memory fallback container failed: \(error.localizedDescription, privacy: .public)")
         }
         CadenceApp.containerFailed = true
         return nil
     }()
+
+    // Latches the flag `hadPersistentStore` reads. Never cleared: once real
+    // entries have been written to disk, "reinstalling is safe" stops being
+    // true for this device even if a later launch opens the store fine.
+    private static func recordPersistentStoreOpened() {
+        guard !AppLaunch.isUITesting else { return }
+        UserDefaults.standard.set(true, forKey: UserDefaultsKey.persistentStoreOpened)
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -236,7 +279,20 @@ struct ContentView: View {
         .alert("Storage Unavailable", isPresented: $showStorageWarning) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Cadence couldn't open its database (a migration may be needed). Your data is safe, but changes made this session won't be saved. Try deleting and reinstalling the app if this persists.")
+            // Two messages, not one with a ternary: `Text(cond ? "a" : "b")`
+            // resolves to the non-localizing StringProtocol initializer and
+            // would drop both strings out of the catalog.
+            //
+            // The old single message said "your data is safe" and then advised
+            // deleting and reinstalling the app — the one action that turns a
+            // recoverable failure (a store that wouldn't migrate) into
+            // permanent loss. Which advice is safe depends entirely on whether
+            // anything was ever written to disk here.
+            if CadenceApp.hadPersistentStore {
+                Text("Cadence is running on temporary storage, so anything you log right now won't be kept. Your saved entries are still on this device — don't delete Cadence, that would erase them. Force-quit and reopen, and update to the latest version if this keeps happening.")
+            } else {
+                Text("Cadence couldn't open its database and is running on temporary storage, so anything you log right now won't be kept. Force-quit and reopen. Nothing has been saved on this device yet, so reinstalling is safe if this keeps happening.")
+            }
         }
     }
 
@@ -377,7 +433,10 @@ struct StorageFatalErrorView: View {
             VStack(spacing: 8) {
                 Text("Cadence can't start")
                     .font(.title2.bold())
-                Text("The app's data storage failed to initialise. Please force-quit and reopen. If the problem persists, reinstall the app — your health data in Apple Health is unaffected.")
+                // Never advise reinstalling here: this screen appears when the
+                // store could not be opened, which is usually recoverable, and
+                // deleting the app is what makes it permanent.
+                Text("Cadence's data storage wouldn't start. Please force-quit and reopen. If you've logged entries before, they're still on this device — don't delete Cadence, that would erase them. Update to the latest version if this keeps happening.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
