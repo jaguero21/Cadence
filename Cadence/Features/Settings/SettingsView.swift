@@ -18,6 +18,9 @@ struct SettingsView: View {
 
     @State private var isPurchasing = false
     @State private var purchaseError: String?
+    // Kept apart from purchaseError so it can carry its own, non-alarming
+    // title — see the alerts below.
+    @State private var pendingMessage: String?
     @State private var showingManageSubscriptions = false
 
     #if DEBUG
@@ -72,6 +75,19 @@ struct SettingsView: View {
         } message: {
             Text(purchaseError ?? "")
         }
+        // Ask to Buy and bank (SCA) approval are NOT failures — the purchase is
+        // in flight and will complete on its own. Routing them through
+        // purchaseError put that reassuring message under a red "Purchase Error"
+        // heading, which reads as "your payment failed". Mirrors
+        // ProPaywallView, which already keeps the two apart.
+        .alert("Waiting for Approval", isPresented: .init(
+            get: { pendingMessage != nil },
+            set: { if !$0 { pendingMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(pendingMessage ?? "")
+        }
     }
 
     // A failed purchase used to be swallowed by `Task { try? await ... }`, so a
@@ -84,7 +100,7 @@ struct SettingsView: View {
             defer { isPurchasing = false }
             do {
                 if case .pending = try await store.purchase(product) {
-                    purchaseError = String(localized: "Your purchase needs approval before it can finish. Cadence Pro will unlock automatically once it's approved.")
+                    pendingMessage = String(localized: "Your purchase needs approval before it can finish. Cadence Pro will unlock automatically once it's approved.")
                 }
             } catch {
                 purchaseError = String(localized: "Something went wrong. Please try again.")

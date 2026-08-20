@@ -328,12 +328,19 @@ struct LogDetailView: View {
     @Query private var healthRows: [HealthSnapshot]
     private let attachmentStore = AttachmentStore()
 
-    // The day's row, matched to the log by midnight-normalized date. Resolved
-    // here so every presenter of this sheet (calendar tap, search result,
-    // insight drill-in) gets it for free.
-    private var health: HealthSnapshot? {
-        healthRows.first { Calendar.current.startOfDay(for: $0.date) == Calendar.current.startOfDay(for: log.date) }
+    // Scoped to this log's day in the query itself. It previously fetched every
+    // HealthSnapshot the device holds and searched it in Swift for one match —
+    // the whole table materialised to read a single row, on a sheet opened from
+    // three places.
+    init(log: DailyLog) {
+        self.log = log
+        let day = Calendar.current.startOfDay(for: log.date)
+        _healthRows = Query(filter: #Predicate<HealthSnapshot> { $0.date == day })
     }
+
+    // The day's row. Resolved here so every presenter of this sheet (calendar
+    // tap, search result, insight drill-in) gets it for free.
+    private var health: HealthSnapshot? { healthRows.first }
 
     var body: some View {
         NavigationStack {

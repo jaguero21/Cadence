@@ -207,7 +207,11 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `DashboardView` (90d), `DailyLogView` (30d), `WeeklyReviewView` (14d),
   `InsightsView` (180d). Unbounded `@Query` is only for small reference
   tables (`SymptomTag`, `CustomTracker`, `Medication`, `Flare`) or
-  DEBUG-only tooling, not log/review data.
+  DEBUG-only tooling, not log/review data. **`HealthSnapshot` counts as
+  per-day data**, so its `@Query` is windowed to match the logs it joins
+  against — 90d in `DashboardView`, 180d in `InsightsView`, and a single
+  `$0.date == day` predicate in `LogDetailView`, which needs exactly one row
+  and used to materialise the whole table to search it in Swift.
 - **Persistence resilience.** `sharedModelContainer` tries a **CloudKit-mirrored**
   synced store first (`cloudKitDatabase: .automatic`), then a local-only
   persistent one (used when the iCloud entitlement is absent), then in-memory,
@@ -436,8 +440,18 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   shows the delta. Built-ins map via `ChartMetric.series` (stress is inverted —
   lower is better); custom trackers via `ChartSeries.custom`, whose
   `higherIsBetter` is `nil` → neutral badge. Badge threshold in
-  `ChartThreshold`. `TrendChartView.mean`, `ChartMetric.isImprovement`, and
-  `ChartSeries.isImprovement` are the pure, unit-tested helpers.
+  `ChartThreshold`. `TrendChartView.mean`, `ChartMetric.isImprovement`,
+  `ChartSeries.isImprovement`, and `InsightsView.workoutMinutes(for:from:)`
+  are the pure, unit-tested helpers.
+- **A dictionary-backed series must cover the comparison window too.**
+  `ChartSeries.workoutMinutes` reads every value out of the `minutesByDay` map
+  it is handed, so a day absent from that map is indistinguishable from a day
+  with no workout. Building the map from the visible range alone therefore made
+  the period-comparison badge impossible — `previousAverage` averages the
+  series over `previousLogs`, which all resolved to nil. `InsightsView` now
+  merges the previous window's days into the lookup map while still taking the
+  chart's PRESENCE and y-domain from the visible range only, so an out-of-range
+  workout still can't summon the chart or stretch its axis.
 - `InsightsView`'s `@Query` spans **2× the largest chart window** (180 days) so
   `previousLogs` has data for the 90D comparison; keep it at 2× if ranges
   change (`ChartRange.days` is the per-range source of truth). Insight
@@ -456,7 +470,20 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 
 - The doctor/personal PDF is built by `PDFBuilder`; a spreadsheet export is built
   by `CSVBuilder` (`csvString(from:)` is the pure, testable core; `build(logs:)`
-  writes the temp file). Both are driven from `ExportView`; PDFs open in
+  writes the temp file). **Every export writes through
+  `ExportScratch.write(_:to:)`** — never `Data.write(to:options:)` directly and
+  never a renderer's own file-writing call. That seam applies `.atomic` +
+  `.completeFileProtection`, without which a generated report stays readable off
+  a locked device that has been unlocked once since boot. `PDFBuilder` used to
+  call `UIGraphicsPDFRenderer.writePDF(to:)`, which takes a URL and no write
+  options, so the full narrative report — the most sensitive of the three files
+  — was the one export missing the protection the CSV and JSON backup had; it
+  now renders via `pdfData` and hands the bytes to the seam. The protection
+  class is **not assertable in tests** (the simulator reports `.protectionKey`
+  as nil regardless), so the single code path is the guarantee.
+  `AttachmentStore` deliberately stays outside this seam — media uses
+  `.completeFileProtectionUnlessOpen` so a photo or voice note stays readable
+  while it's on screen or playing. Both are driven from `ExportView`; PDFs open in
   `ReportPreviewSheet` (PDFKit) with sharing in its toolbar — never straight
   into a blind share sheet — while the CSV still uses `ShareSheet`.
 - `PDFBuilder` layout goes through the private `Cursor` class (page breaks,
@@ -520,6 +547,11 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   model's `saveError`, an `errorMessage`), build it with
   `String(localized: "...")` at the assignment site so it extracts and
   localizes; then `Text(thatString)` displays the already-localized value.
+  **The same trap fires on a ternary of two literals**: `Text(cond ? "a" : "b")`
+  and `.accessibilityLabel(cond ? "a" : "b")` both type-infer `String` and pick
+  the non-localizing overload, so NEITHER string reaches the catalog. Write two
+  `Text("literal")` values (`.accessibilityLabel` takes a `Text`) or an
+  if/else, never a ternary of bare literals.
 - Not yet migrated: debug-only copy behind the simulated-data tooling in
   `SettingsView` (the `seedResultMessage` interpolations) — intentionally left.
 - **Spanish (`es`) ships.** All catalog keys carry `es` translations

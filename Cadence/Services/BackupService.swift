@@ -379,7 +379,7 @@ enum BackupService {
         let data = try encode(document)
         let stamp = document.exportDate.formatted(.iso8601.year().month().day().dateSeparator(.dash))
         let url = ExportScratch.url(for: "Cadence-Backup-\(stamp).json")
-        try data.write(to: url, options: ExportScratch.writeOptions)
+        try ExportScratch.write(data, to: url)
         return url
     }
 }
