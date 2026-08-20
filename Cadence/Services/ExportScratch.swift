@@ -29,8 +29,27 @@ enum ExportScratch {
     }
 
     // Write options every export should use: atomic, plus complete protection
-    // so a generated report can't be read off a locked device.
+    // so a generated report can't be read off a locked device. (Without it the
+    // default is completeUntilFirstUserAuthentication, which stays readable
+    // whenever the device has been unlocked once since boot.)
     static let writeOptions: Data.WritingOptions = [.atomic, .completeFileProtection]
+
+    // The ONE way an export reaches disk. Every generated file — report, CSV,
+    // backup — goes through here rather than calling `Data.write` itself, so
+    // the options above cannot be forgotten by a new export path.
+    //
+    // They were forgotten once: the PDF report, the most sensitive artefact of
+    // the three, wrote itself through `UIGraphicsPDFRenderer.writePDF(to:)`,
+    // which takes a URL and no write options at all. It picked up this
+    // directory but none of its protection.
+    //
+    // Note for tests: the applied protection class is NOT observable in the
+    // simulator — `attributesOfItem` reports `.protectionKey` as nil there even
+    // for a file written with `.completeFileProtection` — so this is enforced
+    // by having one code path, not by an assertion.
+    static func write(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: writeOptions)
+    }
 
     // Deletes the whole scratch directory. Safe to call when it doesn't exist.
     static func purge() {

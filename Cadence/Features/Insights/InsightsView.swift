@@ -22,6 +22,9 @@ struct InsightsView: View {
         let day = Calendar.current.startOfDay(for: referenceDate)
         let cutoff = Calendar.current.date(byAdding: .day, value: -2 * PatternThreshold.insightWindowDays, to: day) ?? .distantPast
         _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
+        // Same window as `logs` — per-day data, so it gets the same treatment
+        // rather than an unbounded fetch of the whole health store.
+        _healthRows = Query(filter: #Predicate<HealthSnapshot> { $0.date >= cutoff })
     }
     @Environment(StoreService.self) private var store
     @Environment(AppState.self) private var appState
@@ -155,10 +158,22 @@ struct InsightsView: View {
                 // local-only health store and scoped to `filtered`, so neither
                 // the chart's presence nor its y-domain can be driven by a
                 // workout outside the range currently on screen.
-                let workoutMinutes = workoutMinutes(for: filtered)
-                if let longest = workoutMinutes.values.max() {
+                // Named apart from the `workoutMinutes(for:)` helper: a local
+                // called `workoutMinutes` would shadow it for the rest of scope.
+                let currentMinutes = workoutMinutes(for: filtered)
+                if let longest = currentMinutes.values.max() {
+                    // The LOOKUP map must also cover the previous window, or
+                    // TrendChartView's period-comparison badge can never appear:
+                    // it averages `series.value` over `previousLogs`, and this
+                    // series reads its value out of this dictionary, so days
+                    // missing from it come back nil and the previous average is
+                    // always nil. Presence and y-domain still come from
+                    // `currentMinutes`/`longest` — i.e. the visible range alone —
+                    // so a workout outside it still can't summon the chart or
+                    // stretch its axis.
+                    let withComparison = currentMinutes.merging(workoutMinutes(for: previous)) { current, _ in current }
                     TrendChartView(logs: filtered,
-                                   series: .workoutMinutes(longestSession: longest, minutesByDay: workoutMinutes),
+                                   series: .workoutMinutes(longestSession: longest, minutesByDay: withComparison),
                                    range: vm.chartRange, previousLogs: previous, onOpenDay: openDay)
                 }
             }
@@ -176,10 +191,19 @@ struct InsightsView: View {
         .cadenceCard()
     }
 
+    private func workoutMinutes(for logs: [DailyLog]) -> [Date: Double] {
+        Self.workoutMinutes(for: logs, from: healthRows)
+    }
+
     // Workout minutes keyed by day for exactly the given logs, read from the
     // local-only HealthSnapshot store. Empty when none of those days has a
     // workout, which is what keeps the chart from appearing at all.
-    private func workoutMinutes(for logs: [DailyLog]) -> [Date: Double] {
+    //
+    // Static and pure so it can be unit-tested, same reasoning as
+    // HistoryView.logMatches: which days land in this map decides both whether
+    // the chart appears and whether its comparison badge can compute a previous
+    // average, and neither is observable from the view.
+    static func workoutMinutes(for logs: [DailyLog], from healthRows: [HealthSnapshot]) -> [Date: Double] {
         let days = Set(logs.map { Calendar.current.startOfDay(for: $0.date) })
         var result: [Date: Double] = [:]
         for row in healthRows {

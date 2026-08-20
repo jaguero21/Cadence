@@ -1163,6 +1163,69 @@ struct ChartSeriesTests {
         // The tracker's declared range drives the chart's y-axis.
         #expect(series.yDomain == 0...8)
     }
+
+    // MARK: Workout minutes
+
+    // The series reads every value out of the dictionary it is handed, so days
+    // absent from that map are indistinguishable from days with no workout.
+    // That is what made the comparison badge silently impossible: InsightsView
+    // built the map from the VISIBLE window only, so `previousLogs` — the
+    // equal-length window before it, which is the entire basis of the badge —
+    // resolved to nil for every day and the previous average never existed.
+    @Test("workoutMinutes series is nil for days missing from its map")
+    func workoutMinutes_nilOutsideMap() {
+        let day = Calendar.current.startOfDay(for: .now)
+        let series = ChartSeries.workoutMinutes(longestSession: 60, minutesByDay: [day: 45])
+        let inMap = DailyLog(date: day)
+        let outOfMap = DailyLog(date: Calendar.current.date(byAdding: .day, value: -40, to: day) ?? day)
+        #expect(series.value(inMap) == 45)
+        #expect(series.value(outOfMap) == nil)
+        // Neutral badge: more exercise isn't unconditionally better.
+        #expect(series.isImprovement(delta: 1.0) == nil)
+    }
+
+    @Test("workoutMinutes map covers exactly the days it is asked for")
+    func workoutMinutes_mapScopedToGivenLogs() throws {
+        let schema = Schema([DailyLog.self, HealthSnapshot.self])
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let context = ModelContext(try ModelContainer(for: schema, configurations: [config]))
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+
+        func day(_ ago: Int) -> Date { cal.date(byAdding: .day, value: -ago, to: today) ?? today }
+
+        var logs: [DailyLog] = []
+        for ago in [1, 40] {
+            let log = DailyLog(date: day(ago))
+            context.insert(log)
+            logs.append(log)
+            let row = HealthSnapshot(date: day(ago))
+            row.hkWorkoutMinutes = Double(ago)
+            context.insert(row)
+        }
+        // A health row whose day has no log in the slice being asked about.
+        let orphan = HealthSnapshot(date: day(80))
+        orphan.hkWorkoutMinutes = 99
+        context.insert(orphan)
+        try context.save()
+
+        let rows = try context.fetch(FetchDescriptor<HealthSnapshot>())
+
+        // Asked for the recent log only: just that day, never the orphan.
+        let current = InsightsView.workoutMinutes(for: [logs[0]], from: rows)
+        #expect(current == [day(1): 1])
+
+        // Asked for the older log — this is the call the comparison badge needs,
+        // and it must produce the previous window's days rather than nothing.
+        let previous = InsightsView.workoutMinutes(for: [logs[1]], from: rows)
+        #expect(previous == [day(40): 40])
+
+        // Merged, the lookup spans both windows, which is what the chart passes
+        // to the series so `previousAverage` can be computed at all.
+        let merged = current.merging(previous) { keep, _ in keep }
+        #expect(merged.count == 2)
+        #expect(merged[day(80)] == nil)
+    }
 }
 
 // MARK: - PatternEngine: daylightMoodCorrelation

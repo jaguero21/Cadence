@@ -1,6 +1,7 @@
 import SwiftUI
 import PDFKit
 import Charts
+import OSLog
 
 enum PDFBuilder {
     static func build(logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = []) async -> URL? {
@@ -13,15 +14,27 @@ enum PDFBuilder {
         // before the PDF context opens.
         let charts = await trendChartImages(logs: logs)
 
+        // Rendered to Data and written through ExportScratch rather than with
+        // `renderer.writePDF(to:)`. That call writes the file itself and accepts
+        // no write options, so the finished report — a full narrative health
+        // history — landed without the complete-protection class the CSV and the
+        // JSON backup both get. Holding a report in memory briefly is a fair
+        // price; these are hundreds of KB, not hundreds of MB.
+        let data = renderer.pdfData { ctx in
+            renderReport(ctx: ctx, logs: logs, charts: charts, insights: insights, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers)
+        }
         do {
-            try renderer.writePDF(to: url) { ctx in
-                renderReport(ctx: ctx, logs: logs, charts: charts, insights: insights, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers)
-            }
+            try ExportScratch.write(data, to: url)
             return url
         } catch {
+            // ExportView turns nil into a visible "Couldn't create the report"
+            // message, but the reason would otherwise be lost entirely.
+            log.error("Failed to write report: \(error, privacy: .public)")
             return nil
         }
     }
+
+    private static let log = Logger(subsystem: "com.carpecadence", category: "PDFBuilder")
 
     // MARK: - Print palette
 

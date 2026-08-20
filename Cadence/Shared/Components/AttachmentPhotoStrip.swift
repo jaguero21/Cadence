@@ -70,7 +70,13 @@ private struct AttachmentThumbnail: View {
         }
         .frame(width: tileSize, height: tileSize)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .accessibilityLabel(isMissing ? "Photo added on another device — not available here" : "Attached photo")
+        // Two Text values, not a ternary of two String literals: the latter
+        // resolves to accessibilityLabel's StringProtocol overload, which does
+        // NOT localize, and would silently drop both strings out of the
+        // catalog. Text("literal") takes a LocalizedStringKey, so each extracts.
+        .accessibilityLabel(isMissing
+            ? Text("Photo added on another device — not available here")
+            : Text("Attached photo"))
         .task(id: filename) {
             let decoded = store.thumbnail(for: filename, maxPixel: tileSize * displayScale)
             image = decoded

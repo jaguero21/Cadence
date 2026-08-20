@@ -145,7 +145,12 @@ struct SchemaMigrationTests {
     @Test("A log with no health row for its day joins to nil hk* values, not zeros")
     func joinWithoutHealthRow_yieldsNilNotZero() throws {
         let fullSchema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, HealthSnapshot.self])
-        let config = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
+        // Unique name, like every other container in the suite: unnamed
+        // in-memory configurations share one store identity, so parallel suites
+        // declaring different schemas collide and the resulting ObjC exception
+        // takes down the whole bundle (every test passes alone, the full run
+        // reports "0 tests"). See the Testing section of CLAUDE.md.
+        let config = ModelConfiguration(UUID().uuidString, schema: fullSchema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: fullSchema, configurations: [config])
         let context = ModelContext(container)
 

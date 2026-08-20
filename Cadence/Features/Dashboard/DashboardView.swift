@@ -30,6 +30,10 @@ struct DashboardView: View {
         let day = Calendar.current.startOfDay(for: referenceDate)
         let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: day) ?? .distantPast
         _logs = Query(filter: #Predicate<DailyLog> { $0.date >= cutoff }, sort: \DailyLog.date, order: .reverse)
+        // Windowed to match `logs`. HealthSnapshot is per-day data, not a small
+        // reference table, so an unbounded query here would materialise every
+        // row the device has ever recorded to join against 90 days of logs.
+        _healthRows = Query(filter: #Predicate<HealthSnapshot> { $0.date >= cutoff })
     }
 
     var body: some View {
@@ -245,7 +249,17 @@ struct DashboardView: View {
         // Computed by the pure helper, which windows to the real trailing seven
         // days and averages only over values the user actually entered — see
         // DashboardViewModel.sevenDayStats.
-        let stats = DashboardViewModel.sevenDayStats(from: logs.map { DailyLogSnapshot($0) }, referenceDate: referenceDate)
+        // Windowed BEFORE snapshotting. `sevenDayStats` filters to today-6...today
+        // itself, but reaching it meant building a DailyLogSnapshot for all ~90
+        // logs the query holds — each one copying symptoms, factors, basics and
+        // custom metrics — on every body evaluation, to then discard 83 of them.
+        // Filtering on `date` first is a cheap comparison and leaves the helper's
+        // own window as the authority.
+        let calendar = Calendar.current
+        let windowStart = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: referenceDate))
+            ?? calendar.startOfDay(for: referenceDate)
+        let recent = logs.filter { $0.date >= windowStart }
+        let stats = DashboardViewModel.sevenDayStats(from: recent.map { DailyLogSnapshot($0) }, referenceDate: referenceDate)
         if stats.loggedDays > 0 {
             VStack(alignment: .leading, spacing: 12) {
                 Text("7-Day Snapshot")
