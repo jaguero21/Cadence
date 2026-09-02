@@ -89,9 +89,22 @@ struct StreakBadge: View {
             Text("\(count)")
                 .font(.subheadline.bold())
                 .contentTransition(.numericText())
-            Text(isMilestone ? "day streak!" : (count == 1 ? "day" : "days"))
-                .font(.subheadline)
-                .foregroundStyle(isMilestone ? .primary : .secondary)
+            // Two keys rather than one Vary-by-Plural entry, on Xcode's own
+            // instruction: a plural variation whose value doesn't reference the
+            // number is a hard build error ("use separate top-level strings for
+            // one and greater than one"). The count is rendered by its own bold
+            // Text above, so these values are the bare noun and can't carry it.
+            Group {
+                if isMilestone {
+                    Text("day streak!")
+                } else if count == 1 {
+                    Text("day")
+                } else {
+                    Text("days")
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(isMilestone ? .primary : .secondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -101,7 +114,7 @@ struct StreakBadge: View {
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isMilestone
-            ? "Milestone: \(count) day logging streak"
-            : "\(count) day logging streak")
+            ? Text("Milestone: \(count) day logging streak")
+            : Text("\(count) day logging streak"))
     }
 }

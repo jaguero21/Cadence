@@ -153,7 +153,9 @@ struct DashboardView: View {
                     Text("Today's Log")
                         .font(.headline)
                     if let log = vm.todayLog {
-                        Text(log.isComplete ? "Completed" : "In progress — tap to finish")
+                        (log.isComplete
+                            ? Text("Completed")
+                            : Text("In progress — tap to finish"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     } else {
@@ -195,7 +197,9 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Weekly Review")
                         .font(.headline)
-                    Text(vm.thisWeekReview?.isComplete == true ? "Completed this week" : "Ready to review")
+                    (vm.thisWeekReview?.isComplete == true
+                        ? Text("Completed this week")
+                        : Text("Ready to review"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -209,8 +213,8 @@ struct DashboardView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(vm.thisWeekReview?.isComplete == true
-            ? "Weekly Review, completed this week"
-            : "Weekly Review, ready to review")
+            ? Text("Weekly Review, completed this week")
+            : Text("Weekly Review, ready to review"))
         .sheet(isPresented: $showingWeeklyReview) {
             ReviewFlowView(existingReview: vm.thisWeekReview, logs: logs)
         }
@@ -336,20 +340,25 @@ struct DashboardView: View {
         .cadenceCard()
     }
 
+    // Built with String(localized:) rather than returned as bare literals: a
+    // plain String reaches Text/.accessibilityLabel through the non-localizing
+    // StringProtocol overload, so these never entered the catalog at all.
     private var todayCardAccessibilityLabel: String {
         if let log = vm.todayLog {
-            return log.isComplete ? "Today's Log, completed" : "Today's Log, in progress"
+            return log.isComplete
+                ? String(localized: "Today's Log, completed")
+                : String(localized: "Today's Log, in progress")
         }
-        return "Today's Log, not started. Takes about 90 seconds."
+        return String(localized: "Today's Log, not started. Takes about 90 seconds.")
     }
 
     private var greetingText: String {
         let hour = Calendar.current.component(.hour, from: .now)
         switch hour {
-        case 5..<12:  return "Good morning"
-        case 12..<17: return "Good afternoon"
-        case 17..<21: return "Good evening"
-        default:      return "Good night"
+        case 5..<12:  return String(localized: "Good morning")
+        case 12..<17: return String(localized: "Good afternoon")
+        case 17..<21: return String(localized: "Good evening")
+        default:      return String(localized: "Good night")
         }
     }
 }

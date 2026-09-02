@@ -133,7 +133,7 @@ private enum OnboardingStep: CaseIterable {
 
     var next: OnboardingStep {
         let all = Self.allCases
-        let i = all.firstIndex(of: self)!
+        guard let i = all.firstIndex(of: self) else { return self }
         return i + 1 < all.count ? all[i + 1] : self
     }
 }

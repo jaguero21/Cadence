@@ -70,7 +70,7 @@ struct DailyLogView: View {
                 Text("Today").font(.headline)
                 Spacer()
                 if let log = todayLog {
-                    Text(log.isComplete ? "Complete" : "In Progress")
+                    (log.isComplete ? Text("Complete") : Text("In Progress"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(log.isComplete ? CadenceColor.successGreen : CadenceColor.energyOrange)
                 }

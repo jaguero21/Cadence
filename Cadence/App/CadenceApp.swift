@@ -10,6 +10,9 @@ import OSLog
 struct CadenceApp: App {
     @State private var appState = AppState()
     @State private var store = StoreService.shared
+    // Mirrors the static so a successful retry from StorageFatalErrorView
+    // re-renders the scene into the real app.
+    @State private var container: ModelContainer? = CadenceApp.sharedModelContainer
 
     // Set when the persistent store failed and we fell back to in-memory storage.
     static private(set) var usingFallbackStorage = false
@@ -33,7 +36,23 @@ struct CadenceApp: App {
     // Static so App Intents (which run outside the SwiftUI scene) reach the
     // same container the UI uses; `static let` keeps it single-init even if
     // the App struct is re-created.
-    static let sharedModelContainer: ModelContainer? = {
+    static private(set) var sharedModelContainer: ModelContainer? = makeContainer()
+
+    // Retry hook for StorageFatalErrorView. Every tier below can fail for a
+    // reason that is gone a moment later — a device that just booted has not
+    // made protected files readable yet — and before this the only recovery a
+    // user could reach was force-quitting the app themselves. @MainActor so the
+    // one reassignment only ever happens from the scene showing the failure.
+    @MainActor
+    static func retryMakingContainer() -> ModelContainer? {
+        guard sharedModelContainer == nil else { return sharedModelContainer }
+        containerFailed = false
+        usingFallbackStorage = false
+        sharedModelContainer = makeContainer()
+        return sharedModelContainer
+    }
+
+    private static func makeContainer() -> ModelContainer? {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
@@ -121,7 +140,7 @@ struct CadenceApp: App {
         }
         CadenceApp.containerFailed = true
         return nil
-    }()
+    }
 
     // Latches the flag `hadPersistentStore` reads. Never cleared: once real
     // entries have been written to disk, "reinstalling is safe" stops being
@@ -133,7 +152,7 @@ struct CadenceApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let container = Self.sharedModelContainer {
+            if let container {
                 Group {
                     if appState.hasCompletedOnboarding {
                         ContentView()
@@ -199,7 +218,9 @@ struct CadenceApp: App {
                     }
                 }
             } else {
-                StorageFatalErrorView()
+                StorageFatalErrorView {
+                    container = CadenceApp.retryMakingContainer()
+                }
             }
         }
     }
@@ -424,6 +445,11 @@ struct ContentView: View {
 
 // Shown when both the persistent and in-memory ModelContainer fail to initialise.
 struct StorageFatalErrorView: View {
+    // Without this the screen is a dead end: no focusable element for VoiceOver
+    // or Switch Control, and no way to recover from a failure that is often
+    // transient. Defaulted so previews still construct the view bare.
+    var onRetry: () -> Void = {}
+
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "externaldrive.badge.exclamationmark")
@@ -442,11 +468,14 @@ struct StorageFatalErrorView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button("Force Quit") {
-                exit(1)
+            Button(action: onRetry) {
+                Text("Try Again")
+                    .font(.body.bold())
+                    .frame(maxWidth: 220)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.red)
+            .controlSize(.large)
+            .tint(CadenceColor.accent)
         }
         .padding(32)
     }

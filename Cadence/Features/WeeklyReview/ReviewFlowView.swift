@@ -172,7 +172,14 @@ struct ReviewFlowView: View {
                 vm.next()
             } label: {
                 HStack {
-                    Text(vm.isLastStep ? "Complete" : "Next").font(.body.bold())
+                    // Its own key: here "Complete" is the verb that finishes the
+                    // review, not the status adjective on ReviewRowView.
+                    (vm.isLastStep
+                        ? Text(String(localized: "review.button.complete",
+                                      defaultValue: "Complete",
+                                      comment: "Button that finishes the weekly review. A verb, unlike the identically-worded status label."))
+                        : Text("Next"))
+                        .font(.body.bold())
                     if !vm.isLastStep {
                         Image(systemName: "chevron.right")
                     }
