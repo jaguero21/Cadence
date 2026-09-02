@@ -84,7 +84,9 @@ struct SymptomPickerView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(name)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
-            .accessibilityHint(isSelected ? "Double-tap and hold to adjust severity" : "Double-tap to select, then hold to rate severity")
+            .accessibilityHint(isSelected
+                ? Text("Double-tap and hold to adjust severity")
+                : Text("Double-tap to select, then hold to rate severity"))
             .accessibilityAction(named: "Rate severity") {
                 expandSeverity(name: name, emoji: emoji)
             }

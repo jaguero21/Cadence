@@ -102,7 +102,9 @@ struct AudioPlaybackButton: View {
                 .foregroundStyle(CadenceColor.accent)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(playback.isPlaying ? "Stop voice note" : "Play voice note")
+        .accessibilityLabel(playback.isPlaying
+            ? Text("Stop voice note")
+            : Text("Play voice note"))
         .onDisappear { playback.stop() }
     }
 }

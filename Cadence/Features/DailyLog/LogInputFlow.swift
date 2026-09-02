@@ -202,7 +202,7 @@ struct LogInputFlow: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(step.title)
                 .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
-                .accessibilityHint(isCurrent ? "Current step" : "Jump to this step")
+                .accessibilityHint(isCurrent ? Text("Current step") : Text("Jump to this step"))
             }
         }
         .padding(.horizontal, 8)
@@ -256,14 +256,17 @@ struct LogInputFlow: View {
         MoodScale.emoji(for: value)
     }
 
+    // String(localized:) at the return, not a bare literal: .accessibilityLabel
+    // takes the non-localizing StringProtocol overload for a plain String, so
+    // these five labels never reached the catalog.
     private func moodLabel(_ value: Int) -> String {
         switch value {
-        case 1: return "Very sad, 1 of 5"
-        case 2: return "Sad, 2 of 5"
-        case 3: return "Neutral, 3 of 5"
-        case 4: return "Happy, 4 of 5"
-        case 5: return "Very happy, 5 of 5"
-        default: return "Neutral"
+        case 1: return String(localized: "Very sad, 1 of 5")
+        case 2: return String(localized: "Sad, 2 of 5")
+        case 3: return String(localized: "Neutral, 3 of 5")
+        case 4: return String(localized: "Happy, 4 of 5")
+        case 5: return String(localized: "Very happy, 5 of 5")
+        default: return String(localized: "Neutral")
         }
     }
 
@@ -629,7 +632,7 @@ struct LogInputFlow: View {
                     vm.nextStep()
                 } label: {
                     HStack {
-                        Text(vm.currentStep == .reflection ? "Finish" : "Next")
+                        (vm.currentStep == .reflection ? Text("Finish") : Text("Next"))
                             .font(.body.bold())
                         if vm.currentStep != .reflection {
                             Image(systemName: "chevron.right")

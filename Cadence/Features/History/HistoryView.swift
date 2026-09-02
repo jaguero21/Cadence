@@ -235,7 +235,7 @@ struct HistoryView: View {
         .zoomTransitionSource(id: day, in: detailZoom)
         .disabled(isFuture || log == nil)
         .accessibilityLabel(dayCellLabel(day: day, log: log, isToday: isToday))
-        .accessibilityHint(log != nil && !isFuture ? "Double-tap to view details" : "")
+        .accessibilityHint(log != nil && !isFuture ? Text("Double-tap to view details") : Text(verbatim: ""))
     }
 
     private func dayCellLabel(day: Date, log: DailyLog?, isToday: Bool) -> String {

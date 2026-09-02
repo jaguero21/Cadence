@@ -114,7 +114,9 @@ struct StarRatingView: View {
                             .foregroundStyle(star <= rating ? Color.yellow : Color(.quaternaryLabel))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(star) \(star == 1 ? "star" : "stars") out of 5")
+                    // One key, pluralized by the String Catalog rather than by
+                    // a `star == 1` branch that only knows English's two forms.
+                    .accessibilityLabel(Text("\(star) stars out of 5"))
                     .accessibilityAddTraits(star == rating ? [.isSelected] : [])
                 }
             }

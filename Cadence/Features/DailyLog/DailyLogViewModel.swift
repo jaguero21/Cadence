@@ -75,15 +75,18 @@ enum LogStep: Int, CaseIterable {
 
     var isMetricStep: Bool { self == .bodyMetrics }
 
+    // Displayed and read aloud (LogInputFlow's step chips), so each case is
+    // built with String(localized:) — a bare literal here would reach Text and
+    // .accessibilityLabel through their non-localizing String overloads.
     var title: String {
         switch self {
-        case .mood:        return "Overall Mood"
-        case .bodyMetrics: return "Body Metrics"
-        case .basics:      return "Basics Done Today"
-        case .symptoms:    return "Symptoms"
-        case .factors:     return "Possible Triggers"
-        case .reflection:  return "Reflection"
-        case .done:        return "All done!"
+        case .mood:        return String(localized: "Overall Mood")
+        case .bodyMetrics: return String(localized: "Body Metrics")
+        case .basics:      return String(localized: "Basics Done Today")
+        case .symptoms:    return String(localized: "Symptoms")
+        case .factors:     return String(localized: "Possible Triggers")
+        case .reflection:  return String(localized: "Reflection")
+        case .done:        return String(localized: "All done!")
         }
     }
 
