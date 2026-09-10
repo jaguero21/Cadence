@@ -70,10 +70,9 @@ private struct AttachmentThumbnail: View {
         }
         .frame(width: tileSize, height: tileSize)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        // Two Text values, not a ternary of two String literals: the latter
-        // resolves to accessibilityLabel's StringProtocol overload, which does
-        // NOT localize, and would silently drop both strings out of the
-        // catalog. Text("literal") takes a LocalizedStringKey, so each extracts.
+        // Text("literal") takes a LocalizedStringKey, so both branches extract.
+        // A ternary of two String-typed values would not: that reaches
+        // accessibilityLabel's non-localizing StringProtocol overload.
         .accessibilityLabel(isMissing
             ? Text("Photo added on another device — not available here")
             : Text("Attached photo"))

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Foundation
 import UserNotifications
 import WidgetKit
 import TipKit
@@ -14,45 +15,74 @@ struct CadenceApp: App {
     // re-renders the scene into the real app.
     @State private var container: ModelContainer? = CadenceApp.sharedModelContainer
 
+    // The storage statics below are `nonisolated`, unlike the rest of this type.
+    // Conforming to App infers @MainActor onto every member, but the store is
+    // opened by whoever touches it first — which is LogCheckInIntent's own
+    // context, not the scene, when Siri logs a check-in from a cold start. The
+    // annotations describe what already happens; without them the retry can't
+    // leave the main thread (see retryMakingContainer).
+    //
     // Set when the persistent store failed and we fell back to in-memory storage.
-    static private(set) var usingFallbackStorage = false
-    // Set when even the in-memory fallback failed; app runs without SwiftData.
-    static private(set) var containerFailed = false
+    nonisolated(unsafe) static private(set) var usingFallbackStorage = false
     // Set when the CloudKit-mirrored store initialised (vs the local-only
     // fallback). CloudSyncMonitor uses this to show a truthful sync status.
-    static private(set) var usingCloudKitStore = false
+    nonisolated(unsafe) static private(set) var usingCloudKitStore = false
     // Whether a PERSISTENT store has ever opened on this device. Recorded the
     // first time one does, and read only when we've fallen back to in-memory:
     // it's the difference between "you have nothing saved yet, reinstalling is
     // harmless" and "your entries are on disk, deleting the app destroys them".
     // Getting that advice backwards is how a recoverable failure becomes
     // permanent data loss, so it is worth one UserDefaults flag.
-    static var hadPersistentStore: Bool {
+    nonisolated static var hadPersistentStore: Bool {
         UserDefaults.standard.bool(forKey: UserDefaultsKey.persistentStoreOpened)
     }
 
-    private static let log = Logger(subsystem: "com.carpecadence", category: "Storage")
+    nonisolated private static let log = Logger(subsystem: "com.carpecadence", category: "Storage")
 
-    // Static so App Intents (which run outside the SwiftUI scene) reach the
-    // same container the UI uses; `static let` keeps it single-init even if
-    // the App struct is re-created.
-    static private(set) var sharedModelContainer: ModelContainer? = makeContainer()
+    // Static so App Intents (which run outside the SwiftUI scene) reach the same
+    // container the UI uses, and built exactly once for the process — the lazy
+    // initialiser below runs under swift_once no matter who touches it first.
+    //
+    // It has to be a `var` because StorageFatalErrorView can rebuild it (see
+    // `retryMakingContainer`), which costs the race-freedom `let` gave by
+    // construction: LogCheckInIntent reads it from the intent's own context,
+    // not the main actor, while the retry writes it from the scene. No target
+    // enables SWIFT_STRICT_CONCURRENCY, so nothing would flag a torn read of
+    // the container a Siri check-in writes the user's mood through. Hence the
+    // lock: every read and the one write go through it.
+    nonisolated private static let containerLock = NSLock()
+    nonisolated(unsafe) private static var _sharedModelContainer: ModelContainer? = makeContainer()
+    nonisolated static var sharedModelContainer: ModelContainer? {
+        containerLock.withLock { _sharedModelContainer }
+    }
 
     // Retry hook for StorageFatalErrorView. Every tier below can fail for a
     // reason that is gone a moment later — a device that just booted has not
     // made protected files readable yet — and before this the only recovery a
-    // user could reach was force-quitting the app themselves. @MainActor so the
-    // one reassignment only ever happens from the scene showing the failure.
-    @MainActor
-    static func retryMakingContainer() -> ModelContainer? {
-        guard sharedModelContainer == nil else { return sharedModelContainer }
-        containerFailed = false
+    // user could reach was force-quitting the app themselves. Returns nil when
+    // the rebuild failed too, so the caller can say so instead of re-rendering
+    // an identical screen.
+    //
+    // `async` + a detached task on purpose: makeContainer() opens (and may
+    // migrate) the store synchronously and can block for seconds, and this
+    // hangs off a button. Running it inline on the MainActor froze the UI, and
+    // with no disabled state impatient taps stacked those freezes — the heavy
+    // pattern is warranted here for the same reason ExportView's generationTask
+    // uses it.
+    nonisolated static func retryMakingContainer() async -> ModelContainer? {
+        if let existing = sharedModelContainer { return existing }
         usingFallbackStorage = false
-        sharedModelContainer = makeContainer()
-        return sharedModelContainer
+        let rebuilt = await Task.detached(priority: .userInitiated) { makeContainer() }.value
+        return containerLock.withLock {
+            // Only fill an empty slot: a concurrent first-access from an intent
+            // may have won the race, and that container is the one already
+            // handed out.
+            if _sharedModelContainer == nil { _sharedModelContainer = rebuilt }
+            return _sharedModelContainer
+        }
     }
 
-    private static func makeContainer() -> ModelContainer? {
+    nonisolated private static func makeContainer() -> ModelContainer? {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
@@ -78,9 +108,18 @@ struct CadenceApp: App {
         let fullSchema   = Schema(syncedModels + localModels)
 
         // UI tests get an isolated in-memory store so runs are deterministic.
+        // do/catch, not `try?`, for the same reason as the tiers below: this
+        // returns out of the whole function, so a swallowed failure here put the
+        // smoke test on StorageFatalErrorView with nothing in the log and a
+        // Try Again button that could only ever fail the same silent way.
         if AppLaunch.isUITesting {
             let testConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
-            return try? ModelContainer(for: fullSchema, configurations: [testConfig])
+            do {
+                return try ModelContainer(for: fullSchema, configurations: [testConfig])
+            } catch {
+                log.error("UI-test in-memory container failed: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
         }
 
         // Named, so it lands in its own file alongside the main store. The
@@ -138,14 +177,13 @@ struct CadenceApp: App {
         } catch {
             log.error("In-memory fallback container failed: \(error.localizedDescription, privacy: .public)")
         }
-        CadenceApp.containerFailed = true
         return nil
     }
 
     // Latches the flag `hadPersistentStore` reads. Never cleared: once real
     // entries have been written to disk, "reinstalling is safe" stops being
     // true for this device even if a later launch opens the store fine.
-    private static func recordPersistentStoreOpened() {
+    nonisolated private static func recordPersistentStoreOpened() {
         guard !AppLaunch.isUITesting else { return }
         UserDefaults.standard.set(true, forKey: UserDefaultsKey.persistentStoreOpened)
     }
@@ -219,7 +257,9 @@ struct CadenceApp: App {
                 }
             } else {
                 StorageFatalErrorView {
-                    container = CadenceApp.retryMakingContainer()
+                    let rebuilt = await CadenceApp.retryMakingContainer()
+                    container = rebuilt
+                    return rebuilt != nil
                 }
             }
         }
@@ -300,10 +340,6 @@ struct ContentView: View {
         .alert("Storage Unavailable", isPresented: $showStorageWarning) {
             Button("OK", role: .cancel) {}
         } message: {
-            // Two messages, not one with a ternary: `Text(cond ? "a" : "b")`
-            // resolves to the non-localizing StringProtocol initializer and
-            // would drop both strings out of the catalog.
-            //
             // The old single message said "your data is safe" and then advised
             // deleting and reinstalling the app — the one action that turns a
             // recoverable failure (a store that wouldn't migrate) into
@@ -447,8 +483,18 @@ struct ContentView: View {
 struct StorageFatalErrorView: View {
     // Without this the screen is a dead end: no focusable element for VoiceOver
     // or Switch Control, and no way to recover from a failure that is often
-    // transient. Defaulted so previews still construct the view bare.
-    var onRetry: () -> Void = {}
+    // transient. Returns whether the store actually opened — a retry that fails
+    // leaves this view on screen re-rendered byte-identically, so without an
+    // answer to report the button reads as broken. Defaulted so previews still
+    // construct the view bare.
+    var onRetry: () async -> Bool = { false }
+
+    @State private var isRetrying = false
+    @State private var retryFailed = false
+    // The retry leaves focus on the button, so a VoiceOver user would get no
+    // signal at all that it failed — the screen renders identically. Move focus
+    // to the message instead.
+    @AccessibilityFocusState private var failureFocused: Bool
 
     var body: some View {
         VStack(spacing: 24) {
@@ -461,22 +507,53 @@ struct StorageFatalErrorView: View {
                     .font(.title2.bold())
                 // Never advise reinstalling here: this screen appears when the
                 // store could not be opened, which is usually recoverable, and
-                // deleting the app is what makes it permanent.
-                Text("Cadence's data storage wouldn't start. Please force-quit and reopen. If you've logged entries before, they're still on this device — don't delete Cadence, that would erase them. Update to the latest version if this keeps happening.")
+                // deleting the app is what makes it permanent. It used to send
+                // the user off to force-quit instead, which contradicted the
+                // Try Again button sitting right under it.
+                Text("Cadence's data storage wouldn't start. Tap Try Again — this often clears on its own, especially just after a restart. If you've logged entries before, they're still on this device — don't delete Cadence, that would erase them. Update to the latest version if this keeps happening.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
-            Button(action: onRetry) {
-                Text("Try Again")
-                    .font(.body.bold())
-                    .frame(maxWidth: 220)
+            Button {
+                guard !isRetrying else { return }
+                isRetrying = true
+                retryFailed = false
+                Task {
+                    let recovered = await onRetry()
+                    // On success the scene swaps this view out; only a failure
+                    // gets to land back here.
+                    isRetrying = false
+                    retryFailed = !recovered
+                }
+            } label: {
+                Group {
+                    if isRetrying {
+                        ProgressView()
+                    } else {
+                        Text("Try Again")
+                    }
+                }
+                .font(.body.bold())
+                .frame(maxWidth: 220)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .tint(CadenceColor.accent)
+            .disabled(isRetrying)
+
+            if retryFailed {
+                Text("Still couldn't open your data. Wait a moment and try again, or restart the device. Your saved entries aren't affected by this.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+                    .accessibilityFocused($failureFocused)
+                    .onAppear { failureFocused = true }
+            }
         }
+        .animation(CadenceAnimation.smooth, value: retryFailed)
         .padding(32)
     }
 }

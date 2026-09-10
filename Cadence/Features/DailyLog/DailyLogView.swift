@@ -70,7 +70,11 @@ struct DailyLogView: View {
                 Text("Today").font(.headline)
                 Spacer()
                 if let log = todayLog {
-                    (log.isComplete ? Text("Complete") : Text("In Progress"))
+                    // Same keys the dashboard uses for the same daily-log state
+                    // ("Completed"/"In progress"). This used to say
+                    // "Complete"/"In Progress" — three keys for one status, so
+                    // Spanish got "Completo" here and "Completado" there.
+                    (log.isComplete ? Text("Completed") : Text("In progress"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(log.isComplete ? CadenceColor.successGreen : CadenceColor.energyOrange)
                 }

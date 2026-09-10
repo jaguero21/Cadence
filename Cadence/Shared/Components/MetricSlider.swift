@@ -81,6 +81,23 @@ struct StreakBadge: View {
 
     private var isMilestone: Bool { Self.milestones.contains(count) }
 
+    // Two keys rather than one Vary-by-Plural entry, on Xcode's own instruction:
+    // a plural variation whose value doesn't reference the number is a hard
+    // build error ("use separate top-level strings for one and greater than
+    // one"). The count is rendered by its own bold Text in the badge, so these
+    // values are the bare noun and can't carry it.
+    //
+    // Returns Text rather than branching inside a Group — same shape as
+    // WeeklyReviewView.statusText, and it keeps ONE view identity as the count
+    // crosses 1→2 or hits a milestone. A Group here builds _ConditionalContent,
+    // whose identity changes on those transitions, inside a badge that animates
+    // its count and flame deliberately.
+    private var unitText: Text {
+        if isMilestone { return Text("day streak!") }
+        if count == 1 { return Text("day") }
+        return Text("days")
+    }
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "flame.fill")
@@ -89,22 +106,9 @@ struct StreakBadge: View {
             Text("\(count)")
                 .font(.subheadline.bold())
                 .contentTransition(.numericText())
-            // Two keys rather than one Vary-by-Plural entry, on Xcode's own
-            // instruction: a plural variation whose value doesn't reference the
-            // number is a hard build error ("use separate top-level strings for
-            // one and greater than one"). The count is rendered by its own bold
-            // Text above, so these values are the bare noun and can't carry it.
-            Group {
-                if isMilestone {
-                    Text("day streak!")
-                } else if count == 1 {
-                    Text("day")
-                } else {
-                    Text("days")
-                }
-            }
-            .font(.subheadline)
-            .foregroundStyle(isMilestone ? .primary : .secondary)
+            unitText
+                .font(.subheadline)
+                .foregroundStyle(isMilestone ? .primary : .secondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

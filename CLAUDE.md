@@ -547,11 +547,17 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   model's `saveError`, an `errorMessage`), build it with
   `String(localized: "...")` at the assignment site so it extracts and
   localizes; then `Text(thatString)` displays the already-localized value.
-  **The same trap fires on a ternary of two literals**: `Text(cond ? "a" : "b")`
-  and `.accessibilityLabel(cond ? "a" : "b")` both type-infer `String` and pick
-  the non-localizing overload, so NEITHER string reaches the catalog. Write two
-  `Text("literal")` values (`.accessibilityLabel` takes a `Text`) or an
-  if/else, never a ternary of bare literals.
+  **A ternary of two bare literals is NOT the same trap** — this was documented
+  backwards once and drove a whole pass of no-op rewrites. `Text(cond ? "a" :
+  "b")`, `.accessibilityLabel(...)`, `.navigationTitle(...)` and
+  `Label(cond ? "a" : "b", systemImage:)` all resolve to `LocalizedStringKey`
+  and extract **both** branches (verified with `swiftc
+  -emit-localized-strings`; `CustomTrackersView`'s "New Tracker"/"Edit Tracker"
+  and `LogInputFlow`'s "Stop recording"/"Voice memo" exist in the catalog,
+  translated, only because of ternary sites). It is a ternary of two
+  `String`-*typed* values that silently skips the catalog — same as any other
+  `String` variable. Splitting into two `Text`s is a fine style choice; it is
+  not a localization fix.
 - Not yet migrated: debug-only copy behind the simulated-data tooling in
   `SettingsView` (the `seedResultMessage` interpolations) — intentionally left.
 - **Spanish (`es`) ships.** All catalog keys carry `es` translations
