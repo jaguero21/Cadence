@@ -589,7 +589,9 @@ struct LogInputFlow: View {
         .padding(.top, 32)
     }
 
-    private func summaryPill(label: String, value: String, color: Color) -> some View {
+    // label is a LocalizedStringKey for the same reason as BodyMetricRow's;
+    // `value` stays a String because it's a formatted number or an emoji.
+    private func summaryPill(label: LocalizedStringKey, value: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value).font(.headline).foregroundStyle(color)
             Text(label).font(.caption).foregroundStyle(.secondary)
@@ -898,8 +900,13 @@ private struct AttachmentControls: View {
 
 private struct LogSectionHeader: View {
     let icon: String
-    let title: String
-    let time: String
+    // LocalizedStringKey, not String: as plain Strings these reached
+    // Label(_:systemImage:) and Text through their non-localizing StringProtocol
+    // overloads, so every step header in the log flow ("BODY METRICS", "~60
+    // sec", …) stayed English in every language and never entered the catalog.
+    // `icon` stays a String — it's an SF Symbol name, not user-facing copy.
+    let title: LocalizedStringKey
+    let time: LocalizedStringKey
 
     var body: some View {
         HStack {
@@ -954,6 +961,8 @@ private struct SleepHoursRow: View {
 }
 
 private struct CustomMetricRow: View {
+    // A String, deliberately: this is the tracker name the user typed, so it
+    // must NOT be looked up in the catalog.
     let label: String
     let unit: String
     let range: ClosedRange<Int>
@@ -990,7 +999,11 @@ private struct CustomMetricRow: View {
 }
 
 private struct BodyMetricRow: View {
-    let label: String
+    // LocalizedStringKey so the five literal labels at the call site extract and
+    // localize — as a String they reached both Text and .accessibilityLabel
+    // through the non-localizing overloads. Contrast CustomMetricRow.label,
+    // which is a String on purpose: that one is a name the user typed.
+    let label: LocalizedStringKey
     @Binding var value: Int
     // Slider-only edit callback — same rationale as SleepHoursRow.onEdit, and
     // the same shape CustomMetricRow's caller already uses for its binding.

@@ -74,7 +74,10 @@ struct DashboardView: View {
             .readableColumn()
         }
         .background(AmbientMeshBackground())
-        .navigationTitle("")
+        // Text(verbatim:), not "": a bare empty literal is a LocalizedStringKey
+        // and extracts an empty key into the catalog, where it sits forever as
+        // an untranslated string nobody can translate.
+        .navigationTitle(Text(verbatim: ""))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
