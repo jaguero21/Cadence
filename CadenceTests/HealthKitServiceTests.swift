@@ -411,8 +411,36 @@ struct SymptomCatalogTests {
     func catalogHasNoDuplicates() {
         let names = SymptomTag.optionalCatalog.map { $0.name.lowercased() }
         #expect(Set(names).count == names.count)
-        let defaultNames = Set(SymptomTag.defaults.map { $0.name.lowercased() })
+        let defaultNames = Set(SymptomTag.defaultSeeds.map { $0.name.lowercased() })
         #expect(defaultNames.isDisjoint(with: names))
+    }
+}
+
+// The seeded defaults used to be a `static let` array of @Model INSTANCES: one
+// process-wide set of objects that seeding inserted into a context, and that
+// HealthKitService then read off the main actor. Seeds are plain values now, and
+// every seeding call must get its own models.
+@Suite("SymptomTag – default seeds")
+struct SymptomDefaultSeedTests {
+
+    @Test("makeDefaults builds new instances on every call")
+    func makeDefaults_returnsFreshInstances() {
+        let first = SymptomTag.makeDefaults()
+        let second = SymptomTag.makeDefaults()
+        #expect(first.count == second.count)
+        #expect(zip(first, second).allSatisfy { $0 !== $1 })
+    }
+
+    @Test("makeDefaults mirrors defaultSeeds in order, flagged as defaults")
+    func makeDefaults_mirrorsSeeds() {
+        let tags = SymptomTag.makeDefaults()
+        #expect(tags.map(\.name) == SymptomTag.defaultSeeds.map(\.name))
+        #expect(tags.map(\.emoji) == SymptomTag.defaultSeeds.map(\.emoji))
+        #expect(tags.map(\.sortOrder) == Array(tags.indices))
+        // Bound first: #expect decomposes a direct `allSatisfy(\.isDefault)` call
+        // and types the key-path argument as a throwing function.
+        let allFlaggedDefault = tags.allSatisfy { $0.isDefault }
+        #expect(allFlaggedDefault)
     }
 }
 

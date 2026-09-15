@@ -51,7 +51,10 @@ struct HistoryView: View {
     }
 
     // Pure match predicate, extracted so it's unit-testable without a ModelContext.
-    static func logMatches(isComplete: Bool, symptomNames: [String], factors: [String], note: String, filter: HistoryFilter, query: String) -> Bool {
+    // nonisolated because it IS pure: as a member of a View it was implicitly
+    // @MainActor, and under Swift 6's runtime isolation checks the closure inside
+    // trapped the moment a test called it off the main thread.
+    nonisolated static func logMatches(isComplete: Bool, symptomNames: [String], factors: [String], note: String, filter: HistoryFilter, query: String) -> Bool {
         let passesFilter: Bool
         switch filter {
         case .all:         passesFilter = true

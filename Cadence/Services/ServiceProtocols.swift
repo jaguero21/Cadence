@@ -19,8 +19,12 @@ protocol ModelPersisting {
 
 extension ModelContext: ModelPersisting {}
 
+// Sendable so `any HealthKitServiceProtocol` can be captured by the task group
+// in LogInputFlow.applyHealthKitData, which races fetchLogSnapshot against a
+// timeout. It costs conformers nothing: the protocol is @MainActor, so every
+// conforming class is already Sendable — the existential just couldn't say so.
 @MainActor
-protocol HealthKitServiceProtocol: AnyObject {
+protocol HealthKitServiceProtocol: AnyObject, Sendable {
     var isAvailable: Bool { get }
     var isAuthorized: Bool { get }
     func requestAuthorization() async throws -> Bool
