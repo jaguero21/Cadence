@@ -3,6 +3,25 @@ import SwiftData
 import WatchConnectivity
 import OSLog
 
+// The Sendable form of a quick-log payload. WatchConnectivity delivers
+// `[String: Any]`, which Swift 6 won't let cross from the nonisolated delegate
+// callbacks to the main actor, so they parse into this first. Type extraction
+// only: clamping to the model's scales stays in the upsert that writes the model.
+struct QuickLogPayload: Sendable {
+    let mood: Int
+    let energy: Int?
+    let date: Date
+
+    // "mood" must be an Int or nothing is logged. A non-Int "energy" is dropped
+    // rather than rejecting the whole entry. A missing "date" means now.
+    init?(_ dict: [String: Any]) {
+        guard let mood = dict["mood"] as? Int else { return nil }
+        self.mood = mood
+        self.energy = dict["energy"] as? Int
+        self.date = (dict["date"] as? TimeInterval).map(Date.init(timeIntervalSinceReferenceDate:)) ?? .now
+    }
+}
+
 // Receives quick-log payloads from the Watch app and persists them into the
 // day they were RECORDED (payload "date"), not the day they arrive — a
 // transferUserInfo payload queued overnight must not clobber the new day's
@@ -24,14 +43,19 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
 
     // Core upsert, static and context-injected so tests can exercise it against
     // an in-memory container (the seam the watch↔phone bridge hinges on).
-    // Returns whether anything was persisted.
+    // Returns whether anything was persisted. The dictionary entry point is what
+    // the widget queue, the Siri intent, and the tests call; it parses and
+    // delegates, so QuickLogPayload is the only parser.
     @discardableResult
     static func applyQuickLog(_ payload: [String: Any], context: ModelContext) -> Bool {
-        guard let mood = payload["mood"] as? Int else { return false }
+        guard let parsed = QuickLogPayload(payload) else { return false }
+        return applyQuickLog(parsed, context: context)
+    }
 
+    @discardableResult
+    static func applyQuickLog(_ payload: QuickLogPayload, context: ModelContext) -> Bool {
         // Attribute the entry to the day it was recorded on the wrist.
-        let recordedAt = (payload["date"] as? TimeInterval).map(Date.init(timeIntervalSinceReferenceDate:)) ?? .now
-        let day = Calendar.current.startOfDay(for: recordedAt)
+        let day = Calendar.current.startOfDay(for: payload.date)
 
         // Upsert that day's log so a wrist entry merges with an in-progress day.
         let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == day })
@@ -43,9 +67,9 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
             context.insert(log)
         }
 
-        log.mood = mood.clamped(to: 1...5)
+        log.mood = payload.mood.clamped(to: 1...5)
         log.didEditMood = true
-        if let energy = payload["energy"] as? Int {
+        if let energy = payload.energy {
             log.energy = energy.clamped(to: 0...10)
             log.didEditMetrics = true
         }
@@ -60,7 +84,7 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
     }
 
     @MainActor
-    private func applyQuickLog(_ payload: [String: Any]) {
+    private func applyQuickLog(_ payload: QuickLogPayload) {
         guard let container else { return }
         let context = container.mainContext
         if Self.applyQuickLog(payload, context: context) {
@@ -70,8 +94,7 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
             DashboardViewModel.publishWidgetSummary(logs: logs, activeFlare: DashboardViewModel.activeFlare(in: context))
             // Mirror the mood into Health's State of Mind — a wrist check-in
             // is still a check-in. Best-effort, fire-and-forget.
-            let recordedAt = (payload["date"] as? TimeInterval).map(Date.init(timeIntervalSinceReferenceDate:)) ?? .now
-            let day = Calendar.current.startOfDay(for: recordedAt)
+            let day = Calendar.current.startOfDay(for: payload.date)
             if let log = logs.first(where: { $0.date == day }) {
                 let snapshot = DailyLogSnapshot(log)
                 Task { await HealthKitService.shared.publish(log: snapshot) }
@@ -79,23 +102,36 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
         }
     }
 
-    // MARK: - WCSessionDelegate (callbacks are nonisolated; hop to main)
+    // MARK: - WCSessionDelegate (callbacks arrive on a background thread; parse
+    // into the Sendable QuickLogPayload here, then hop to main)
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        Task { @MainActor in self.applyQuickLog(message) }
+        guard let payload = QuickLogPayload(message) else { return }
+        Task { @MainActor in self.applyQuickLog(payload) }
     }
 
     // Reply-expected variant: the watch uses the reply as a delivery ack to
-    // show "Sent" vs "Queued" truthfully.
+    // show "Sent" vs "Queued" truthfully, so the reply goes out only after the
+    // save has been attempted. It acks even an unparseable message, as it
+    // always has — the ack means "received", not "saved".
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        let payload = QuickLogPayload(message)
+        // The one unsafe escape in this file. The SDK doesn't mark the reply
+        // block Sendable, and Apple's docs say only that the delegate method
+        // runs on a background thread and must call it, not which thread may.
+        // This keeps the pre-Swift-6 behaviour exactly: reply from the main
+        // actor after the apply. The block is called once, and never touched
+        // on this side again.
+        nonisolated(unsafe) let reply = replyHandler
         Task { @MainActor in
-            self.applyQuickLog(message)
-            replyHandler(["ok": true])
+            if let payload { self.applyQuickLog(payload) }
+            reply(["ok": true])
         }
     }
 
     nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
-        Task { @MainActor in self.applyQuickLog(userInfo) }
+        guard let payload = QuickLogPayload(userInfo) else { return }
+        Task { @MainActor in self.applyQuickLog(payload) }
     }
 
     nonisolated func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
