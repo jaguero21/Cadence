@@ -162,7 +162,10 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   flag, so the picker's `@Query` is untouched. Every catalog name must resolve
   via `HealthKitService.symptomTypeIdentifier` (unit-test-pinned) so enabled
   symptoms sync two-way with Health; history survives toggling off via the
-  picker's unlisted-chip rendering.
+  picker's unlisted-chip rendering. The five seeded defaults are
+  `SymptomTag.defaultSeeds` (plain name/emoji values; order = `sortOrder`);
+  `seedSymptomTagsIfNeeded` inserts fresh models from `makeDefaults()`. See
+  "Never hold `@Model` instances in a `static`" under Code quality conventions.
 - **Factor (trigger) logging:** `DailyLog.factors: [String]` holds contextual
   triggers chosen from a fixed list (`LogInputFlow.factorItems`) in the `.factors`
   log step — same hardcoded-list pattern as `basicsCompleted` (no model).
@@ -182,7 +185,11 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `NotificationServiceProtocol`, `ModelPersisting`), injected via
   `@Environment` or defaulted init params, so tests can pass fakes.
   `ModelPersisting` is a seam over `ModelContext` (insert/delete/save) so save
-  failure paths can be tested with a throwing stub.
+  failure paths can be tested with a throwing stub. `HealthKitServiceProtocol`
+  refines `Sendable` so `LogInputFlow.applyHealthKitData`'s task group can
+  capture `any HealthKitServiceProtocol` under Swift 6. Conformers pay nothing
+  for it: the protocol is `@MainActor`, so every conforming class is already
+  `Sendable`.
 - **PatternEngine** is a stateless `enum`: takes `[DailyLogSnapshot]`, returns
   `[InsightCard]` **sorted strongest-first** (the dashboard headline takes
   `.first`, so it must be the strongest signal, not detector order).
@@ -288,14 +295,53 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 
 ## Code quality conventions
 
-- **Concurrency mode.** App/widget/watch targets build with `SWIFT_VERSION =
-  5.0`, `SWIFT_APPROACHABLE_CONCURRENCY = YES`,
-  `SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES`; test targets use
-  `SWIFT_VERSION = 5.9` with neither flag. No target enables
-  `SWIFT_STRICT_CONCURRENCY` or Swift 6 mode. Don't over-annotate with
-  `Sendable`/actor-isolation attributes the compiler isn't actually enforcing
-  here — the Snapshot boundary (see Architecture) is what's really preventing
-  cross-actor races, not the type system.
+- **Concurrency mode: app, widget, and watch are Swift 6 language mode**
+  (Xcode 27, iOS 27 SDK). Per-target settings, as they actually are in
+  `project.pbxproj` (an earlier version of this section misstated them):
+
+  | Target | `SWIFT_VERSION` | Approachable concurrency | Member import visibility | Other |
+  |---|---|---|---|---|
+  | Cadence (app) | 6.0 | — | — | |
+  | CadenceWidgetExtension | 6.0 | YES | YES | |
+  | CadenceWidget Watch App | 6.0 | YES | YES | `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` |
+  | CadenceTests | 5.9 | — | — | |
+  | CadenceUITests | 5.0 | YES | YES | |
+
+  Don't flip approachable concurrency on or off for a target as a "cleanup".
+  It changes where every `nonisolated async` function runs (caller's actor vs.
+  the global executor), which is a runtime behaviour change, not just a
+  diagnostics one. The Swift 6 migration kept each target's setting exactly as
+  it was for that reason.
+- **Fix isolation errors by restructuring, not suppressing.** Make whatever
+  crosses an isolation boundary genuinely `Sendable`. Examples from the
+  migration: `HealthKitService`'s fetch helpers take `start`/`end` `Date`s and
+  build their own `NSPredicate` instead of sharing one across `async let`
+  tasks; WatchConnectivity payloads become `QuickLogPayload` before the
+  main-actor hop. `nonisolated(unsafe)`, `@unchecked Sendable`, and
+  `@preconcurrency` are only for an Apple API the SDK hasn't annotated or a
+  state the compiler can't see is lock-guarded, and each one carries a comment
+  naming the guarantee relied on. Current instances: the WCSession
+  `replyHandler` in `PhoneConnectivityManager` and
+  `CadenceApp._sharedModelContainer` behind `containerLock`. `@Model`
+  `Sendable` conformance is still macro-synthesized rather than real, so the
+  Snapshot boundary (see Architecture) still matters under Swift 6.
+- **Pure helpers on a `View` or `@MainActor` type must be `nonisolated static`.**
+  A member of a SwiftUI `View` is implicitly `@MainActor`. Swift 6 compiles
+  **runtime** isolation checks into it (SE-0423), so a closure inside such a
+  helper traps the moment it's called off the main thread. The Swift 5.9 test
+  target calls helpers from nonisolated suites on background threads, and
+  because `View`'s isolation is `@preconcurrency`, *no compiler diagnostic
+  warns you*, not even with strict checking. The symptom is the crash-loop
+  described under Testing. `HistoryView.logMatches` did exactly this, as would
+  `TrendChartView.nearestPoint` and `.mean`; all three are
+  `nonisolated static` now, following `HealthKitService`'s existing pure
+  statics (`sleepQualityScore`, `isIntenseExercise`, …).
+- **Never hold `@Model` instances in a `static`.** `SymptomTag.defaults` was a
+  `static let` array of models. Seeding inserted those shared objects into a
+  context, and `HealthKitService` then read them off the main actor. Static
+  seed data is plain values (`SymptomTag.defaultSeeds`, the same shape as
+  `optionalCatalog`), and models are built fresh where they're inserted
+  (`makeDefaults()`).
 - **Fire-and-forget `Task {}` vs. the cancelable pattern.** Bare `Task { }`
   with no stored handle is the default for best-effort `@MainActor` side
   effects that can silently fail or be superseded (HealthKit publish, widget
@@ -415,7 +461,15 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   entry lands on the day it was recorded, never clobbering the new day — then
   republishes the widget summary. No model types are shared across the targets;
   `MoodScale` (in the watch folder, member of both targets) keeps the emoji
-  scale identical on both sides.
+  scale identical on both sides. On the phone, the nonisolated
+  `WCSessionDelegate` callbacks parse the dictionary into `QuickLogPayload`
+  (`Sendable`) *before* hopping to the main actor. `[String: Any]` can't cross
+  that boundary under Swift 6. The parser does type extraction only (mood must
+  be an `Int`; a non-`Int` energy is dropped, not fatal; a missing date means
+  now), and clamping stays in the upsert. `applyQuickLog(_ payload: [String:
+  Any], context:)` still exists as the entry point for the widget queue, the
+  Siri intent, and `SeamTests`, and delegates to the typed overload, so there
+  is one parser.
 - Watch deployment target is 26.2; live phone↔watch transfer needs paired
   sims/devices to verify (compiles + structurally complete here).
 
@@ -598,6 +652,15 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   exact `entities.count` and deliberately builds a narrow schema.
 - Any suite that calls a `@MainActor` singleton (e.g. `NotificationService.shared`)
   must itself be annotated `@MainActor`, or it won't compile.
+- **The same "0 tests / Restarting after unexpected exit" symptom has a second
+  cause since Swift 6:** a nonisolated suite calling a main-actor-isolated
+  helper that contains a closure. Swift 6's runtime isolation check traps inside
+  it, the host process dies, and the retries take every suite down with it.
+  The compiler gives no warning (see "Pure helpers on a `View` … must be
+  `nonisolated static`" under Code quality conventions). To find the culprit,
+  look at the newest `~/Library/Logs/DiagnosticReports/Cadence-*.ips`: the
+  faulting thread shows `_dispatch_assert_queue_fail` →
+  `swift_task_isCurrentExecutor…` → the helper and the test that called it.
 - Inject fakes that conform to the service protocols; use `ThrowingPersistence`
   (a `ModelPersisting` whose `save()` throws) to cover save-failure branches.
 
@@ -639,10 +702,21 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   there you can edit but not compile. SourceKit then reports spurious
   "Cannot find type ..." / "SwiftDataMacros ... plugin not found" diagnostics
   for cross-file and macro references — treat those as indexer noise, not errors.
-- **CI** (`.github/workflows/ci.yml`) runs on every push: newest available
-  Xcode, ensures a watchOS simulator runtime (the scheme embeds the watch
-  app), picks an iPhone simulator, runs `xcodebuild test -scheme Cadence`,
-  and gates on `** TEST SUCCEEDED **` in the log. There is no lint/format
+- **Xcode 27 is required** (Swift 6 language mode, iOS 27 SDK). Xcode 26.x can't
+  build the project.
+- **CI** (`.github/workflows/ci.yml`) runs on every push, on GitHub's
+  `xcode-27` runner image (public preview as of 2026-09; `macos-latest` only
+  has Xcode 26.6). It selects the newest installed `Xcode_27*.app` and fails
+  loudly if there isn't one. It doesn't float to "newest Xcode", because Swift 6
+  diagnostics change between compiler versions. It ensures a watchOS simulator
+  runtime (the scheme embeds the watch app), picks an iPhone simulator, and
+  runs `xcodebuild test -scheme Cadence -testPlan Cadence`. It then gates on
+  `** TEST SUCCEEDED **`, on the Swift Testing count being at least
+  `MIN_TESTS`, and on **zero compiler warnings in the app, widget, and watch
+  targets** (`.github/scripts/check_warnings.py`, which re-points
+  macro-expansion warnings to their source line and excludes the test
+  targets). Run the same script locally against an `xcodebuild` log before
+  pushing. There is no lint/format
   tooling in the repo (no `.swiftlint.yml`/`.swiftformat`/lint build phase) —
   style consistency is enforced only by the conventions in this file, not by
   a linter.

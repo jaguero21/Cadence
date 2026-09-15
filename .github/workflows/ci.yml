@@ -11,15 +11,29 @@ concurrency:
 jobs:
   build-and-test:
     name: Build & test (iOS simulator)
-    runs-on: macos-latest
+    # Xcode 27 is required: the app, widget, and watch targets are Swift 6
+    # language mode on the iOS 27 SDK. `macos-latest` (the macOS 26 image) tops
+    # out at Xcode 26.6, so use GitHub's Xcode 27 image (public preview as of
+    # 2026-09; actions/runner-images#14404). Move back to a GA label once one
+    # ships Xcode 27.
+    runs-on: xcode-27
     timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select newest Xcode on the runner
+      # Pinned to the Xcode 27 line, not "newest on the runner". Swift 6
+      # diagnostics change between compiler versions, so floating to whatever the
+      # image adds next can turn CI red with no code change, and an older Xcode
+      # can't build this project at all. Newest 27.x wins, so the image moving
+      # from a beta to the release is picked up automatically.
+      - name: Select Xcode 27
         run: |
-          XCODE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            echo "::error::No Xcode 27 on this runner. Installed: $(ls -d /Applications/Xcode*.app | tr '\n' ' ')"
+            exit 1
+          fi
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
@@ -87,6 +101,13 @@ jobs:
             echo "::error::Only $COUNT unit tests ran, expected at least $MIN_TESTS. Coverage regressed."
             exit 1
           fi
+
+      # Swift 6 makes concurrency mistakes errors, but deprecations and other
+      # warnings still build green. App, widget, and watch are held to zero; the
+      # test targets stay on older Swift modes and are excluded. See the script
+      # for how macro-expansion warnings (#Predicate, #expect) are attributed.
+      - name: Fail on compiler warnings (app, widget, watch)
+        run: python3 .github/scripts/check_warnings.py xcodebuild.log
 
       - name: Upload full build log on failure
         if: failure()
