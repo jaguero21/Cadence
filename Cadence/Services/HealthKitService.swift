@@ -527,7 +527,32 @@ final class HealthKitService: HealthKitServiceProtocol {
                         .sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
                     return total + energy
                 }
-                let intense = Self.isIntenseExercise(totalMinutes: minutes, totalKilocalories: kilocalories)
+                // iOS 27 reports how long each workout spent in each heart-rate
+                // zone, using the zones the person set in Health Settings and
+                // covering every workout app. Converted to plain values here
+                // because the zone structs have no public initializers, so logic
+                // that touched them directly could not be unit-tested.
+                var zoneMinutes: Double?
+                if #available(iOS 27.0, *) {
+                    var durations: [(index: Int, minutes: Double)] = []
+                    var zoneCount = 0
+                    for workout in workouts {
+                        guard let group = workout.zoneGroup(for: HKQuantityType(.heartRate)) else { continue }
+                        zoneCount = max(zoneCount, group.configuration.zones.count)
+                        for entry in group.zoneDurations {
+                            durations.append((index: entry.zone.index, minutes: entry.duration / 60))
+                        }
+                    }
+                    // nil, not 0, when no workout reported zones: absent data has
+                    // to stay distinguishable from "no time up high", or every
+                    // workout without a heart-rate monitor would read as easy.
+                    if !durations.isEmpty {
+                        zoneMinutes = Self.topZoneMinutes(durations: durations, zoneCount: zoneCount)
+                    }
+                }
+                let intense = Self.isIntenseExercise(topZoneMinutes: zoneMinutes,
+                                                     totalMinutes: minutes,
+                                                     totalKilocalories: kilocalories)
                 cont.resume(returning: (minutes, intense ? true : nil))
             }
             store.execute(query)
