@@ -589,6 +589,58 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   reads "Off — local storage" truthfully. The state fold (`stateAfterEvent`) is
   pure and unit-tested; sync events outrank the account probe.
 
+## Week Reflection
+
+- **On-device summary of the week** (`WeekReflectionService`, shown by
+  `WeekReflectionCard` at the first weekly-review step, iOS 26+ Foundation
+  Models). Everything below comes from evaluating the prompt against the iOS 27
+  model (harness: `Tools/ReflectionEval`; baselines in the tmpfiles
+  `reflection-eval/` folder).
+- **Plain text, never `@Generable`.** Guided generation is blocked by the
+  guardrail on weeks mentioning medications — 6 of 6 blocked, against 0 of 12
+  for every plain-text combination of old/new instructions and prompt.
+  Medications are a first-class feature, so guided generation is out. Formatting
+  is stripped afterwards by `sanitize(_:)` instead, because the card renders the
+  text verbatim and markdown would show as literal asterisks.
+- **Only what the user entered reaches the model.** `promptText` gates mood on
+  `didEditMood` and energy/sleep on `didEditMetrics`, the same flags
+  `PatternEngine` and the Health write-back use, and drops a day with nothing
+  filled in. Before that gate, a week whose note said "forgot to fill most of
+  this in" was summarized as "a mood of 3/5, energy at 5/10, sleep at 7.0h" in 3
+  of 3 runs — `DailyLog`'s defaults, reported as fact.
+- **Direction of change is computed in Swift**, never inferred by the model:
+  `trendVerb` turns first-vs-last into rose / dipped / eased / got stronger /
+  held steady, and the prompt states it in words. Numeric series in the prompt
+  get recited back into the summary (8.4 numbers per output when that was
+  tried, against ~1.1 with verbs). Mood carries the app's own word
+  ("mood 3/5 (neutral)") — without it the model called a 3 out of 5 "low".
+- **The instructions are built per week** (`instructions(hasMood:dayCount:)`):
+  the sentence range follows the day count, and the mood rule is omitted when no
+  day recorded a mood, or the model invents one ("the mood was headache").
+- **Prompt wording is localized and injected**, not read inline.
+  `ReflectionStrings.current` reads the `reflection.*` catalog keys and the
+  builder takes the value as a parameter, so tests build a Spanish prompt
+  without changing the device language (`String(localized:locale:)` does not
+  reliably select another language's strings). The card hides itself when
+  `SystemLanguageModel.supportsLocale` is false for the app's language rather
+  than answering in the wrong one. **The Spanish instructions must not contain a
+  `("Tú…")` example** — the model copies it into its answer verbatim.
+- **Crisis language skips the model entirely.** `CrisisLanguage.matches(in:)` is
+  a fixed, accent-folded phrase list (English + Spanish) over the week's own
+  notes; on a match `WeekReflectionCard` shows `SupportResourcesCard` — 988 in
+  the US, Find A Helpline elsewhere (`CrisisSupport.resources(region:isSpanish:)`)
+  — and never calls the model. It exists because the iOS 27 model summarized
+  "had thoughts of hurting myself last night" back like any other entry, with no
+  guardrail error and no refusal. It deliberately does **not** match general
+  despair ("hopeless", "cried a lot"); those weeks still get a reflection, and
+  the model handled them gently in every run. Helpline details were verified
+  2026-09-15 against 988lifeline.org and findahelpline.com — re-verify when
+  touching them, and don't claim a "press 2 for Spanish" phone option, which
+  988's site does not document.
+- **When Apple ships a new on-device model**, re-run `Tools/ReflectionEval`
+  against the shipped service and compare with the archived baseline before
+  changing any wording. Its README lists the acceptance thresholds.
+
 ## Localization
 
 - Strings live in `Cadence/Localizable.xcstrings`. `SWIFT_EMIT_LOC_STRINGS` is
