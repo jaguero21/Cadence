@@ -489,12 +489,41 @@ struct WeekReflectionPromptTests {
         #expect(prompt.contains(String(repeating: "a", count: WeekReflectionService.noteCharacterLimit) + "…"))
     }
 
+    // The instructions are built per week now, so this replaces the old test that
+    // read them as a constant.
     @Test("The instructions pin the no-advice, no-diagnosis guardrails")
-    func instructionsCarryGuardrails() {
-        let instructions = WeekReflectionService.instructions
-        #expect(instructions.contains("never give advice"))
-        #expect(instructions.contains("never diagnose"))
-        #expect(instructions.contains("never invent facts"))
+    func instructions_keepGuardrails() {
+        let text = WeekReflectionService.instructions(hasMood: true, dayCount: 4, strings: .current)
+        #expect(text.contains("never give advice"))
+        #expect(text.contains("never diagnose"))
+        #expect(text.contains("never invent facts"))
+        #expect(text.contains("don't call energy or sleep low or high"))
+    }
+
+    @Test("A thin week asks for fewer sentences than a full one")
+    func sentenceRange_followsDayCount() {
+        let thin = WeekReflectionService.instructions(hasMood: true, dayCount: 2, strings: .current)
+        let full = WeekReflectionService.instructions(hasMood: true, dayCount: 5, strings: .current)
+        #expect(thin.contains("2 to 3 sentences"))
+        #expect(full.contains("3 to 5 sentences"))
+    }
+
+    // Without a mood to describe, the mood rule makes the model invent one —
+    // "the mood was headache" appeared in 2 of 3 runs during evaluation.
+    @Test("The mood rule appears only when the week has a mood")
+    func moodRule_onlyWhenMoodLogged() {
+        let withMood = WeekReflectionService.instructions(hasMood: true, dayCount: 3, strings: .current)
+        let without = WeekReflectionService.instructions(hasMood: false, dayCount: 3, strings: .current)
+        #expect(withMood.contains("mood word"))
+        #expect(!without.contains("mood word"))
+    }
+
+    @Test("hasMood reflects whether any day recorded a mood")
+    func hasMood_readsEditFlags() {
+        let logged = [DailyLogSnapshot(date: .now, mood: 4, didEditMood: true)]
+        let notLogged = [DailyLogSnapshot(date: .now, mood: 3, didEditMood: false)]
+        #expect(WeekReflectionService.hasMood(in: logged))
+        #expect(!WeekReflectionService.hasMood(in: notLogged))
     }
 }
 
