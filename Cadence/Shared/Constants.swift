@@ -184,4 +184,21 @@ enum AppLaunch {
     // in-memory store, fresh onboarding, and no permission prompts so UI tests
     // are deterministic and never blocked by system dialogs.
     static let isUITesting = ProcessInfo.processInfo.arguments.contains("--uitest")
+
+    // True when the app is hosting a unit-test bundle. Xcode sets this variable
+    // in the host process for every unit-test run.
+    //
+    // Unit tests run inside this app, so without it the app opens the REAL
+    // CloudKit-mirrored store while the tests work with their own in-memory
+    // containers. With no iCloud account in the simulator, the mirroring
+    // delegate fails setup, retries, and tears stores down mid-run; the next
+    // fetch in ANY container then throws NSInternalInconsistencyException
+    // ("No eligible connection available"), an uncaught ObjC exception that
+    // kills the whole bundle and reports every test as failed. That is timing
+    // dependent — the same commit passed locally and in CI the day before it
+    // started failing on every run.
+    static let isRunningUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
+    // Either kind of test run: no CloudKit, no permission prompts, no disk store.
+    static var isTesting: Bool { isUITesting || isRunningUnitTests }
 }

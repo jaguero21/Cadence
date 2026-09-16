@@ -17,7 +17,7 @@ struct QuickLogSeamTests {
 
     private func makeContext() throws -> ModelContext {
         let schema = Schema([DailyLog.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
@@ -324,7 +324,7 @@ struct PendingQuickLogTests {
         WidgetData.stashPendingQuickLog(mood: 2, date: yesterday, defaults: defaults)
 
         let schema = Schema([DailyLog.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let context = ModelContext(try ModelContainer(for: schema, configurations: [config]))
 
         for entry in WidgetData.consumePendingQuickLogs(defaults: defaults) {

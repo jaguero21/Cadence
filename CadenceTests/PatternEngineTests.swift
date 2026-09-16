@@ -345,7 +345,7 @@ struct InsightRecorderTests {
 
     private func makeContext() throws -> ModelContext {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
@@ -1187,7 +1187,7 @@ struct ChartSeriesTests {
     @Test("workoutMinutes map covers exactly the days it is asked for")
     func workoutMinutes_mapScopedToGivenLogs() throws {
         let schema = Schema([DailyLog.self, HealthSnapshot.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let context = ModelContext(try ModelContainer(for: schema, configurations: [config]))
         let cal = Calendar.current
         let today = cal.startOfDay(for: .now)
