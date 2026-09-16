@@ -645,6 +645,21 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   the whole test bundle**. The symptom is maddening: every test passes when run
   alone, and the full run reports "0 tests" plus "Restarting after unexpected
   exit". Any new suite that builds a container must use a unique name too.
+- **Every in-memory `ModelConfiguration` must pass `cloudKitDatabase: .none`.**
+  It defaults to `.automatic`, so each test container tries to start CloudKit
+  mirroring. With no iCloud account in a simulator the mirroring delegate fails
+  setup, retries, and tears stores down mid-run, and a fetch in any other
+  container in the process then throws `NSInternalInconsistencyException`
+  ("No eligible connection available") — an uncaught ObjC exception that kills
+  the bundle and is reported as every test failing. It is timing dependent: the
+  same commit passed locally and in CI one day and failed on every local run the
+  next, including with parallel execution disabled. The app's own test-path
+  container passes `.none` for the same reason.
+- **The unit-test host is a test launch too.** `AppLaunch.isRunningUnitTests`
+  (set from `XCTestConfigurationFilePath`) exists because unit tests run inside
+  the app: without it the host opened the real CloudKit-mirrored store while
+  tests ran. Gate store selection on `AppLaunch.isTesting`, which covers both
+  kinds of run; `isUITesting` alone still gates UI-affecting behaviour.
 - Test containers should include **`HealthSnapshot.self`** whenever the code
   under test can reach a write path that upserts one (backup restore, the
   health refresher, the log-flow save). The exception is
