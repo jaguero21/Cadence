@@ -253,6 +253,44 @@ struct HealthMappingTests {
 @Suite("HealthKitService – isIntenseExercise")
 struct IntenseExerciseGateTests {
 
+    // Zones are whatever the person configured in Health Settings — 3 zones or
+    // 5 — so "hard" is the top two by index, not a fixed zone number.
+    @Test("Top-zone minutes sum the highest two zones, whatever the zone count")
+    func topZoneMinutes_sumsTopTwo() {
+        let five: [(index: Int, minutes: Double)] = [(1, 20), (2, 15), (3, 10), (4, 6), (5, 4)]
+        #expect(HealthKitService.topZoneMinutes(durations: five, zoneCount: 5) == 10)
+
+        let three: [(index: Int, minutes: Double)] = [(1, 30), (2, 8), (3, 5)]
+        #expect(HealthKitService.topZoneMinutes(durations: three, zoneCount: 3) == 13)
+
+        let one: [(index: Int, minutes: Double)] = [(1, 12)]
+        #expect(HealthKitService.topZoneMinutes(durations: one, zoneCount: 1) == 12)
+
+        #expect(HealthKitService.topZoneMinutes(durations: [], zoneCount: 5) == 0)
+    }
+
+    @Test("Ten minutes in the top zones is the line")
+    func zoneThreshold_isTenMinutes() {
+        #expect(!HealthKitService.isIntenseExercise(topZoneMinutes: 9.9, totalMinutes: 30, totalKilocalories: 200))
+        #expect(HealthKitService.isIntenseExercise(topZoneMinutes: 10, totalMinutes: 30, totalKilocalories: 200))
+    }
+
+    // The whole point: effort, not time on feet.
+    @Test("Zones override the duration and calorie rule in both directions")
+    func zones_overrideTotals() {
+        // Two-hour easy hike: clears 45 minutes, no time up high.
+        #expect(!HealthKitService.isIntenseExercise(topZoneMinutes: 0, totalMinutes: 120, totalKilocalories: 600))
+        // Short intervals: clears neither old threshold.
+        #expect(HealthKitService.isIntenseExercise(topZoneMinutes: 12, totalMinutes: 25, totalKilocalories: 150))
+    }
+
+    @Test("Without zone data the original rule still decides")
+    func noZoneData_fallsBackToTotals() {
+        #expect(HealthKitService.isIntenseExercise(topZoneMinutes: nil, totalMinutes: 50, totalKilocalories: 100))
+        #expect(HealthKitService.isIntenseExercise(topZoneMinutes: nil, totalMinutes: 20, totalKilocalories: 500))
+        #expect(!HealthKitService.isIntenseExercise(topZoneMinutes: nil, totalMinutes: 20, totalKilocalories: 100))
+    }
+
     @Test("Below both thresholds is not intense")
     func belowBoth() {
         #expect(HealthKitService.isIntenseExercise(totalMinutes: 30, totalKilocalories: 250) == false)
@@ -283,7 +321,7 @@ struct HealthDataRefresherTests {
     // covered directly in SchemaMigrationTests.
     private func makeContext() throws -> ModelContext {
         let schema = Schema([DailyLog.self, HealthSnapshot.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
