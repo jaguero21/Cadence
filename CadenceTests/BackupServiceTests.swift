@@ -14,7 +14,7 @@ import SwiftData
         // now (it lives in a separate local-only store in the app), so a
         // container without it would not exercise the real restore path.
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self, HealthSnapshot.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
@@ -283,7 +283,7 @@ struct BackupHealthStoreTests {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self,
                              Medication.self, Flare.self, CustomTracker.self,
                              InsightRecord.self, HealthSnapshot.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 

@@ -34,7 +34,7 @@ struct SchemaMigrationTests {
     @Test("In-memory ModelContainer initialises without throwing")
     func inMemoryContainer_initialisesSuccessfully() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [config])
         #expect(container.configurations.isEmpty == false)
     }
@@ -42,7 +42,7 @@ struct SchemaMigrationTests {
     @Test("In-memory container accepts DailyLog insert and fetch")
     func inMemoryContainer_acceptsDailyLogInsertAndFetch() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
 
@@ -57,7 +57,7 @@ struct SchemaMigrationTests {
     @Test("In-memory container accepts WeeklyReview insert and fetch")
     func inMemoryContainer_acceptsWeeklyReviewInsertAndFetch() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
 
@@ -72,7 +72,7 @@ struct SchemaMigrationTests {
     @Test("In-memory container accepts SymptomTag insert and fetch")
     func inMemoryContainer_acceptsSymptomTagInsertAndFetch() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
 
@@ -90,7 +90,7 @@ struct SchemaMigrationTests {
     @Test("DailyLog didEditMood defaults to false")
     func dailyLog_didEditMood_defaultsFalse() throws {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
 
@@ -113,8 +113,14 @@ struct SchemaMigrationTests {
         let syncedSchema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self])
         let localSchema  = Schema([HealthSnapshot.self])
         let fullSchema   = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, HealthSnapshot.self])
-        let synced = ModelConfiguration("Synced", schema: syncedSchema, isStoredInMemoryOnly: true)
-        let local  = ModelConfiguration("Local",  schema: localSchema,  isStoredInMemoryOnly: true)
+        // Unique names, like every other container in these tests. Fixed names
+        // give two in-memory stores one identity across suites running in
+        // parallel; when one container goes away the other's next fetch throws
+        // "No eligible connection available" — an uncaught ObjC exception that
+        // takes the whole bundle down, reported as every test failing at once.
+        let suffix = UUID().uuidString
+        let synced = ModelConfiguration("Synced-\(suffix)", schema: syncedSchema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        let local  = ModelConfiguration("Local-\(suffix)",  schema: localSchema,  isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: fullSchema, configurations: [synced, local])
         let context = ModelContext(container)
 
@@ -150,7 +156,7 @@ struct SchemaMigrationTests {
         // declaring different schemas collide and the resulting ObjC exception
         // takes down the whole bundle (every test passes alone, the full run
         // reports "0 tests"). See the Testing section of CLAUDE.md.
-        let config = ModelConfiguration(UUID().uuidString, schema: fullSchema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: fullSchema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: fullSchema, configurations: [config])
         let context = ModelContext(container)
 
