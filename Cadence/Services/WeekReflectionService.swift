@@ -112,37 +112,91 @@ enum WeekReflectionService {
         logs.contains { $0.didEditMood }
     }
 
-    // Pure prompt builder (unit-tested): one compact line per logged day.
-    // Returns nil when the week is too thin to summarize honestly.
-    static func promptText(from logs: [DailyLogSnapshot]) -> String? {
+    // Pure prompt builder (unit-tested): one compact line per logged day, then
+    // one line stating the direction of every change.
+    //
+    // Only fields the user actually edited are sent. DailyLog defaults mood to
+    // 3, energy to 5 and sleep to 7 hours, and the old builder passed those
+    // defaults on as if they were entries — a week whose note said "forgot to
+    // fill most of this in" came back as "a mood of 3/5, energy at 5/10, sleep
+    // at 7.0h" in 3 of 3 runs. PatternEngine and the Health write-back already
+    // gate on these flags; this now does too.
+    static func promptText(from logs: [DailyLogSnapshot],
+                           strings s: ReflectionStrings = .current,
+                           locale: Locale = .current) -> String? {
         let sorted = logs.sorted { $0.date < $1.date }
         guard sorted.count >= minimumDays else { return nil }
 
-        let dayFormat = Date.FormatStyle().weekday(.abbreviated).month(.abbreviated).day()
+        let dayFormat = Date.FormatStyle(locale: locale).weekday(.abbreviated).month(.abbreviated).day()
         var lines: [String] = []
+        var moods: [Int] = []
+        var energies: [Int] = []
+        var symptomSeries: [(name: String, values: [Int])] = []
+
         for logDay in sorted {
             var parts: [String] = []
-            parts.append("mood \(logDay.mood)/5, energy \(logDay.energy)/10, sleep \(String(format: "%.1f", logDay.sleepHours))h")
+            var metrics: [String] = []
+            if logDay.didEditMood, let word = s.moodWords[logDay.mood] {
+                metrics.append("\(s.moodLabel) \(logDay.mood)/5 (\(word))")
+                moods.append(logDay.mood)
+            }
+            if logDay.didEditMetrics {
+                metrics.append("\(s.energyLabel) \(logDay.energy)/10, \(s.sleepLabel) \(String(format: "%.1f", logDay.sleepHours))h")
+                energies.append(logDay.energy)
+            }
+            if !metrics.isEmpty { parts.append(metrics.joined(separator: ", ")) }
             if !logDay.symptoms.isEmpty {
                 let symptoms = logDay.symptoms.map { "\($0.name) \($0.severity)/10" }.joined(separator: ", ")
-                parts.append("symptoms: \(symptoms)")
+                parts.append("\(s.symptomsLabel): \(symptoms)")
+                for symptom in logDay.symptoms {
+                    if let index = symptomSeries.firstIndex(where: { $0.name == symptom.name }) {
+                        symptomSeries[index].values.append(symptom.severity)
+                    } else {
+                        symptomSeries.append((symptom.name, [symptom.severity]))
+                    }
+                }
             }
             if !logDay.factors.isEmpty {
-                parts.append("factors: \(logDay.factors.joined(separator: ", "))")
+                parts.append("\(s.factorsLabel): \(logDay.factors.joined(separator: ", "))")
             }
             if !logDay.peaksAndValleysNote.isEmpty {
-                parts.append("peaks & valleys: \"\(truncated(logDay.peaksAndValleysNote))\"")
+                parts.append("\(s.peaksLabel): \"\(truncated(logDay.peaksAndValleysNote))\"")
             }
             if !logDay.freeNote.isEmpty {
-                parts.append("note: \"\(truncated(logDay.freeNote))\"")
+                parts.append("\(s.noteLabel): \"\(truncated(logDay.freeNote))\"")
             }
             if !logDay.intentionsForTomorrow.isEmpty {
-                parts.append("intentions: \"\(truncated(logDay.intentionsForTomorrow))\"")
+                parts.append("\(s.intentionsLabel): \"\(truncated(logDay.intentionsForTomorrow))\"")
             }
+            // A day where nothing was filled in tells the model nothing.
+            guard !parts.isEmpty else { continue }
             lines.append("\(logDay.date.formatted(dayFormat)) — \(parts.joined(separator: "; "))")
         }
-        return "Here are my diary entries for this week:\n" + lines.joined(separator: "\n")
-            + "\n\nPlease summarize my week."
+
+        guard lines.count >= minimumDays else { return nil }
+
+        var trends: [String] = []
+        if let verb = trendVerb(moods, higherIsWorse: false, strings: s) { trends.append("\(s.moodName) \(verb).") }
+        if let verb = trendVerb(energies, higherIsWorse: false, strings: s) { trends.append("\(s.energyName) \(verb).") }
+        for series in symptomSeries {
+            if let verb = trendVerb(series.values, higherIsWorse: true, strings: s) {
+                trends.append("\(series.name) \(verb).")
+            }
+        }
+
+        var text = s.header + "\n" + lines.joined(separator: "\n")
+        if !trends.isEmpty { text += "\n\n" + s.trendHeader + " " + trends.joined(separator: " ") }
+        return text + "\n\n" + s.closing
+    }
+
+    // First vs last logged value. Verbs only — a numeric series in the prompt
+    // gets recited back into the summary (8.4 numbers per output when that was
+    // tried, against 1.0 with verbs).
+    static func trendVerb(_ values: [Int], higherIsWorse: Bool, strings s: ReflectionStrings) -> String? {
+        guard values.count >= 2, let first = values.first, let last = values.last else { return nil }
+        if first == last { return s.heldSteady }
+        if higherIsWorse { return last < first ? s.eased : s.gotStronger }
+        return last > first ? s.rose : s.dipped
     }
 
     private static func truncated(_ text: String) -> String {
