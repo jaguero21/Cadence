@@ -321,7 +321,7 @@ struct HealthDataRefresherTests {
     // covered directly in SchemaMigrationTests.
     private func makeContext() throws -> ModelContext {
         let schema = Schema([DailyLog.self, HealthSnapshot.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
