@@ -125,13 +125,23 @@ struct CadenceApp: App {
         let localSchema  = Schema(localModels)
         let fullSchema   = Schema(syncedModels + localModels)
 
-        // UI tests get an isolated in-memory store so runs are deterministic.
+        // Tests — UI and unit alike — get an isolated in-memory store so runs are
+        // deterministic. Unit tests run inside this app, so before they were
+        // included here the host opened the real CloudKit-mirrored store; with no
+        // iCloud account the mirroring delegate tore stores down mid-run and the
+        // tests' own containers died with it (see AppLaunch.isRunningUnitTests).
+        //
         // do/catch, not `try?`, for the same reason as the tiers below: this
         // returns out of the whole function, so a swallowed failure here put the
         // smoke test on StorageFatalErrorView with nothing in the log and a
         // Try Again button that could only ever fail the same silent way.
-        if AppLaunch.isUITesting {
-            let testConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
+        if AppLaunch.isTesting {
+            // cloudKitDatabase: .none matters as much as the in-memory flag:
+            // ModelConfiguration defaults to .automatic, so even an in-memory store
+            // starts CloudKit mirroring. With no iCloud account in a simulator the
+            // mirroring delegate fails setup, retries, and tears stores down, which
+            // breaks unrelated containers in the same process.
+            let testConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
             do {
                 return try ModelContainer(for: fullSchema, configurations: [testConfig])
             } catch {

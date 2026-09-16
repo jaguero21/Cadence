@@ -117,7 +117,21 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 - **Workout detail:** `HealthSnapshot.hkWorkoutMinutes` (total workout duration;
   nil = no workouts, so a "workout day" is inferable but missing-data never is)
   is fetched by `fetchWorkoutDetail` alongside the `intenseWorkout` gate that
-  auto-selects the "Intense exercise" factor chip. Two one-direction-only
+  auto-selects the "Intense exercise" factor chip. That gate reads iOS 27's
+  heart-rate zones (`workout.zoneGroup(for:)`, not the Optional
+  `zoneGroupsByType` dictionary): 10+ minutes (`HealthThreshold
+  .intenseZoneMinutes`) in the **top two zones the person configured** — by
+  index, since zone counts differ between people. Zones decide alone when a
+  workout reports them, so a long easy session no longer counts and a short hard
+  one does; days without zone data (iOS 26, no heart-rate monitor, a
+  hand-entered workout) keep the original 45-minute-or-400-kcal rule. That's why
+  both `isIntenseExercise` overloads exist and are tested. Zone structs convert
+  to plain `(index, minutes)` pairs inside `fetchWorkoutDetail` because they have
+  no public initializers — logic holding them directly couldn't be unit-tested —
+  and `zoneMinutes` stays nil rather than 0 when nothing reported zones, so
+  absent data never reads as "no time up high". Heart rate only: cycling power
+  zones would need a read type Cadence doesn't request, and every requested type
+  must be fetched. Two one-direction-only
   detectors: `workoutMoodCorrelation` (`workout-mood`, workout days → better
   mood) and `workoutRecoveryPattern` (`workout-recovery`, MORE symptoms the
   day after a workout, consecutive-day pairs only — the "fewer symptoms"
