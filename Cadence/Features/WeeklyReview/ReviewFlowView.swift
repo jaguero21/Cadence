@@ -235,9 +235,18 @@ private struct WeekReflectionCard: View {
     }
     @State private var phase: Phase = .idle
 
+    // The week's own words, which is all the check looks at.
+    private var writtenText: [String] {
+        logs.flatMap { [$0.freeNote, $0.peaksAndValleysNote, $0.intentionsForTomorrow] }
+    }
+
     var body: some View {
-        if WeekReflectionService.isSupported && !AppLaunch.isUITesting,
-           WeekReflectionService.promptText(from: logs) != nil {
+        if CrisisLanguage.matches(in: writtenText) {
+            // Deliberately before any model call: summarizing "I thought about
+            // hurting myself" back at someone is not what this feature is for.
+            SupportResourcesCard()
+        } else if WeekReflectionService.isSupported && !AppLaunch.isUITesting,
+                  WeekReflectionService.promptText(from: logs) != nil {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles")
@@ -301,5 +310,62 @@ private struct WeekReflectionCard: View {
             case .unavailable, .failed: phase = .failed
             }
         }
+    }
+}
+
+// Shown instead of the reflection when the week's own words contain explicit
+// self-harm language. Nothing is blocked — the weekly review continues — and no
+// model call is made.
+private struct SupportResourcesCard: View {
+    private var resources: CrisisSupport.Resources {
+        CrisisSupport.resources(region: Locale.current.region?.identifier,
+                                isSpanish: Locale.current.language.languageCode?.identifier == "es")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "heart.text.square")
+                    .foregroundStyle(CadenceColor.accent)
+                Text("Support is available")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Text("Something you wrote this week mentions hurting yourself. If you're in crisis, or you just want someone to talk to, these lines are free and confidential.")
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // URLs arrive as Strings so this layer can fail soft instead of
+            // force-unwrapping; a malformed one hides its link rather than crashing.
+            switch resources {
+            case .lifeline988(let chatURL):
+                if let call = URL(string: "tel:988") {
+                    Link("Call 988", destination: call).font(.subheadline.weight(.medium))
+                }
+                if let text = URL(string: "sms:988") {
+                    Link("Text 988", destination: text).font(.subheadline.weight(.medium))
+                }
+                if let chat = URL(string: chatURL) {
+                    Link("Chat with the 988 Lifeline", destination: chat).font(.subheadline.weight(.medium))
+                }
+                Text("988 Suicide & Crisis Lifeline — free and confidential, 24/7.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            case .findAHelpline(let directoryURL):
+                if let directory = URL(string: directoryURL) {
+                    Link("Find a helpline in your country", destination: directory).font(.subheadline.weight(.medium))
+                }
+                Text("In an emergency, contact your local emergency services.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("Cadence checked this on your iPhone. Nothing was sent anywhere.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .tint(CadenceColor.accent)
+        .cadenceCard()
     }
 }
