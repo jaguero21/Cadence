@@ -17,7 +17,7 @@ struct QuickLogSeamTests {
 
     private func makeContext() throws -> ModelContext {
         let schema = Schema([DailyLog.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
@@ -108,6 +108,55 @@ struct QuickLogSeamTests {
         #expect(saved == false)
         let logs = try context.fetch(FetchDescriptor<DailyLog>())
         #expect(logs.isEmpty)
+    }
+}
+
+// MARK: Watch payload → Sendable value
+
+// WCSessionDelegate hands us `[String: Any]`, which can't cross to the main
+// actor under Swift 6. QuickLogPayload is the Sendable form, parsed on the
+// delegate side. It does TYPE EXTRACTION ONLY: clamping stays in the upsert
+// (covered by QuickLogSeamTests.outOfRangeValues_areClamped above).
+@Suite("QuickLogPayload – parsing")
+struct QuickLogPayloadTests {
+
+    @Test("A complete payload keeps mood, energy, and date")
+    func completePayload_keepsAllFields() throws {
+        let recorded = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let parsed = try #require(QuickLogPayload(["mood": 4, "energy": 6, "date": recorded.timeIntervalSinceReferenceDate]))
+        #expect(parsed.mood == 4)
+        #expect(parsed.energy == 6)
+        #expect(parsed.date == recorded)
+    }
+
+    @Test("A payload without a mood doesn't parse")
+    func missingMood_isNil() {
+        #expect(QuickLogPayload(["energy": 6]) == nil)
+    }
+
+    @Test("A non-integer mood doesn't parse")
+    func nonIntegerMood_isNil() {
+        #expect(QuickLogPayload(["mood": "3"]) == nil)
+    }
+
+    @Test("A non-integer energy is dropped, not fatal")
+    func nonIntegerEnergy_isIgnored() throws {
+        let parsed = try #require(QuickLogPayload(["mood": 2, "energy": "high"]))
+        #expect(parsed.mood == 2)
+        #expect(parsed.energy == nil)
+    }
+
+    @Test("A payload without a date is stamped now")
+    func missingDate_isNow() throws {
+        let parsed = try #require(QuickLogPayload(["mood": 3]))
+        #expect(abs(parsed.date.timeIntervalSinceNow) < 1)
+    }
+
+    @Test("Out-of-range values pass through unclamped")
+    func outOfRange_isNotClamped() throws {
+        let parsed = try #require(QuickLogPayload(["mood": 99, "energy": -3]))
+        #expect(parsed.mood == 99)
+        #expect(parsed.energy == -3)
     }
 }
 
@@ -275,7 +324,7 @@ struct PendingQuickLogTests {
         WidgetData.stashPendingQuickLog(mood: 2, date: yesterday, defaults: defaults)
 
         let schema = Schema([DailyLog.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let context = ModelContext(try ModelContainer(for: schema, configurations: [config]))
 
         for entry in WidgetData.consumePendingQuickLogs(defaults: defaults) {
