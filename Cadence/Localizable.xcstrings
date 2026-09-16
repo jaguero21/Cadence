@@ -4229,6 +4229,366 @@
           }
         }
       }
+    },
+    "Support is available" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hay apoyo disponible"
+          }
+        }
+      }
+    },
+    "Something you wrote this week mentions hurting yourself. If you're in crisis, or you just want someone to talk to, these lines are free and confidential." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algo que escribiste esta semana menciona hacerte daño. Si estás en crisis, o simplemente quieres hablar con alguien, estas líneas son gratuitas y confidenciales."
+          }
+        }
+      }
+    },
+    "Call 988" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Llama al 988"
+          }
+        }
+      }
+    },
+    "Text 988" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envía un mensaje al 988"
+          }
+        }
+      }
+    },
+    "Chat with the 988 Lifeline" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chatea con la línea 988"
+          }
+        }
+      }
+    },
+    "988 Suicide & Crisis Lifeline — free and confidential, 24/7." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "988 Suicide & Crisis Lifeline: gratuita y confidencial, 24/7."
+          }
+        }
+      }
+    },
+    "Find a helpline in your country" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Busca una línea de ayuda en tu país"
+          }
+        }
+      }
+    },
+    "In an emergency, contact your local emergency services." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En una emergencia, comunícate con los servicios de emergencia locales."
+          }
+        }
+      }
+    },
+    "Cadence checked this on your iPhone. Nothing was sent anywhere." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cadence lo revisó en tu iPhone. No se envió nada a ninguna parte."
+          }
+        }
+      }
+    },
+    "This feature isn't designed to summarize some of what you wrote this week. You can still review as usual." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta función no está diseñada para resumir parte de lo que escribiste esta semana. Puedes seguir con tu revisión como siempre."
+          }
+        }
+      }
+    },
+    "reflection.instructions" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eres un asistente de diario amable dentro de una app personal de bienestar. Resume la semana de la persona a partir de sus propias entradas del diario en %@, hablándole de tú. Refleja solo lo que dicen las entradas: nunca inventes datos, nunca des consejos ni sugerencias, nunca diagnostiques y nunca uses terminología médica más allá de las palabras que la persona escribió. Lenguaje cálido, sencillo y concreto. Esto es para tomar conciencia, no una orientación médica. Describe los cambios solo como los indican las líneas de \"A lo largo de la semana\" y no digas que la energía o el sueño fueron bajos o altos. Responde en español."
+          }
+        }
+      }
+    },
+    "reflection.sentenceRange" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de %1$lld a %2$lld frases"
+          }
+        }
+      }
+    },
+    "reflection.moodRule" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe el ánimo con la palabra de ánimo dada."
+          }
+        }
+      }
+    },
+    "reflection.header" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estas son mis entradas del diario de esta semana:"
+          }
+        }
+      }
+    },
+    "reflection.closing" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por favor, resume mi semana."
+          }
+        }
+      }
+    },
+    "reflection.trendHeader" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A lo largo de la semana:"
+          }
+        }
+      }
+    },
+    "reflection.label.mood" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ánimo"
+          }
+        }
+      }
+    },
+    "reflection.label.energy" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "energía"
+          }
+        }
+      }
+    },
+    "reflection.label.sleep" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sueño"
+          }
+        }
+      }
+    },
+    "reflection.label.symptoms" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "síntomas"
+          }
+        }
+      }
+    },
+    "reflection.label.factors" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "factores"
+          }
+        }
+      }
+    },
+    "reflection.label.peaks" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "altibajos"
+          }
+        }
+      }
+    },
+    "reflection.label.note" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nota"
+          }
+        }
+      }
+    },
+    "reflection.label.intentions" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "intenciones"
+          }
+        }
+      }
+    },
+    "reflection.mood.1" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "muy triste"
+          }
+        }
+      }
+    },
+    "reflection.mood.2" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "triste"
+          }
+        }
+      }
+    },
+    "reflection.mood.3" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "neutral"
+          }
+        }
+      }
+    },
+    "reflection.mood.4" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "feliz"
+          }
+        }
+      }
+    },
+    "reflection.mood.5" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "muy feliz"
+          }
+        }
+      }
+    },
+    "reflection.trend.moodName" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El ánimo"
+          }
+        }
+      }
+    },
+    "reflection.trend.energyName" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La energía"
+          }
+        }
+      }
+    },
+    "reflection.trend.rose" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "subió"
+          }
+        }
+      }
+    },
+    "reflection.trend.dipped" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bajó"
+          }
+        }
+      }
+    },
+    "reflection.trend.eased" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "se alivió"
+          }
+        }
+      }
+    },
+    "reflection.trend.gotStronger" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "se intensificó"
+          }
+        }
+      }
+    },
+    "reflection.trend.heldSteady" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "se mantuvo estable"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"
