@@ -647,6 +647,35 @@ struct ReflectionTrendTests {
     }
 }
 
+// The card renders the model's text verbatim, so anything it formats must come
+// off: markdown appeared in 3 of 27 runs during evaluation and would have shown
+// as literal asterisks.
+@Suite("WeekReflectionService – sanitize")
+struct ReflectionSanitizeTests {
+
+    @Test("Markdown emphasis and code marks are removed")
+    func stripsMarkdown() {
+        #expect(WeekReflectionService.sanitize("You felt **sad** on Monday.") == "You felt sad on Monday.")
+        #expect(WeekReflectionService.sanitize("__Tuesday__ was `quiet`.") == "Tuesday was quiet.")
+    }
+
+    @Test("Headings lose their hashes")
+    func stripsHeadings() {
+        #expect(WeekReflectionService.sanitize("## Your week\nYou rested.") == "Your week You rested.")
+    }
+
+    @Test("Whitespace collapses and edges are trimmed")
+    func collapsesWhitespace() {
+        #expect(WeekReflectionService.sanitize("  You slept\n\n   more.  ") == "You slept more.")
+    }
+
+    @Test("Ordinary prose is untouched")
+    func leavesPlainTextAlone() {
+        let text = "You felt happy on Monday. Your energy rose."
+        #expect(WeekReflectionService.sanitize(text) == text)
+    }
+}
+
 // MARK: - Crisis language
 
 // The on-device model summarized "had thoughts of hurting myself last night"

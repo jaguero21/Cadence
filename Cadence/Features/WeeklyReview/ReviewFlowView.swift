@@ -231,7 +231,7 @@ private struct WeekReflectionCard: View {
     let logs: [DailyLogSnapshot]
 
     private enum Phase: Equatable {
-        case idle, generating, done(String), failed
+        case idle, generating, done(String), blocked, failed
     }
     @State private var phase: Phase = .idle
 
@@ -271,6 +271,12 @@ private struct WeekReflectionCard: View {
                     Button("Regenerate") { generate() }
                         .font(.caption)
                         .foregroundStyle(CadenceColor.accent)
+                case .blocked:
+                    // Apple's safety guidance: say plainly that the input is what
+                    // the feature can't handle, rather than showing a generic error.
+                    Text("This feature isn't designed to summarize some of what you wrote this week. You can still review as usual.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 case .failed:
                     Text("Couldn't summarize this week. You can still review as usual.")
                         .font(.subheadline)
@@ -289,10 +295,10 @@ private struct WeekReflectionCard: View {
         phase = .generating
         let snapshot = logs
         Task {
-            if let text = await WeekReflectionService.generate(from: snapshot) {
-                phase = .done(text)
-            } else {
-                phase = .failed
+            switch await WeekReflectionService.generate(from: snapshot) {
+            case .text(let text):       phase = .done(text)
+            case .blocked:              phase = .blocked
+            case .unavailable, .failed: phase = .failed
             }
         }
     }

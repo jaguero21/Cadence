@@ -215,23 +215,56 @@ enum WeekReflectionService {
         #endif
     }
 
-    // Best-effort generation; nil on any failure (unsupported device, thin
-    // week, model error) — callers just hide the result.
-    static func generate(from logs: [DailyLogSnapshot]) async -> String? {
-        guard let prompt = promptText(from: logs) else { return nil }
+    // What the card should show. `blocked` is a guardrail hit or a model refusal,
+    // which needs different copy from a plain failure — Apple's safety guidance
+    // asks for a clear message when the input is what the feature can't handle.
+    enum Outcome: Sendable, Equatable {
+        case text(String)
+        case unavailable
+        case blocked
+        case failed
+    }
+
+    // The card renders this verbatim, so formatting the model adds has to come
+    // off. Pure and unit-tested.
+    static func sanitize(_ raw: String) -> String {
+        var text = raw.replacingOccurrences(of: "\\*\\*|__|`", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "(?m)^#{1,6}[ \t]*", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // Best-effort generation. Plain text on purpose: guided generation
+    // (`@Generable`) was blocked by the guardrail on both medication weeks during
+    // evaluation — 6 of 6, against 0 of 12 for every plain-text combination — and
+    // medications are a first-class Cadence feature.
+    static func generate(from logs: [DailyLogSnapshot],
+                         strings: ReflectionStrings = .current,
+                         locale: Locale = .current) async -> Outcome {
+        guard let prompt = promptText(from: logs, strings: strings, locale: locale) else { return .unavailable }
         #if canImport(FoundationModels)
-        guard #available(iOS 26.0, *), isSupported else { return nil }
+        guard #available(iOS 26.0, *), isSupported else { return .unavailable }
+        // Hide the card rather than answer in the wrong language: the model
+        // translated Spanish entries into English before the prompt was localized.
+        guard SystemLanguageModel.default.supportsLocale(locale) else { return .unavailable }
+        let instructionText = instructions(hasMood: hasMood(in: logs), dayCount: logs.count, strings: strings)
         do {
-            let session = LanguageModelSession(instructions: instructions(hasMood: hasMood(in: logs), dayCount: logs.count))
+            let session = LanguageModelSession(instructions: instructionText)
             let response = try await session.respond(to: prompt)
-            let text = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
-            return text.isEmpty ? nil : text
+            let text = sanitize(response.content)
+            return text.isEmpty ? .failed : .text(text)
         } catch {
             Self.log.error("Week reflection generation failed: \(error, privacy: .public)")
-            return nil
+            if #available(iOS 27.0, *), let modelError = error as? LanguageModelError {
+                switch modelError {
+                case .guardrailViolation, .refusal: return .blocked
+                default: return .failed
+                }
+            }
+            return .failed
         }
         #else
-        return nil
+        return .unavailable
         #endif
     }
 }
