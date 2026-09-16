@@ -253,6 +253,44 @@ struct HealthMappingTests {
 @Suite("HealthKitService – isIntenseExercise")
 struct IntenseExerciseGateTests {
 
+    // Zones are whatever the person configured in Health Settings — 3 zones or
+    // 5 — so "hard" is the top two by index, not a fixed zone number.
+    @Test("Top-zone minutes sum the highest two zones, whatever the zone count")
+    func topZoneMinutes_sumsTopTwo() {
+        let five: [(index: Int, minutes: Double)] = [(1, 20), (2, 15), (3, 10), (4, 6), (5, 4)]
+        #expect(HealthKitService.topZoneMinutes(durations: five, zoneCount: 5) == 10)
+
+        let three: [(index: Int, minutes: Double)] = [(1, 30), (2, 8), (3, 5)]
+        #expect(HealthKitService.topZoneMinutes(durations: three, zoneCount: 3) == 13)
+
+        let one: [(index: Int, minutes: Double)] = [(1, 12)]
+        #expect(HealthKitService.topZoneMinutes(durations: one, zoneCount: 1) == 12)
+
+        #expect(HealthKitService.topZoneMinutes(durations: [], zoneCount: 5) == 0)
+    }
+
+    @Test("Ten minutes in the top zones is the line")
+    func zoneThreshold_isTenMinutes() {
+        #expect(!HealthKitService.isIntenseExercise(topZoneMinutes: 9.9, totalMinutes: 30, totalKilocalories: 200))
+        #expect(HealthKitService.isIntenseExercise(topZoneMinutes: 10, totalMinutes: 30, totalKilocalories: 200))
+    }
+
+    // The whole point: effort, not time on feet.
+    @Test("Zones override the duration and calorie rule in both directions")
+    func zones_overrideTotals() {
+        // Two-hour easy hike: clears 45 minutes, no time up high.
+        #expect(!HealthKitService.isIntenseExercise(topZoneMinutes: 0, totalMinutes: 120, totalKilocalories: 600))
+        // Short intervals: clears neither old threshold.
+        #expect(HealthKitService.isIntenseExercise(topZoneMinutes: 12, totalMinutes: 25, totalKilocalories: 150))
+    }
+
+    @Test("Without zone data the original rule still decides")
+    func noZoneData_fallsBackToTotals() {
+        #expect(HealthKitService.isIntenseExercise(topZoneMinutes: nil, totalMinutes: 50, totalKilocalories: 100))
+        #expect(HealthKitService.isIntenseExercise(topZoneMinutes: nil, totalMinutes: 20, totalKilocalories: 500))
+        #expect(!HealthKitService.isIntenseExercise(topZoneMinutes: nil, totalMinutes: 20, totalKilocalories: 100))
+    }
+
     @Test("Below both thresholds is not intense")
     func belowBoth() {
         #expect(HealthKitService.isIntenseExercise(totalMinutes: 30, totalKilocalories: 250) == false)
@@ -283,7 +321,7 @@ struct HealthDataRefresherTests {
     // covered directly in SchemaMigrationTests.
     private func makeContext() throws -> ModelContext {
         let schema = Schema([DailyLog.self, HealthSnapshot.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
@@ -411,8 +449,36 @@ struct SymptomCatalogTests {
     func catalogHasNoDuplicates() {
         let names = SymptomTag.optionalCatalog.map { $0.name.lowercased() }
         #expect(Set(names).count == names.count)
-        let defaultNames = Set(SymptomTag.defaults.map { $0.name.lowercased() })
+        let defaultNames = Set(SymptomTag.defaultSeeds.map { $0.name.lowercased() })
         #expect(defaultNames.isDisjoint(with: names))
+    }
+}
+
+// The seeded defaults used to be a `static let` array of @Model INSTANCES: one
+// process-wide set of objects that seeding inserted into a context, and that
+// HealthKitService then read off the main actor. Seeds are plain values now, and
+// every seeding call must get its own models.
+@Suite("SymptomTag – default seeds")
+struct SymptomDefaultSeedTests {
+
+    @Test("makeDefaults builds new instances on every call")
+    func makeDefaults_returnsFreshInstances() {
+        let first = SymptomTag.makeDefaults()
+        let second = SymptomTag.makeDefaults()
+        #expect(first.count == second.count)
+        #expect(zip(first, second).allSatisfy { $0 !== $1 })
+    }
+
+    @Test("makeDefaults mirrors defaultSeeds in order, flagged as defaults")
+    func makeDefaults_mirrorsSeeds() {
+        let tags = SymptomTag.makeDefaults()
+        #expect(tags.map(\.name) == SymptomTag.defaultSeeds.map(\.name))
+        #expect(tags.map(\.emoji) == SymptomTag.defaultSeeds.map(\.emoji))
+        #expect(tags.map(\.sortOrder) == Array(tags.indices))
+        // Bound first: #expect decomposes a direct `allSatisfy(\.isDefault)` call
+        // and types the key-path argument as a throwing function.
+        let allFlaggedDefault = tags.allSatisfy { $0.isDefault }
+        #expect(allFlaggedDefault)
     }
 }
 
@@ -437,8 +503,10 @@ struct WeekReflectionPromptTests {
             DailyLogSnapshot(date: cal.date(byAdding: .day, value: -2, to: .now)!, mood: 2, energy: 3,
                              symptoms: [SymptomEntry(name: "Headache", severity: 7, emoji: "🤕")],
                              factors: ["Travel"],
+                             didEditMetrics: true, didEditMood: true,
                              peaksAndValleysNote: "rough flight home"),
-            DailyLogSnapshot(date: .now, mood: 4, energy: 7, freeNote: "felt like myself again"),
+            DailyLogSnapshot(date: .now, mood: 4, energy: 7,
+                             didEditMetrics: true, didEditMood: true, freeNote: "felt like myself again"),
         ]
         let prompt = try #require(WeekReflectionService.promptText(from: logs))
         #expect(prompt.contains("mood 2/5"))
@@ -454,18 +522,259 @@ struct WeekReflectionPromptTests {
         let longNote = String(repeating: "a", count: 1000)
         let logs = [
             DailyLogSnapshot(date: cal.date(byAdding: .day, value: -1, to: .now)!, freeNote: longNote),
-            DailyLogSnapshot(date: .now),
+            DailyLogSnapshot(date: .now, mood: 4, didEditMood: true),
         ]
         let prompt = try #require(WeekReflectionService.promptText(from: logs))
         #expect(!prompt.contains(longNote))
         #expect(prompt.contains(String(repeating: "a", count: WeekReflectionService.noteCharacterLimit) + "…"))
     }
 
+    // The instructions are built per week now, so this replaces the old test that
+    // read them as a constant.
     @Test("The instructions pin the no-advice, no-diagnosis guardrails")
-    func instructionsCarryGuardrails() {
-        let instructions = WeekReflectionService.instructions
-        #expect(instructions.contains("never give advice"))
-        #expect(instructions.contains("never diagnose"))
-        #expect(instructions.contains("never invent facts"))
+    func instructions_keepGuardrails() {
+        let text = WeekReflectionService.instructions(hasMood: true, dayCount: 4, strings: .current)
+        #expect(text.contains("never give advice"))
+        #expect(text.contains("never diagnose"))
+        #expect(text.contains("never invent facts"))
+        #expect(text.contains("don't call energy or sleep low or high"))
+    }
+
+    @Test("A thin week asks for fewer sentences than a full one")
+    func sentenceRange_followsDayCount() {
+        let thin = WeekReflectionService.instructions(hasMood: true, dayCount: 2, strings: .current)
+        let full = WeekReflectionService.instructions(hasMood: true, dayCount: 5, strings: .current)
+        #expect(thin.contains("2 to 3 sentences"))
+        #expect(full.contains("3 to 5 sentences"))
+    }
+
+    // Without a mood to describe, the mood rule makes the model invent one —
+    // "the mood was headache" appeared in 2 of 3 runs during evaluation.
+    @Test("The mood rule appears only when the week has a mood")
+    func moodRule_onlyWhenMoodLogged() {
+        let withMood = WeekReflectionService.instructions(hasMood: true, dayCount: 3, strings: .current)
+        let without = WeekReflectionService.instructions(hasMood: false, dayCount: 3, strings: .current)
+        #expect(withMood.contains("mood word"))
+        #expect(!without.contains("mood word"))
+    }
+
+    @Test("hasMood reflects whether any day recorded a mood")
+    func hasMood_readsEditFlags() {
+        let logged = [DailyLogSnapshot(date: .now, mood: 4, didEditMood: true)]
+        let notLogged = [DailyLogSnapshot(date: .now, mood: 3, didEditMood: false)]
+        #expect(WeekReflectionService.hasMood(in: logged))
+        #expect(!WeekReflectionService.hasMood(in: notLogged))
+    }
+
+    // DailyLog defaults mood to 3, energy to 5 and sleep to 7h. The old builder
+    // passed those defaults on as if the user had entered them: a week whose note
+    // said "forgot to fill most of this in" came back as "a mood of 3/5, energy
+    // at 5/10, sleep at 7.0h" in 3 of 3 runs.
+    @Test("Ratings the user never entered stay out of the prompt")
+    func uneditedMetrics_areOmitted() throws {
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -2, to: .now)!, mood: 3, energy: 5, sleepHours: 7,
+                             symptoms: [SymptomEntry(name: "Headache", severity: 6, emoji: "🤕")],
+                             didEditMetrics: false, didEditMood: false),
+            DailyLogSnapshot(date: .now, mood: 3, energy: 5, sleepHours: 7,
+                             didEditMetrics: false, didEditMood: false, freeNote: "busy day"),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs))
+        #expect(!prompt.contains("mood"))
+        #expect(!prompt.contains("energy"))
+        #expect(!prompt.contains("sleep"))
+        #expect(prompt.contains("Headache 6/10"))
+        #expect(prompt.contains("busy day"))
+    }
+
+    // Without the word, the model called a 3/5 mood "low".
+    @Test("A logged mood carries the app's own word")
+    func mood_carriesWord() throws {
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -1, to: .now)!, mood: 3, energy: 5, sleepHours: 7,
+                             didEditMetrics: true, didEditMood: true),
+            DailyLogSnapshot(date: .now, mood: 5, energy: 6, sleepHours: 7, didEditMetrics: true, didEditMood: true),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs))
+        #expect(prompt.contains("mood 3/5 (neutral)"))
+        #expect(prompt.contains("mood 5/5 (very happy)"))
+    }
+
+    // The model read a 6 → 5 → 3 week as "joint pain increasing slightly" in 2 of
+    // 3 runs, so direction is computed here and stated in words.
+    @Test("The prompt states each trend's direction in words")
+    func prompt_carriesTrendLines() throws {
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -2, to: .now)!, mood: 3, energy: 4, sleepHours: 6.5,
+                             symptoms: [SymptomEntry(name: "Joint pain", severity: 6, emoji: "🦴")],
+                             didEditMetrics: true, didEditMood: true),
+            DailyLogSnapshot(date: .now, mood: 4, energy: 6, sleepHours: 7.5,
+                             symptoms: [SymptomEntry(name: "Joint pain", severity: 3, emoji: "🦴")],
+                             didEditMetrics: true, didEditMood: true),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs))
+        #expect(prompt.contains("Over the week:"))
+        #expect(prompt.contains("Mood rose."))
+        #expect(prompt.contains("Energy rose."))
+        #expect(prompt.contains("Joint pain eased."))
+    }
+
+    @Test("Spanish wording produces a Spanish prompt")
+    func spanishStrings_produceSpanishPrompt() throws {
+        let spanish = ReflectionStrings(
+            instructionsBody: "Resume mi semana en %@.", sentenceRange: "de %1$lld a %2$lld frases",
+            moodRule: "Describe el ánimo con la palabra dada.",
+            header: "Estas son mis entradas del diario de esta semana:", closing: "Por favor, resume mi semana.",
+            trendHeader: "A lo largo de la semana:", moodLabel: "ánimo", energyLabel: "energía", sleepLabel: "sueño",
+            symptomsLabel: "síntomas", factorsLabel: "factores", peaksLabel: "altibajos", noteLabel: "nota",
+            intentionsLabel: "intenciones",
+            moodWords: [1: "muy triste", 2: "triste", 3: "neutral", 4: "feliz", 5: "muy feliz"],
+            moodName: "El ánimo", energyName: "La energía", rose: "subió", dipped: "bajó",
+            eased: "se alivió", gotStronger: "se intensificó", heldSteady: "se mantuvo estable")
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -1, to: .now)!, mood: 2, energy: 3, sleepHours: 6,
+                             didEditMetrics: true, didEditMood: true),
+            DailyLogSnapshot(date: .now, mood: 4, energy: 6, sleepHours: 7, didEditMetrics: true, didEditMood: true),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs, strings: spanish,
+                                                                  locale: Locale(identifier: "es_ES")))
+        #expect(prompt.contains("ánimo 2/5 (triste)"))
+        #expect(prompt.contains("El ánimo subió."))
+        #expect(prompt.hasSuffix("Por favor, resume mi semana."))
+    }
+
+    @Test("A week of empty logs yields no prompt")
+    func emptyDays_yieldNoPrompt() {
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -1, to: .now)!, didEditMetrics: false, didEditMood: false),
+            DailyLogSnapshot(date: .now, didEditMetrics: false, didEditMood: false),
+        ]
+        #expect(WeekReflectionService.promptText(from: logs) == nil)
+    }
+}
+
+// The direction of every change is decided in Swift, never by the model.
+@Suite("WeekReflectionService – trend verbs")
+struct ReflectionTrendTests {
+
+    @Test("Ratings use rose, dipped, or held steady")
+    func ratingVerbs() {
+        let s = ReflectionStrings.current
+        #expect(WeekReflectionService.trendVerb([2, 4], higherIsWorse: false, strings: s) == "rose")
+        #expect(WeekReflectionService.trendVerb([4, 2], higherIsWorse: false, strings: s) == "dipped")
+        #expect(WeekReflectionService.trendVerb([3, 5, 3], higherIsWorse: false, strings: s) == "held steady")
+    }
+
+    @Test("Symptoms use eased or got stronger, with severity inverted")
+    func symptomVerbs() {
+        let s = ReflectionStrings.current
+        #expect(WeekReflectionService.trendVerb([6, 3], higherIsWorse: true, strings: s) == "eased")
+        #expect(WeekReflectionService.trendVerb([3, 6], higherIsWorse: true, strings: s) == "got stronger")
+    }
+
+    @Test("A single reading has no direction")
+    func singleValue_hasNoVerb() {
+        let s = ReflectionStrings.current
+        #expect(WeekReflectionService.trendVerb([4], higherIsWorse: false, strings: s) == nil)
+        #expect(WeekReflectionService.trendVerb([], higherIsWorse: true, strings: s) == nil)
+    }
+}
+
+// The card renders the model's text verbatim, so anything it formats must come
+// off: markdown appeared in 3 of 27 runs during evaluation and would have shown
+// as literal asterisks.
+@Suite("WeekReflectionService – sanitize")
+struct ReflectionSanitizeTests {
+
+    @Test("Markdown emphasis and code marks are removed")
+    func stripsMarkdown() {
+        #expect(WeekReflectionService.sanitize("You felt **sad** on Monday.") == "You felt sad on Monday.")
+        #expect(WeekReflectionService.sanitize("__Tuesday__ was `quiet`.") == "Tuesday was quiet.")
+    }
+
+    @Test("Headings lose their hashes")
+    func stripsHeadings() {
+        #expect(WeekReflectionService.sanitize("## Your week\nYou rested.") == "Your week You rested.")
+    }
+
+    @Test("Whitespace collapses and edges are trimmed")
+    func collapsesWhitespace() {
+        #expect(WeekReflectionService.sanitize("  You slept\n\n   more.  ") == "You slept more.")
+    }
+
+    @Test("Ordinary prose is untouched")
+    func leavesPlainTextAlone() {
+        let text = "You felt happy on Monday. Your energy rose."
+        #expect(WeekReflectionService.sanitize(text) == text)
+    }
+}
+
+// MARK: - Crisis language
+
+// The on-device model summarized "had thoughts of hurting myself last night"
+// back like any other entry on iOS 27 — no guardrail error, no refusal. This
+// check is the app's own layer, and it is deliberately a fixed phrase list:
+// explainable, offline, and stable across OS versions.
+@Suite("CrisisLanguage – phrase matching")
+struct CrisisLanguageTests {
+
+    @Test("Explicit English self-harm language matches")
+    func englishPhrases_match() {
+        #expect(CrisisLanguage.matches(in: ["had thoughts of hurting myself last night"]))
+        #expect(CrisisLanguage.matches(in: ["I want to die"]))
+        #expect(CrisisLanguage.matches(in: ["", "everyone would be better off dead"]))
+    }
+
+    @Test("Explicit Spanish self-harm language matches, accented or not")
+    func spanishPhrases_match() {
+        #expect(CrisisLanguage.matches(in: ["pensé en hacerme daño"]))
+        #expect(CrisisLanguage.matches(in: ["pense en hacerme dano"]))
+        #expect(CrisisLanguage.matches(in: ["no quiero vivir así"]))
+    }
+
+    @Test("A curly apostrophe still matches")
+    func curlyApostrophe_matches() {
+        #expect(CrisisLanguage.matches(in: ["I don\u{2019}t want to be here"]))
+    }
+
+    @Test("Ordinary hard weeks do not match")
+    func generalDistress_doesNotMatch() {
+        #expect(!CrisisLanguage.matches(in: ["felt hopeless most of the day"]))
+        #expect(!CrisisLanguage.matches(in: ["couldn't get out of bed, cried a lot"]))
+        #expect(!CrisisLanguage.matches(in: ["hurt my back lifting boxes"]))
+        #expect(!CrisisLanguage.matches(in: []))
+    }
+
+    // Accepted by design: over-matching shows support, which is the safer error.
+    @Test("An innocent phrasing that still matches is accepted")
+    func acceptedFalsePositive() {
+        #expect(CrisisLanguage.matches(in: ["hurt myself at the gym"]))
+    }
+}
+
+@Suite("CrisisSupport – resources by region")
+struct CrisisSupportTests {
+
+    @Test("US gets the 988 Lifeline, with the Spanish chat in Spanish")
+    func unitedStates_gets988() {
+        #expect(CrisisSupport.resources(region: "US", isSpanish: false) == .lifeline988(chatURL: "https://chat.988lifeline.org/"))
+        #expect(CrisisSupport.resources(region: "US", isSpanish: true) == .lifeline988(chatURL: "https://chat.988lifeline.org/?lang=es"))
+    }
+
+    @Test("Other regions get their Find A Helpline country page")
+    func otherRegion_getsCountryDirectory() {
+        #expect(CrisisSupport.resources(region: "ES", isSpanish: true) == .findAHelpline(directoryURL: "https://findahelpline.com/countries/es"))
+        #expect(CrisisSupport.resources(region: "GB", isSpanish: false) == .findAHelpline(directoryURL: "https://findahelpline.com/countries/gb"))
+    }
+
+    @Test("An unknown or malformed region falls back to the directory root")
+    func unknownRegion_fallsBackToRoot() {
+        #expect(CrisisSupport.resources(region: nil, isSpanish: false) == .findAHelpline(directoryURL: "https://findahelpline.com"))
+        #expect(CrisisSupport.resources(region: "419", isSpanish: false) == .findAHelpline(directoryURL: "https://findahelpline.com"))
     }
 }

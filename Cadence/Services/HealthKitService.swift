@@ -7,6 +7,10 @@ import OSLog
 final class HealthKitService: HealthKitServiceProtocol {
     static let shared = HealthKitService()
     private let store = HKHealthStore()
+    // Registered for the life of the process. `shared` is the only instance
+    // (init is private), so there is deliberately no deinit to remove it in —
+    // one existed, could never run, and under Swift 6 was an error for reading
+    // this non-Sendable token from a nonisolated deinit.
     private var foregroundObserver: NSObjectProtocol?
     nonisolated private static let log = Logger(subsystem: "com.carpecadence", category: "HealthKit")
 
@@ -22,12 +26,6 @@ final class HealthKitService: HealthKitServiceProtocol {
             MainActor.assumeIsolated {
                 self?.cachedIsAuthorized = nil
             }
-        }
-    }
-
-    deinit {
-        if let observer = foregroundObserver {
-            NotificationCenter.default.removeObserver(observer)
         }
     }
 
@@ -108,27 +106,30 @@ final class HealthKitService: HealthKitServiceProtocol {
         let todayStart    = cal.startOfDay(for: .now)
         let yesterdayStart = cal.date(byAdding: .day, value: -1, to: todayStart) ?? todayStart
         let lastNightStart = cal.date(byAdding: .hour, value: 18, to: yesterdayStart) ?? yesterdayStart
-        let todayPredicate     = HKQuery.predicateForSamples(withStart: todayStart, end: .now)
-        let yesterdayPredicate = HKQuery.predicateForSamples(withStart: yesterdayStart, end: todayStart)
-        let nightPredicate     = HKQuery.predicateForSamples(withStart: lastNightStart, end: .now)
+        let now = Date.now
 
-        async let steps   = fetchSum(.stepCount, unit: .count(), predicate: todayPredicate)
-        async let energy  = fetchSum(.activeEnergyBurned, unit: .kilocalorie(), predicate: todayPredicate)
-        async let mindful = fetchDurationMinutes(.mindfulSession, predicate: todayPredicate)
-        async let flow    = fetchHasMenstrualFlow(predicate: todayPredicate)
-        async let hr    = fetchLatest(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: yesterdayPredicate)
-        async let hrv   = fetchLatest(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), predicate: yesterdayPredicate)
-        async let temp  = fetchAverage(.appleSleepingWristTemperature, unit: .degreeCelsius(), predicate: nightPredicate)
-        async let sleep = fetchSleepDetail(start: lastNightStart, end: .now)
-        async let symptoms = fetchExternalSymptoms(start: todayStart, end: .now)
-        async let mood = fetchExternalDailyMood(start: todayStart, end: .now)
-        async let workout = fetchWorkoutDetail(predicate: todayPredicate)
-        async let respiratory = fetchAverage(.respiratoryRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: nightPredicate)
-        async let spo2 = fetchAverage(.oxygenSaturation, unit: .percent(), predicate: nightPredicate)
-        async let daylight = fetchSum(.timeInDaylight, unit: .minute(), predicate: todayPredicate)
-        async let caffeine = fetchSum(.dietaryCaffeine, unit: .gramUnit(with: .milli), predicate: todayPredicate)
-        async let water = fetchSum(.dietaryWater, unit: .liter(), predicate: todayPredicate)
-        async let daytimeHR = fetchAverage(.heartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: todayPredicate)
+        // Each fetch gets its window as plain Dates and builds its own
+        // NSPredicate. One shared predicate object handed to every `async let`
+        // child task is a non-Sendable value crossing into concurrent code —
+        // an error under Swift 6 — and the start/end shape is what
+        // fetchSleepDetail and fetchExternalSymptoms already used.
+        async let steps   = fetchSum(.stepCount, unit: .count(), start: todayStart, end: now)
+        async let energy  = fetchSum(.activeEnergyBurned, unit: .kilocalorie(), start: todayStart, end: now)
+        async let mindful = fetchDurationMinutes(.mindfulSession, start: todayStart, end: now)
+        async let flow    = fetchHasMenstrualFlow(start: todayStart, end: now)
+        async let hr    = fetchLatest(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), start: yesterdayStart, end: todayStart)
+        async let hrv   = fetchLatest(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), start: yesterdayStart, end: todayStart)
+        async let temp  = fetchAverage(.appleSleepingWristTemperature, unit: .degreeCelsius(), start: lastNightStart, end: now)
+        async let sleep = fetchSleepDetail(start: lastNightStart, end: now)
+        async let symptoms = fetchExternalSymptoms(start: todayStart, end: now)
+        async let mood = fetchExternalDailyMood(start: todayStart, end: now)
+        async let workout = fetchWorkoutDetail(start: todayStart, end: now)
+        async let respiratory = fetchAverage(.respiratoryRate, unit: HKUnit.count().unitDivided(by: .minute()), start: lastNightStart, end: now)
+        async let spo2 = fetchAverage(.oxygenSaturation, unit: .percent(), start: lastNightStart, end: now)
+        async let daylight = fetchSum(.timeInDaylight, unit: .minute(), start: todayStart, end: now)
+        async let caffeine = fetchSum(.dietaryCaffeine, unit: .gramUnit(with: .milli), start: todayStart, end: now)
+        async let water = fetchSum(.dietaryWater, unit: .liter(), start: todayStart, end: now)
+        async let daytimeHR = fetchAverage(.heartRate, unit: HKUnit.count().unitDivided(by: .minute()), start: todayStart, end: now)
 
         let sleepDetail = await sleep
         let workoutDetail = await workout
@@ -393,7 +394,8 @@ final class HealthKitService: HealthKitServiceProtocol {
     // internal queue and don't touch any @MainActor state. Marking them
     // nonisolated avoids unnecessary main-thread hops while results are pending.
 
-    nonisolated private func fetchSum(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
+    nonisolated private func fetchSum(_ id: HKQuantityTypeIdentifier, unit: HKUnit, start: Date, end: Date) async -> Double? {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, stats, error in
@@ -405,7 +407,8 @@ final class HealthKitService: HealthKitServiceProtocol {
         }
     }
 
-    nonisolated private func fetchLatest(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
+    nonisolated private func fetchLatest(_ id: HKQuantityTypeIdentifier, unit: HKUnit, start: Date, end: Date) async -> Double? {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { _, samples, error in
@@ -423,7 +426,6 @@ final class HealthKitService: HealthKitServiceProtocol {
     // excluded — otherwise a symptom the user removed in Cadence would
     // resurrect from Health on the next open.
     nonisolated private func fetchExternalSymptoms(start: Date, end: Date) async -> [SymptomEntry] {
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         let ownBundle = Bundle.main.bundleIdentifier
         var entries: [SymptomEntry] = []
         await withTaskGroup(of: SymptomEntry?.self) { group in
@@ -431,6 +433,10 @@ final class HealthKitService: HealthKitServiceProtocol {
                 group.addTask { [store] in
                     guard let type = HKObjectType.categoryType(forIdentifier: identifier),
                           let name = Self.symptomName(for: identifier) else { return nil }
+                    // Built per task from the Sendable start/end: a predicate
+                    // created outside and captured by every child task is a
+                    // non-Sendable value shared across concurrent code.
+                    let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
                     let sample: HKCategorySample? = await withCheckedContinuation { cont in
                         let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
                             if let error { Self.log.error("fetchExternalSymptoms(\(identifier.rawValue, privacy: .public)) failed: \(error, privacy: .public)") }
@@ -444,7 +450,7 @@ final class HealthKitService: HealthKitServiceProtocol {
                         store.execute(query)
                     }
                     guard let sample else { return nil }
-                    let emoji = SymptomTag.defaults.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.emoji ?? "🤒"
+                    let emoji = SymptomTag.defaultSeeds.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.emoji ?? "🤒"
                     return SymptomEntry(name: name, severity: Self.cadenceSeverity(fromHKSeverity: sample.value), emoji: emoji)
                 }
             }
@@ -490,7 +496,8 @@ final class HealthKitService: HealthKitServiceProtocol {
     }
 
     // Average of a discrete quantity (e.g. overnight wrist temperature).
-    nonisolated private func fetchAverage(_ id: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate) async -> Double? {
+    nonisolated private func fetchAverage(_ id: HKQuantityTypeIdentifier, unit: HKUnit, start: Date, end: Date) async -> Double? {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         guard let type = HKObjectType.quantityType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .discreteAverage) { _, stats, error in
@@ -506,8 +513,9 @@ final class HealthKitService: HealthKitServiceProtocol {
     // "Intense exercise" gate (see isIntenseExercise). nil = no workouts, so
     // the factor chip and the log's minutes stay untouched; false/0 is never
     // reported for the same reason as menstrual flow below.
-    nonisolated private func fetchWorkoutDetail(predicate: NSPredicate) async -> (minutes: Double?, intense: Bool?) {
-        await withCheckedContinuation { cont in
+    nonisolated private func fetchWorkoutDetail(start: Date, end: Date) async -> (minutes: Double?, intense: Bool?) {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+        return await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: HKObjectType.workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
                 if let error { Self.log.error("fetchWorkoutDetail failed: \(error, privacy: .public)") }
                 guard error == nil, let workouts = samples as? [HKWorkout], !workouts.isEmpty else {
@@ -519,7 +527,32 @@ final class HealthKitService: HealthKitServiceProtocol {
                         .sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
                     return total + energy
                 }
-                let intense = Self.isIntenseExercise(totalMinutes: minutes, totalKilocalories: kilocalories)
+                // iOS 27 reports how long each workout spent in each heart-rate
+                // zone, using the zones the person set in Health Settings and
+                // covering every workout app. Converted to plain values here
+                // because the zone structs have no public initializers, so logic
+                // that touched them directly could not be unit-tested.
+                var zoneMinutes: Double?
+                if #available(iOS 27.0, *) {
+                    var durations: [(index: Int, minutes: Double)] = []
+                    var zoneCount = 0
+                    for workout in workouts {
+                        guard let group = workout.zoneGroup(for: HKQuantityType(.heartRate)) else { continue }
+                        zoneCount = max(zoneCount, group.configuration.zones.count)
+                        for entry in group.zoneDurations {
+                            durations.append((index: entry.zone.index, minutes: entry.duration / 60))
+                        }
+                    }
+                    // nil, not 0, when no workout reported zones: absent data has
+                    // to stay distinguishable from "no time up high", or every
+                    // workout without a heart-rate monitor would read as easy.
+                    if !durations.isEmpty {
+                        zoneMinutes = Self.topZoneMinutes(durations: durations, zoneCount: zoneCount)
+                    }
+                }
+                let intense = Self.isIntenseExercise(topZoneMinutes: zoneMinutes,
+                                                     totalMinutes: minutes,
+                                                     totalKilocalories: kilocalories)
                 cont.resume(returning: (minutes, intense ? true : nil))
             }
             store.execute(query)
@@ -533,10 +566,33 @@ final class HealthKitService: HealthKitServiceProtocol {
             || totalKilocalories >= HealthThreshold.intenseWorkoutKilocalories
     }
 
+    // Minutes spent in the top two zones the person has configured. Zone counts
+    // differ between people (Health Settings lets them set their own), so the
+    // high end is defined by index rather than by a fixed zone number.
+    nonisolated static func topZoneMinutes(durations: [(index: Int, minutes: Double)], zoneCount: Int) -> Double {
+        guard zoneCount > 0 else { return 0 }
+        let cutoff = max(1, zoneCount - 1)   // top two, or the only zone there is
+        return durations.filter { $0.index >= cutoff }.reduce(0) { $0 + $1.minutes }
+    }
+
+    // Zones measure effort; duration and calories only stand in for it. When a
+    // workout reports zones they decide alone — that is the point of using them —
+    // and days without zone data (iOS 26, no heart-rate monitor, a workout typed
+    // in by hand) keep the original rule.
+    nonisolated static func isIntenseExercise(topZoneMinutes: Double?,
+                                              totalMinutes: Double,
+                                              totalKilocalories: Double) -> Bool {
+        if let topZoneMinutes {
+            return topZoneMinutes >= HealthThreshold.intenseZoneMinutes
+        }
+        return isIntenseExercise(totalMinutes: totalMinutes, totalKilocalories: totalKilocalories)
+    }
+
     // Whether any menstrual-flow sample (of any intensity) overlaps the window.
     // nil = no data (not asked / not tracked); false is never reported because
     // an absent sample can't distinguish "no flow" from "doesn't track cycles".
-    nonisolated private func fetchHasMenstrualFlow(predicate: NSPredicate) async -> Bool? {
+    nonisolated private func fetchHasMenstrualFlow(start: Date, end: Date) async -> Bool? {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         guard let type = HKObjectType.categoryType(forIdentifier: .menstrualFlow) else { return nil }
         return await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
@@ -559,7 +615,8 @@ final class HealthKitService: HealthKitServiceProtocol {
     // Sums the duration of category samples (e.g. mindful sessions) in minutes.
     // Returns nil rather than 0 when there are no samples, so callers can
     // distinguish "no data" from a genuine zero.
-    nonisolated private func fetchDurationMinutes(_ id: HKCategoryTypeIdentifier, predicate: NSPredicate) async -> Double? {
+    nonisolated private func fetchDurationMinutes(_ id: HKCategoryTypeIdentifier, start: Date, end: Date) async -> Double? {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         guard let type = HKObjectType.categoryType(forIdentifier: id) else { return nil }
         return await withCheckedContinuation { cont in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in

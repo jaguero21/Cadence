@@ -5,6 +5,7 @@ import UserNotifications
 import WidgetKit
 import TipKit
 import OSLog
+import os
 
 
 @main
@@ -22,11 +23,26 @@ struct CadenceApp: App {
     // annotations describe what already happens; without them the retry can't
     // leave the main thread (see retryMakingContainer).
     //
+    // What happened while opening the store. Written by makeContainer(), which
+    // can run off the main actor, and read by the scene, so it lives inside a
+    // lock that owns the state rather than in two nonisolated(unsafe) vars.
+    // Deliberately NOT containerLock: makeContainer() runs inside that lock (the
+    // lazy initialiser fires within sharedModelContainer's withLock), and NSLock
+    // isn't re-entrant — taking it again here would deadlock on first launch.
+    private struct StorageFlags: Sendable {
+        var usingFallbackStorage = false
+        var usingCloudKitStore = false
+    }
+    nonisolated private static let storageFlags = OSAllocatedUnfairLock(initialState: StorageFlags())
     // Set when the persistent store failed and we fell back to in-memory storage.
-    nonisolated(unsafe) static private(set) var usingFallbackStorage = false
+    nonisolated static var usingFallbackStorage: Bool {
+        storageFlags.withLock { $0.usingFallbackStorage }
+    }
     // Set when the CloudKit-mirrored store initialised (vs the local-only
     // fallback). CloudSyncMonitor uses this to show a truthful sync status.
-    nonisolated(unsafe) static private(set) var usingCloudKitStore = false
+    nonisolated static var usingCloudKitStore: Bool {
+        storageFlags.withLock { $0.usingCloudKitStore }
+    }
     // Whether a PERSISTENT store has ever opened on this device. Recorded the
     // first time one does, and read only when we've fallen back to in-memory:
     // it's the difference between "you have nothing saved yet, reinstalling is
@@ -46,10 +62,12 @@ struct CadenceApp: App {
     // It has to be a `var` because StorageFatalErrorView can rebuild it (see
     // `retryMakingContainer`), which costs the race-freedom `let` gave by
     // construction: LogCheckInIntent reads it from the intent's own context,
-    // not the main actor, while the retry writes it from the scene. No target
-    // enables SWIFT_STRICT_CONCURRENCY, so nothing would flag a torn read of
-    // the container a Siri check-in writes the user's mood through. Hence the
-    // lock: every read and the one write go through it.
+    // not the main actor, while the retry writes it from the scene — and a torn
+    // read there is the container a Siri check-in writes the user's mood
+    // through. Hence the lock: every read and the one write go through it.
+    // (Swift 6 can't see that the lock guards `_sharedModelContainer`, which is
+    // why the backing var is nonisolated(unsafe); the accessor is the only way
+    // in.)
     nonisolated private static let containerLock = NSLock()
     nonisolated(unsafe) private static var _sharedModelContainer: ModelContainer? = makeContainer()
     nonisolated static var sharedModelContainer: ModelContainer? {
@@ -71,7 +89,7 @@ struct CadenceApp: App {
     // uses it.
     nonisolated static func retryMakingContainer() async -> ModelContainer? {
         if let existing = sharedModelContainer { return existing }
-        usingFallbackStorage = false
+        storageFlags.withLock { $0.usingFallbackStorage = false }
         let rebuilt = await Task.detached(priority: .userInitiated) { makeContainer() }.value
         return containerLock.withLock {
             // Only fill an empty slot: a concurrent first-access from an intent
@@ -107,13 +125,23 @@ struct CadenceApp: App {
         let localSchema  = Schema(localModels)
         let fullSchema   = Schema(syncedModels + localModels)
 
-        // UI tests get an isolated in-memory store so runs are deterministic.
+        // Tests — UI and unit alike — get an isolated in-memory store so runs are
+        // deterministic. Unit tests run inside this app, so before they were
+        // included here the host opened the real CloudKit-mirrored store; with no
+        // iCloud account the mirroring delegate tore stores down mid-run and the
+        // tests' own containers died with it (see AppLaunch.isRunningUnitTests).
+        //
         // do/catch, not `try?`, for the same reason as the tiers below: this
         // returns out of the whole function, so a swallowed failure here put the
         // smoke test on StorageFatalErrorView with nothing in the log and a
         // Try Again button that could only ever fail the same silent way.
-        if AppLaunch.isUITesting {
-            let testConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
+        if AppLaunch.isTesting {
+            // cloudKitDatabase: .none matters as much as the in-memory flag:
+            // ModelConfiguration defaults to .automatic, so even an in-memory store
+            // starts CloudKit mirroring. With no iCloud account in a simulator the
+            // mirroring delegate fails setup, retries, and tears stores down, which
+            // breaks unrelated containers in the same process.
+            let testConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
             do {
                 return try ModelContainer(for: fullSchema, configurations: [testConfig])
             } catch {
@@ -146,7 +174,7 @@ struct CadenceApp: App {
         let cloudConfig = ModelConfiguration(schema: syncedSchema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
         do {
             let container = try ModelContainer(for: fullSchema, configurations: [cloudConfig, healthConfig])
-            CadenceApp.usingCloudKitStore = true
+            storageFlags.withLock { $0.usingCloudKitStore = true }
             CadenceApp.recordPersistentStoreOpened()
             return container
         } catch {
@@ -170,7 +198,7 @@ struct CadenceApp: App {
             // only diagnostic that will exist.
             log.error("Persistent store failed to open, falling back to in-memory: \(error.localizedDescription, privacy: .public)")
         }
-        CadenceApp.usingFallbackStorage = true
+        storageFlags.withLock { $0.usingFallbackStorage = true }
         let fallbackConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
         do {
             return try ModelContainer(for: fullSchema, configurations: [fallbackConfig])
@@ -464,7 +492,7 @@ struct ContentView: View {
         // second device seeding before its first sync completes can still race;
         // name-based dedup here covers every case where the data is visible.
         let existingNames = Set(((try? modelContext.fetch(FetchDescriptor<SymptomTag>())) ?? []).map(\.name))
-        for tag in SymptomTag.defaults where !existingNames.contains(tag.name) {
+        for tag in SymptomTag.makeDefaults() where !existingNames.contains(tag.name) {
             modelContext.insert(tag)
         }
         do {
