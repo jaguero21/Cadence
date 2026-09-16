@@ -497,3 +497,68 @@ struct WeekReflectionPromptTests {
         #expect(instructions.contains("never invent facts"))
     }
 }
+
+// MARK: - Crisis language
+
+// The on-device model summarized "had thoughts of hurting myself last night"
+// back like any other entry on iOS 27 — no guardrail error, no refusal. This
+// check is the app's own layer, and it is deliberately a fixed phrase list:
+// explainable, offline, and stable across OS versions.
+@Suite("CrisisLanguage – phrase matching")
+struct CrisisLanguageTests {
+
+    @Test("Explicit English self-harm language matches")
+    func englishPhrases_match() {
+        #expect(CrisisLanguage.matches(in: ["had thoughts of hurting myself last night"]))
+        #expect(CrisisLanguage.matches(in: ["I want to die"]))
+        #expect(CrisisLanguage.matches(in: ["", "everyone would be better off dead"]))
+    }
+
+    @Test("Explicit Spanish self-harm language matches, accented or not")
+    func spanishPhrases_match() {
+        #expect(CrisisLanguage.matches(in: ["pensé en hacerme daño"]))
+        #expect(CrisisLanguage.matches(in: ["pense en hacerme dano"]))
+        #expect(CrisisLanguage.matches(in: ["no quiero vivir así"]))
+    }
+
+    @Test("A curly apostrophe still matches")
+    func curlyApostrophe_matches() {
+        #expect(CrisisLanguage.matches(in: ["I don\u{2019}t want to be here"]))
+    }
+
+    @Test("Ordinary hard weeks do not match")
+    func generalDistress_doesNotMatch() {
+        #expect(!CrisisLanguage.matches(in: ["felt hopeless most of the day"]))
+        #expect(!CrisisLanguage.matches(in: ["couldn't get out of bed, cried a lot"]))
+        #expect(!CrisisLanguage.matches(in: ["hurt my back lifting boxes"]))
+        #expect(!CrisisLanguage.matches(in: []))
+    }
+
+    // Accepted by design: over-matching shows support, which is the safer error.
+    @Test("An innocent phrasing that still matches is accepted")
+    func acceptedFalsePositive() {
+        #expect(CrisisLanguage.matches(in: ["hurt myself at the gym"]))
+    }
+}
+
+@Suite("CrisisSupport – resources by region")
+struct CrisisSupportTests {
+
+    @Test("US gets the 988 Lifeline, with the Spanish chat in Spanish")
+    func unitedStates_gets988() {
+        #expect(CrisisSupport.resources(region: "US", isSpanish: false) == .lifeline988(chatURL: "https://chat.988lifeline.org/"))
+        #expect(CrisisSupport.resources(region: "US", isSpanish: true) == .lifeline988(chatURL: "https://chat.988lifeline.org/?lang=es"))
+    }
+
+    @Test("Other regions get their Find A Helpline country page")
+    func otherRegion_getsCountryDirectory() {
+        #expect(CrisisSupport.resources(region: "ES", isSpanish: true) == .findAHelpline(directoryURL: "https://findahelpline.com/countries/es"))
+        #expect(CrisisSupport.resources(region: "GB", isSpanish: false) == .findAHelpline(directoryURL: "https://findahelpline.com/countries/gb"))
+    }
+
+    @Test("An unknown or malformed region falls back to the directory root")
+    func unknownRegion_fallsBackToRoot() {
+        #expect(CrisisSupport.resources(region: nil, isSpanish: false) == .findAHelpline(directoryURL: "https://findahelpline.com"))
+        #expect(CrisisSupport.resources(region: "419", isSpanish: false) == .findAHelpline(directoryURL: "https://findahelpline.com"))
+    }
+}
