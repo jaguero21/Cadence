@@ -157,6 +157,10 @@ enum HealthThreshold {
     // that factor chip) when they total at least this much time or energy.
     static let intenseWorkoutMinutes: Double = 45
     static let intenseWorkoutKilocalories: Double = 400
+    // Minutes in the top two heart-rate zones before a day counts as intense
+    // exercise. Ten is the usual line for vigorous effort, and it reads the same
+    // whether someone configured three zones or five.
+    static let intenseZoneMinutes: Double = 10
     // Logged dietary caffeine (mg) that auto-selects the "Caffeine" factor —
     // roughly half a cup of coffee; trace amounts don't count.
     static let caffeineMilligrams: Double = 50

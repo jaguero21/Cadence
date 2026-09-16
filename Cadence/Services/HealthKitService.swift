@@ -541,6 +541,28 @@ final class HealthKitService: HealthKitServiceProtocol {
             || totalKilocalories >= HealthThreshold.intenseWorkoutKilocalories
     }
 
+    // Minutes spent in the top two zones the person has configured. Zone counts
+    // differ between people (Health Settings lets them set their own), so the
+    // high end is defined by index rather than by a fixed zone number.
+    nonisolated static func topZoneMinutes(durations: [(index: Int, minutes: Double)], zoneCount: Int) -> Double {
+        guard zoneCount > 0 else { return 0 }
+        let cutoff = max(1, zoneCount - 1)   // top two, or the only zone there is
+        return durations.filter { $0.index >= cutoff }.reduce(0) { $0 + $1.minutes }
+    }
+
+    // Zones measure effort; duration and calories only stand in for it. When a
+    // workout reports zones they decide alone — that is the point of using them —
+    // and days without zone data (iOS 26, no heart-rate monitor, a workout typed
+    // in by hand) keep the original rule.
+    nonisolated static func isIntenseExercise(topZoneMinutes: Double?,
+                                              totalMinutes: Double,
+                                              totalKilocalories: Double) -> Bool {
+        if let topZoneMinutes {
+            return topZoneMinutes >= HealthThreshold.intenseZoneMinutes
+        }
+        return isIntenseExercise(totalMinutes: totalMinutes, totalKilocalories: totalKilocalories)
+    }
+
     // Whether any menstrual-flow sample (of any intensity) overlaps the window.
     // nil = no data (not asked / not tracked); false is never reported because
     // an absent sample can't distinguish "no flow" from "doesn't track cycles".
