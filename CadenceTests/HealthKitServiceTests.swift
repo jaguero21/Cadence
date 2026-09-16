@@ -465,8 +465,10 @@ struct WeekReflectionPromptTests {
             DailyLogSnapshot(date: cal.date(byAdding: .day, value: -2, to: .now)!, mood: 2, energy: 3,
                              symptoms: [SymptomEntry(name: "Headache", severity: 7, emoji: "🤕")],
                              factors: ["Travel"],
+                             didEditMetrics: true, didEditMood: true,
                              peaksAndValleysNote: "rough flight home"),
-            DailyLogSnapshot(date: .now, mood: 4, energy: 7, freeNote: "felt like myself again"),
+            DailyLogSnapshot(date: .now, mood: 4, energy: 7,
+                             didEditMetrics: true, didEditMood: true, freeNote: "felt like myself again"),
         ]
         let prompt = try #require(WeekReflectionService.promptText(from: logs))
         #expect(prompt.contains("mood 2/5"))
@@ -482,7 +484,7 @@ struct WeekReflectionPromptTests {
         let longNote = String(repeating: "a", count: 1000)
         let logs = [
             DailyLogSnapshot(date: cal.date(byAdding: .day, value: -1, to: .now)!, freeNote: longNote),
-            DailyLogSnapshot(date: .now),
+            DailyLogSnapshot(date: .now, mood: 4, didEditMood: true),
         ]
         let prompt = try #require(WeekReflectionService.promptText(from: logs))
         #expect(!prompt.contains(longNote))
@@ -524,6 +526,124 @@ struct WeekReflectionPromptTests {
         let notLogged = [DailyLogSnapshot(date: .now, mood: 3, didEditMood: false)]
         #expect(WeekReflectionService.hasMood(in: logged))
         #expect(!WeekReflectionService.hasMood(in: notLogged))
+    }
+
+    // DailyLog defaults mood to 3, energy to 5 and sleep to 7h. The old builder
+    // passed those defaults on as if the user had entered them: a week whose note
+    // said "forgot to fill most of this in" came back as "a mood of 3/5, energy
+    // at 5/10, sleep at 7.0h" in 3 of 3 runs.
+    @Test("Ratings the user never entered stay out of the prompt")
+    func uneditedMetrics_areOmitted() throws {
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -2, to: .now)!, mood: 3, energy: 5, sleepHours: 7,
+                             symptoms: [SymptomEntry(name: "Headache", severity: 6, emoji: "🤕")],
+                             didEditMetrics: false, didEditMood: false),
+            DailyLogSnapshot(date: .now, mood: 3, energy: 5, sleepHours: 7,
+                             didEditMetrics: false, didEditMood: false, freeNote: "busy day"),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs))
+        #expect(!prompt.contains("mood"))
+        #expect(!prompt.contains("energy"))
+        #expect(!prompt.contains("sleep"))
+        #expect(prompt.contains("Headache 6/10"))
+        #expect(prompt.contains("busy day"))
+    }
+
+    // Without the word, the model called a 3/5 mood "low".
+    @Test("A logged mood carries the app's own word")
+    func mood_carriesWord() throws {
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -1, to: .now)!, mood: 3, energy: 5, sleepHours: 7,
+                             didEditMetrics: true, didEditMood: true),
+            DailyLogSnapshot(date: .now, mood: 5, energy: 6, sleepHours: 7, didEditMetrics: true, didEditMood: true),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs))
+        #expect(prompt.contains("mood 3/5 (neutral)"))
+        #expect(prompt.contains("mood 5/5 (very happy)"))
+    }
+
+    // The model read a 6 → 5 → 3 week as "joint pain increasing slightly" in 2 of
+    // 3 runs, so direction is computed here and stated in words.
+    @Test("The prompt states each trend's direction in words")
+    func prompt_carriesTrendLines() throws {
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -2, to: .now)!, mood: 3, energy: 4, sleepHours: 6.5,
+                             symptoms: [SymptomEntry(name: "Joint pain", severity: 6, emoji: "🦴")],
+                             didEditMetrics: true, didEditMood: true),
+            DailyLogSnapshot(date: .now, mood: 4, energy: 6, sleepHours: 7.5,
+                             symptoms: [SymptomEntry(name: "Joint pain", severity: 3, emoji: "🦴")],
+                             didEditMetrics: true, didEditMood: true),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs))
+        #expect(prompt.contains("Over the week:"))
+        #expect(prompt.contains("Mood rose."))
+        #expect(prompt.contains("Energy rose."))
+        #expect(prompt.contains("Joint pain eased."))
+    }
+
+    @Test("Spanish wording produces a Spanish prompt")
+    func spanishStrings_produceSpanishPrompt() throws {
+        let spanish = ReflectionStrings(
+            instructionsBody: "Resume mi semana en %@.", sentenceRange: "de %1$lld a %2$lld frases",
+            moodRule: "Describe el ánimo con la palabra dada.",
+            header: "Estas son mis entradas del diario de esta semana:", closing: "Por favor, resume mi semana.",
+            trendHeader: "A lo largo de la semana:", moodLabel: "ánimo", energyLabel: "energía", sleepLabel: "sueño",
+            symptomsLabel: "síntomas", factorsLabel: "factores", peaksLabel: "altibajos", noteLabel: "nota",
+            intentionsLabel: "intenciones",
+            moodWords: [1: "muy triste", 2: "triste", 3: "neutral", 4: "feliz", 5: "muy feliz"],
+            moodName: "El ánimo", energyName: "La energía", rose: "subió", dipped: "bajó",
+            eased: "se alivió", gotStronger: "se intensificó", heldSteady: "se mantuvo estable")
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -1, to: .now)!, mood: 2, energy: 3, sleepHours: 6,
+                             didEditMetrics: true, didEditMood: true),
+            DailyLogSnapshot(date: .now, mood: 4, energy: 6, sleepHours: 7, didEditMetrics: true, didEditMood: true),
+        ]
+        let prompt = try #require(WeekReflectionService.promptText(from: logs, strings: spanish,
+                                                                  locale: Locale(identifier: "es_ES")))
+        #expect(prompt.contains("ánimo 2/5 (triste)"))
+        #expect(prompt.contains("El ánimo subió."))
+        #expect(prompt.hasSuffix("Por favor, resume mi semana."))
+    }
+
+    @Test("A week of empty logs yields no prompt")
+    func emptyDays_yieldNoPrompt() {
+        let cal = Calendar.current
+        let logs = [
+            DailyLogSnapshot(date: cal.date(byAdding: .day, value: -1, to: .now)!, didEditMetrics: false, didEditMood: false),
+            DailyLogSnapshot(date: .now, didEditMetrics: false, didEditMood: false),
+        ]
+        #expect(WeekReflectionService.promptText(from: logs) == nil)
+    }
+}
+
+// The direction of every change is decided in Swift, never by the model.
+@Suite("WeekReflectionService – trend verbs")
+struct ReflectionTrendTests {
+
+    @Test("Ratings use rose, dipped, or held steady")
+    func ratingVerbs() {
+        let s = ReflectionStrings.current
+        #expect(WeekReflectionService.trendVerb([2, 4], higherIsWorse: false, strings: s) == "rose")
+        #expect(WeekReflectionService.trendVerb([4, 2], higherIsWorse: false, strings: s) == "dipped")
+        #expect(WeekReflectionService.trendVerb([3, 5, 3], higherIsWorse: false, strings: s) == "held steady")
+    }
+
+    @Test("Symptoms use eased or got stronger, with severity inverted")
+    func symptomVerbs() {
+        let s = ReflectionStrings.current
+        #expect(WeekReflectionService.trendVerb([6, 3], higherIsWorse: true, strings: s) == "eased")
+        #expect(WeekReflectionService.trendVerb([3, 6], higherIsWorse: true, strings: s) == "got stronger")
+    }
+
+    @Test("A single reading has no direction")
+    func singleValue_hasNoVerb() {
+        let s = ReflectionStrings.current
+        #expect(WeekReflectionService.trendVerb([4], higherIsWorse: false, strings: s) == nil)
+        #expect(WeekReflectionService.trendVerb([], higherIsWorse: true, strings: s) == nil)
     }
 }
 
