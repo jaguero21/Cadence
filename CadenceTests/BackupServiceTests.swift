@@ -262,6 +262,36 @@ import SwiftData
         #expect(state == .error("quota exceeded"))
     }
 
+    // The account probe's fold. These pin the rule that a sync event outranks
+    // the probe — without it, a later simplification to
+    // `state = available ? .waiting : .noAccount` would clobber a .synced row
+    // on every Settings visit and nothing would fail.
+
+    @Test("No iCloud account, while still waiting, reads as noAccount")
+    func probeWithoutAccountWhileWaiting() {
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: false, previous: .waiting) == .noAccount)
+    }
+
+    // The mid-session recovery: signed out at launch, signed back in from
+    // Settings.app, returned to Cadence. Without this the row stayed on
+    // .noAccount for the rest of the session.
+    @Test("An account appearing rescues a row stranded on noAccount")
+    func probeWithAccountAfterNoAccount() {
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: true, previous: .noAccount) == .waiting)
+    }
+
+    @Test("A sync event outranks the probe — synced survives a failed probe")
+    func probeDoesNotClobberSynced() {
+        let end = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: false, previous: .synced(end)) == .synced(end))
+    }
+
+    @Test("A probe never disturbs a store that isn't cloud-backed")
+    func probeLeavesLocalOnly() {
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: true, previous: .localOnly) == .localOnly)
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: false, previous: .localOnly) == .localOnly)
+    }
+
     @Test("A finished, successful import is the one event worth reacting to")
     func reactsToFinishedSuccessfulImport() {
         #expect(CloudSyncMonitor.shouldReactTo(isImport: true, finished: true, succeeded: true))
@@ -403,20 +433,16 @@ struct BackupHealthStoreTests {
     // inside the app, so there is no test-only container to redirect writes
     // to, and every run was previously leaving a fabricated summary behind
     // for the simulator's actual widget to read, with nothing restoring it.
-    // WidgetData's only surface is write(_:)/read() -> Summary? — there is no
-    // clear/delete API to hand a nil-prior test back to "nothing stored" — so
-    // that case is handled by reaching into the same suite/key WidgetData
-    // itself uses. The key string duplicates WidgetData's own private `key`
-    // constant ("todaySummary"); that duplication is the price of restoring
-    // state correctly without adding a delete API to production code for
-    // what only this test file needs.
-    private static let widgetSummaryKey = "todaySummary"
-
+    // A nil prior means nothing was stored, which `write` can't express (its
+    // Summary is non-optional), so that case goes through WidgetData.clear().
+    // This used to hand-copy WidgetData's private `key` and reach into the
+    // suite directly — a duplicate that would have stopped restoring silently,
+    // with every test still green, if that key were ever renamed.
     private func restoreWidgetSummary(_ prior: WidgetData.Summary?) {
         if let prior {
             WidgetData.write(prior)
         } else {
-            UserDefaults(suiteName: WidgetData.appGroup)?.removeObject(forKey: Self.widgetSummaryKey)
+            WidgetData.clear()
         }
     }
 

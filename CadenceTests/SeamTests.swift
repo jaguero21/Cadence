@@ -551,3 +551,119 @@ struct QuickLogUndoTests {
         #expect(QuickLogUndo.availableRecord(in: context) == nil)
     }
 }
+
+// MARK: - Streak breadth
+
+// The Dashboard's @Query is capped at 90 days, and computeStreak walks
+// consecutive days backward until a gap, so reading the streak off that slice
+// silently truncated it at the window edge. Every other publish path fetches
+// the unbounded table, so the Dashboard and the widget disagreed about a long
+// streak and each republish undid the other's stored summary.
+@MainActor
+@Suite("DashboardViewModel – streak breadth")
+struct StreakBreadthTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self, HealthSnapshot.self])
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    // 120 consecutive complete days — comfortably past the 90-day window, so a
+    // window-limited walk would stop at 90 and this would fail at exactly that
+    // boundary rather than by some arbitrary amount.
+    @Test("A streak longer than the Dashboard's 90-day window is not truncated")
+    func streakSurvivesPastTheQueryWindow() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        for daysAgo in 0..<120 {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == 120)
+    }
+
+    // The walk must still stop at a real gap — otherwise the fix above would
+    // "pass" by counting every complete log regardless of adjacency.
+    @Test("The streak still stops at the first missing day")
+    func streakStopsAtAGap() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        // Days 0-2 complete, day 3 missing, days 4-100 complete.
+        for daysAgo in Array(0...2) + Array(4...100) {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == 3)
+    }
+
+    // The actual regression. The three tests above exercise computeStreak(in:)
+    // directly, which is new code — none of them could have failed before this
+    // fix, because the function didn't exist. THIS one pins the bug: refresh
+    // receives the view's 90-day slice as `logs`, exactly as DashboardView
+    // passes it, and the streak it publishes must still be the true one. Swap
+    // `computeStreak(in: context)` back to `computeStreak(from: logs)` in
+    // refresh and this returns 90.
+    @Test("refresh reports the true streak even though its logs are a 90-day slice")
+    func refreshIgnoresTheWindowForStreak() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        var all: [DailyLog] = []
+        for daysAgo in 0..<120 {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+            all.append(log)
+        }
+        try context.save()
+
+        // What DashboardView's @Query would hand over: the newest 90 days only.
+        let windowed = Array(all.prefix(90))
+        let vm = DashboardViewModel()
+        vm.refresh(logs: windowed, health: [], reviews: [],
+                   notifications: StreakFakeNotificationService(), context: context)
+
+        #expect(vm.streak == 120)
+    }
+
+    // Incomplete days are not streak days, and the predicate must be what
+    // filters them — not the walk finding them out of order.
+    @Test("Incomplete days don't count toward the streak")
+    func incompleteDaysExcluded() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        for daysAgo in 0..<5 {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = (daysAgo != 2)
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == 2)
+    }
+}
+
+/// Keeps refresh's streak-risk scheduling out of the real notification centre
+/// during the streak-breadth tests.
+@MainActor
+private final class StreakFakeNotificationService: NotificationServiceProtocol {
+    func requestAuthorization() async -> Bool { true }
+    func checkAuthorizationStatus() async -> Bool { true }
+    func scheduleDailyReminder(at hour: Int, minute: Int) {}
+    func scheduleWeeklyReviewReminder(weekday: Int, hour: Int) {}
+    func scheduleStreakAtRisk() {}
+    func sendInsightNotification(title: String) {}
+    func syncMedicationReminders(_ medications: [MedicationSnapshot]) async {}
+    func removeNotification(id: String) {}
+    func removeAll() {}
+}
