@@ -15,11 +15,13 @@ final class DashboardViewModel {
     // each log by date (separate local-only store since the CloudKit split) so
     // the dashboard headline is computed from the same inputs as the Insights
     // tab. Passed in rather than fetched here — see DailyLogSnapshot.build.
-    func refresh(logs: [DailyLog], health: [HealthSnapshot], reviews: [WeeklyReview], medications: [Medication] = [], flares: [Flare] = [], customTrackers: [CustomTracker] = [], notifications: (any NotificationServiceProtocol)? = nil, menopause: [MenopausalTransition] = []) {
+    func refresh(logs: [DailyLog], health: [HealthSnapshot], reviews: [WeeklyReview], medications: [Medication] = [], flares: [Flare] = [], customTrackers: [CustomTracker] = [], notifications: (any NotificationServiceProtocol)? = nil, menopause: [MenopausalTransition] = [], context: ModelContext) {
         let notifications = notifications ?? NotificationService.shared
         todayLog = logs.first { Calendar.current.isDateInToday($0.date) }
         thisWeekReview = reviews.first { $0.weekStartDate.isThisWeek }
-        streak = Self.computeStreak(from: logs)
+        // Deliberately not `from: logs` — see computeStreak(in:); `logs` is the
+        // view's 90-day window and would cap the streak at its edge.
+        streak = Self.computeStreak(in: context)
         // Snapshot @Model values on the main actor before handing them to
         // PatternEngine. Every input PatternEngine takes is included so the
         // dashboard headline agrees with the Insights tab / notifications
@@ -48,11 +50,16 @@ final class DashboardViewModel {
     // Shared by refresh (for the Dashboard's own mascotPose) and
     // publishWidgetSummary (for the widget's copy) so the two can never
     // disagree about how the active flare or streak feeds into the pose. The
-    // log breadth still differs by caller — refresh passes the Dashboard's
+    // `logs` breadth still differs by caller — refresh passes the Dashboard's
     // 90-day @Query slice, the other publish paths pass the unbounded
     // DailyLog table — but MascotPoseEngine.pose windows its input to
     // PatternThreshold.insightWindowDays internally, so both converge to the
     // identical set and produce the identical pose.
+    //
+    // That convergence argument covers the POSE only. It never held for the
+    // streak, which walks back until a gap and so was truncated by the 90-day
+    // slice while every other path saw the whole table; `streakDays` now comes
+    // from computeStreak(in:) on both sides, so the input really is identical.
     private static func resolvePose(logs: [DailyLog], activeFlare: Flare?, streakDays: Int) -> WidgetData.MascotPose {
         MascotPoseEngine.pose(
             for: logs.map { DailyLogSnapshot($0) },
@@ -166,6 +173,26 @@ final class DashboardViewModel {
         guard summary != WidgetData.read() else { return }
         WidgetData.write(summary)
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    // The streak must never be read off a windowed slice. `computeStreak(from:)`
+    // walks consecutive days backward until it finds a gap, and the Dashboard's
+    // @Query is capped at 90 days (see the date-windowed views rule in
+    // CLAUDE.md) — so a 100-day streak hit the edge of the window and displayed
+    // as 90. Every other publish path (Siri, watch, widget queue, log save,
+    // restore, undo) fetches the unbounded table and got 100, so the Dashboard
+    // and the widget disagreed, and each republish rewrote the stored summary
+    // and spent a system-budgeted timeline reload undoing the other.
+    //
+    // Fetching here rather than widening the view's @Query keeps the window
+    // rule intact: this asks only for what the walk needs — complete logs,
+    // newest first — instead of pulling every field of every log into the view.
+    static func computeStreak(in context: ModelContext) -> Int {
+        let descriptor = FetchDescriptor<DailyLog>(
+            predicate: #Predicate { $0.isComplete },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        return computeStreak(from: (try? context.fetch(descriptor)) ?? [])
     }
 
     private static func computeStreak(from logs: [DailyLog]) -> Int {

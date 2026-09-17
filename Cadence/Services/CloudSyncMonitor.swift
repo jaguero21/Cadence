@@ -32,6 +32,12 @@ final class CloudSyncMonitor {
     @ObservationIgnored var onRemoteImport: (() -> Void)?
     @ObservationIgnored var coalesceInterval: Duration = .seconds(SyncThreshold.remoteImportCoalesceSeconds)
     @ObservationIgnored private var reactTask: Task<Void, Never>?
+    // start() now runs on every call rather than once per session, so probes
+    // can overlap. Without cancel-and-replace a slow launch probe could land
+    // AFTER a newer Settings probe and overwrite the fresher answer with a
+    // stale one — the row would flip back to .noAccount seconds after
+    // correctly recovering.
+    @ObservationIgnored private var accountProbeTask: Task<Void, Never>?
     private static let log = Logger(subsystem: "com.carpecadence", category: "CloudSync")
 
     // Pure state fold, unit-tested in isolation. `finished` is whether the
@@ -55,6 +61,20 @@ final class CloudSyncMonitor {
     // true to show.
     static func shouldReactTo(isImport: Bool, finished: Bool, succeeded: Bool) -> Bool {
         isImport && finished && succeeded
+    }
+
+    // Pure fold for the account probe, the companion to stateAfterEvent above.
+    // The probe is the WEAKER of the two signals: a sync event is proof the
+    // account works, so .synced / .syncing / .error pass through untouched, as
+    // does .localOnly (that store isn't cloud-backed at all). Only the two
+    // holding states move — .waiting drops to .noAccount when there is no
+    // account, and .noAccount returns to .waiting once one appears, which is
+    // what lets the Settings row recover after a mid-session iCloud sign-in
+    // instead of reading "No iCloud account" for the rest of the session.
+    static func stateAfterAccountProbe(available: Bool, previous: SyncState) -> SyncState {
+        if !available, previous == .waiting { return .noAccount }
+        if available, previous == .noAccount { return .waiting }
+        return previous
     }
 
     // Cancel-and-restart around a sleep: the cancellation is what collapses a
@@ -121,7 +141,8 @@ final class CloudSyncMonitor {
             }
         }
 
-        Task { await refreshAccountStatus() }
+        accountProbeTask?.cancel()
+        accountProbeTask = Task { await refreshAccountStatus() }
     }
 
     func apply(isImport: Bool, finished: Bool, succeeded: Bool, endDate: Date?, errorDescription: String?) {
@@ -144,21 +165,10 @@ final class CloudSyncMonitor {
 
     private func refreshAccountStatus() async {
         guard let status = try? await CKContainer.default().accountStatus() else { return }
-        // Only downgrade to noAccount while we're still waiting — a sync event
-        // that already arrived is stronger evidence than the account probe.
-        if status != .available, state == .waiting {
-            state = .noAccount
-        }
-        // Recovery direction: the account came back after we'd already
-        // stranded the row on .noAccount (signed back into iCloud in
-        // Settings.app, then returned to Cadence). Now that start() re-probes
-        // on every call instead of only once at launch, this branch is what
-        // actually gets hit — go back to .waiting for the first sync event,
-        // same as a fresh launch with an account already signed in. A sync
-        // event still outranks the probe in both directions: don't overwrite
-        // .synced/.syncing/.error, only the .noAccount holding pattern.
-        if status == .available, state == .noAccount {
-            state = .waiting
-        }
+        // A superseded probe must not publish: start() cancels the previous
+        // task, but cancellation can't interrupt a CKContainer round-trip
+        // already in flight, so the stale answer is discarded here instead.
+        guard !Task.isCancelled else { return }
+        state = Self.stateAfterAccountProbe(available: status == .available, previous: state)
     }
 }
