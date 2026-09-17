@@ -98,6 +98,10 @@ enum PatternThreshold {
     // symptom count worth surfacing.
     static let minimumMedEffectDays: Int = 5
     static let medSymptomDeltaThreshold: Double = 0.5
+    // A life stage needs more evidence than a pill: symptoms fluctuate week to
+    // week, and the "before" side can stretch back months.
+    static let minimumMenopauseEffectDays: Int = 14
+    static let menopauseSymptomDeltaThreshold: Double = 0.5
 
     // Factor (trigger) correlation: minimum days with and without a factor before
     // comparing, and the smallest increase in average daily symptom count on

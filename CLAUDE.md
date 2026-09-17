@@ -156,8 +156,10 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   and the `hk*` objective fields. Nothing is gated on Health access, prefills
   never overwrite user-entered values (`didEditMetrics` guard), and every
   loggable variable stays fully manual. Every type in
-  `HealthKitService.readTypes` must be fetched by `fetchLogSnapshot` —
-  requesting permission for data that's never read is a broken promise.
+  `HealthKitService.readTypes` must actually be fetched somewhere — requesting
+  permission for data that's never read is a broken promise. `fetchLogSnapshot`
+  covers all of them except `menopausalState`, which `fetchMenopausalState`
+  reads across all time rather than per day (see Menopausal state below).
 - **Health two-way sync:** `HealthKitService.publish(log:)` (called from
   `LogInputFlow` after every successful save, fire-and-forget) mirrors the
   day into Health — mapped symptoms as severity samples, and the mood as a

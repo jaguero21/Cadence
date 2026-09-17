@@ -778,3 +778,53 @@ struct CrisisSupportTests {
         #expect(CrisisSupport.resources(region: "419", isSpanish: false) == .findAHelpline(directoryURL: "https://findahelpline.com"))
     }
 }
+
+// MARK: - Menopausal state
+
+// Health records menopausal state as point-in-time samples — one per change,
+// not a daily value — which is why this collapses to the date each state began
+// rather than becoming an hk* field on HealthSnapshot.
+@Suite("HealthKitService – menopausal transitions")
+struct MenopausalTransitionTests {
+
+    private func day(_ offset: Int) -> Date {
+        Calendar.current.date(byAdding: .day, value: offset, to: Calendar.current.startOfDay(for: .now)) ?? .now
+    }
+
+    // Raw values mirror HKCategoryValueMenopausalState: 1 perimenopause,
+    // 2 menopause, 3 none.
+    @Test("A single perimenopause sample becomes one transition")
+    func singleSample() {
+        let result = HealthKitService.transitions(from: [(day(-100), 1)])
+        #expect(result == [MenopausalTransition(state: .perimenopause, began: day(-100))])
+    }
+
+    @Test("Perimenopause then menopause becomes two transitions, in order")
+    func twoStates() {
+        let result = HealthKitService.transitions(from: [(day(-200), 1), (day(-40), 2)])
+        #expect(result.map(\.state) == [.perimenopause, .menopause])
+        #expect(result.map(\.began) == [day(-200), day(-40)])
+    }
+
+    @Test("A state later contradicted by 'none' is dropped")
+    func noneClearsEarlierState() {
+        #expect(HealthKitService.transitions(from: [(day(-90), 1), (day(-10), 3)]).isEmpty)
+    }
+
+    @Test("Only the first record of a state counts")
+    func repeatedSamples_keepTheFirst() {
+        let result = HealthKitService.transitions(from: [(day(-90), 1), (day(-60), 1), (day(-30), 1)])
+        #expect(result == [MenopausalTransition(state: .perimenopause, began: day(-90))])
+    }
+
+    @Test("Unordered input is sorted, and unknown values are ignored")
+    func unorderedAndUnknown() {
+        let result = HealthKitService.transitions(from: [(day(-10), 2), (day(-99), 1), (day(-50), 7)])
+        #expect(result.map(\.state) == [.perimenopause, .menopause])
+    }
+
+    @Test("No samples means no transitions")
+    func empty() {
+        #expect(HealthKitService.transitions(from: []).isEmpty)
+    }
+}
