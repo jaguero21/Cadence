@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import OSLog
 
 // What today's log looked like before a quick check-in wrote to it.
 //
@@ -46,4 +47,57 @@ enum QuickLogUndo {
     static func clear() {
         UserDefaults.standard.removeObject(forKey: UserDefaultsKey.lastQuickLogUndo)
     }
+
+    // MARK: - Offering
+
+    // The record only counts while the quick log is still the last word on
+    // today: if the person has since edited the day, undoing would throw away
+    // work they did by hand, and if they deleted the log there is nothing left
+    // to undo.
+    static func availableRecord(in context: ModelContext) -> QuickLogUndoRecord? {
+        guard let record = stored() else { return nil }
+        guard record.day == Calendar.current.startOfDay(for: .now) else { return nil }
+
+        let day = record.day
+        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == day })
+        guard let log = (try? context.fetch(descriptor))?.first else { return nil }
+        guard log.mood == record.appliedMood, log.didEditMood else { return nil }
+        if let appliedEnergy = record.appliedEnergy, log.energy != appliedEnergy { return nil }
+        return record
+    }
+
+    // MARK: - Applying
+
+    // Deleting is the honest inverse when the check-in created the day: the day
+    // had no entry before, and leaving an empty one would show it as started.
+    // Callers re-publish to Health afterwards — publish(log:) deletes and
+    // rewrites the day's samples, so a removed log leaves nothing behind.
+    static func undo(record: QuickLogUndoRecord, in context: ModelContext) {
+        let day = record.day
+        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == day })
+        guard let log = (try? context.fetch(descriptor))?.first else {
+            clear()
+            return
+        }
+
+        if record.createdLog {
+            context.delete(log)
+        } else {
+            log.mood = record.previousMood
+            log.didEditMood = record.previousDidEditMood
+            log.energy = record.previousEnergy
+            log.didEditMetrics = record.previousDidEditMetrics
+        }
+
+        do {
+            try context.save()
+            clear()
+        } catch {
+            // Leave the record in place: the day is unchanged, so the offer is
+            // still true and the person can try again.
+            Self.log.error("Undoing a quick check-in failed: \(error.localizedDescription)")
+        }
+    }
+
+    private static let log = Logger(subsystem: "com.carpecadence", category: "QuickLogUndo")
 }

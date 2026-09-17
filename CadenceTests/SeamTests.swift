@@ -477,3 +477,77 @@ struct SevenDayStatsTests {
         #expect(DashboardViewModel.sevenDayStats(from: [], referenceDate: today) == DashboardViewModel.SevenDayStats())
     }
 }
+
+// MARK: Undo for a quick check-in
+
+// The offer has to retire itself: undoing after the person has edited the day
+// would throw away work they did by hand.
+@Suite("QuickLogUndo – offering and applying")
+@MainActor
+struct QuickLogUndoTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([DailyLog.self])
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    private func payload(mood: Int, energy: Int? = nil) -> [String: Any] {
+        var p: [String: Any] = ["mood": mood, "date": Date.now.timeIntervalSinceReferenceDate]
+        if let energy { p["energy"] = energy }
+        return p
+    }
+
+    @Test("Undo restores the mood and energy the day had before")
+    func undo_restoresPreviousValues() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        let existing = DailyLog()
+        existing.mood = 2; existing.didEditMood = true
+        existing.energy = 7; existing.didEditMetrics = true
+        context.insert(existing); try context.save()
+
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 5, energy: 9), context: context, source: .siri)
+        let record = try #require(QuickLogUndo.availableRecord(in: context))
+        QuickLogUndo.undo(record: record, in: context)
+
+        let logs = try context.fetch(FetchDescriptor<DailyLog>())
+        #expect(logs.count == 1)
+        #expect(logs.first?.mood == 2)
+        #expect(logs.first?.energy == 7)
+        #expect(QuickLogUndo.stored() == nil)
+    }
+
+    @Test("Undo deletes the log the quick check-in created")
+    func undo_deletesCreatedLog() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 4), context: context, source: .siri)
+        let record = try #require(QuickLogUndo.availableRecord(in: context))
+        QuickLogUndo.undo(record: record, in: context)
+        #expect(try context.fetch(FetchDescriptor<DailyLog>()).isEmpty)
+    }
+
+    @Test("Editing the day by hand retires the offer")
+    func manualEdit_retiresRecord() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 4), context: context, source: .siri)
+        let log = try #require(try context.fetch(FetchDescriptor<DailyLog>()).first)
+        log.mood = 1                       // the person changed it themselves
+        try context.save()
+        #expect(QuickLogUndo.availableRecord(in: context) == nil)
+    }
+
+    @Test("A record from another day is never offered")
+    func staleDay_isNotOffered() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: .now)) ?? .now
+        QuickLogUndo.store(QuickLogUndoRecord(day: yesterday, source: .siri, createdLog: true,
+                                              previousMood: 3, previousDidEditMood: false,
+                                              previousEnergy: 5, previousDidEditMetrics: false,
+                                              appliedMood: 4, appliedEnergy: nil, recordedAt: yesterday))
+        #expect(QuickLogUndo.availableRecord(in: context) == nil)
+    }
+}
