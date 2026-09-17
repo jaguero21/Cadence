@@ -627,19 +627,57 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   one `SyncState`. `CadenceApp.usingCloudKitStore` records whether the
   CloudKit-backed store actually initialised (vs the local fallback) so the row
   reads "Off — local storage" truthfully. The state fold (`stateAfterEvent`) is
-  pure and unit-tested; sync events outrank the account probe.
+  pure and unit-tested; sync events outrank the account probe in both
+  directions — the probe only moves `.waiting` to `.noAccount` on a missing
+  account, and only moves `.noAccount` back to `.waiting` on a recovered one,
+  never touching `.synced`/`.syncing`/`.error`. `apply(...)` is `internal`
+  rather than `private`, and `coalesceInterval` is a settable
+  `@ObservationIgnored var` rather than a constant, purely so
+  `RemoteImportRefreshTests` (`coalescesBurst`, `exportDoesNotTriggerRefresh`)
+  can construct a bare `CloudSyncMonitor()`, drop the interval to
+  milliseconds, and call `apply` directly — driving the debounce without a
+  real CloudKit notification or a real `SyncThreshold.remoteImportCoalesceSeconds`
+  wait. Don't re-privatise either as cleanup; doing so breaks those tests.
   `CloudSyncMonitor.start()` runs at **launch** (in `CadenceApp`, beside
   `PhoneConnectivityManager.start`), not on first Settings visit as it once did:
-  it now also drives the post-import refresh, so its observer must exist for the
-  whole session. `start()` is idempotent, so `SyncBackupSection`'s call is a
-  harmless no-op. A finished, successful **import** (`shouldReactTo`, pure and
-  tested; exports are this device's own writes and setup moves no data) fires
-  `onRemoteImport`, debounced by `SyncThreshold.remoteImportCoalesceSeconds`
-  because CloudKit delivers a pass as a burst and `WidgetCenter` reloads are
-  system-budgeted. `CadenceApp.applyRemoteImport` republishes the widget summary
-  and clears `UserDefaultsKey.lastInsightCheckDay` so the next foreground
-  recomputes insights. It deliberately does **not** recompute inline: that would
-  let a background import fire a health notification at an arbitrary hour.
+  it now also drives the post-import refresh, so its observer needs to be
+  registered before the earliest point an import could finish. That point is
+  NOT "app launch" — `NSPersistentCloudKitContainer` begins mirroring when
+  `sharedModelContainer`'s static initialiser first runs, which happens before
+  SwiftUI's scene body ever evaluates, while the observer isn't installed until
+  the `.task` that calls `start()` actually executes. An import that completes
+  in that gap fires nothing; nothing currently closes it. `start()`'s observer
+  registration is still idempotent (`if observer == nil`), so it installs at
+  most once, but the account probe below it runs on **every** call, including
+  `SyncBackupSection`'s own `.task { syncMonitor.start() }` — that used to be a
+  harmless no-op once launch also called `start()` first, until it was made to
+  re-probe: launch can happen signed out of iCloud (`.noAccount`), and without
+  a re-probe on the Settings visit, signing in from Settings.app and returning
+  left the row stuck reading "No iCloud account" for the rest of the session.
+  A finished, successful **import** (`shouldReactTo`, pure and tested; exports
+  are this device's own writes and setup moves no data) fires `onRemoteImport`,
+  debounced by `SyncThreshold.remoteImportCoalesceSeconds` because CloudKit
+  delivers a pass as a burst and `WidgetCenter` reloads are system-budgeted.
+  `CadenceApp.applyRemoteImport` republishes the widget summary unconditionally
+  (cheap: `publishWidgetSummary` already skips its own write/reload when the
+  summary is unchanged) and clears `UserDefaultsKey.lastInsightCheckDay` so the
+  next foreground recomputes insights — but only when the import's data
+  observably changed. "The import finished successfully" is not, by itself,
+  evidence of that: `NSPersistentCloudKitContainer` reports `succeeded == true`
+  for a pass that imported nothing, including the import this device's own
+  export echoes back as a push, and the `Event` carries no changed-record
+  count for `shouldReactTo` to key off. `applyRemoteImport` instead compares a
+  cheap fingerprint of the fetched logs (count, latest date, completed count,
+  stored under `UserDefaultsKey.lastRemoteImportFingerprint`) against the
+  previous one and only clears the throttle when it differs — otherwise a
+  single-device Pro user would re-run the synchronous 90-day `PatternEngine`
+  pass on every one of their own writes instead of once a day. The fingerprint
+  is deliberately cheap, not exhaustive: an edit to an existing day that
+  changes none of those three fields doesn't clear the throttle, and that
+  insight surfaces on the next calendar day's regular check instead of
+  immediately — an accepted trade, not a bug. It deliberately does **not**
+  recompute inline: that would let a background import fire a health
+  notification at an arbitrary hour.
   **SwiftData's `HistoryObserver` (iOS 27) was evaluated and rejected** for this
   — it is iOS 27-only against an iOS 17 floor (so the fallback would be the
   feature), its only output is an `eventCounter` bump carrying no more

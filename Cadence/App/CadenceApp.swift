@@ -224,6 +224,17 @@ struct CadenceApp: App {
     // clear the stamp rather than recompute: marking it dirty lets the existing
     // foreground path do the work, which is what keeps a background import from
     // firing a health notification at an arbitrary hour.
+    //
+    // The throttle clear is gated on a fingerprint, not unconditional.
+    // NSPersistentCloudKitContainer reports succeeded == true for an import
+    // pass that changed nothing — including the import that fires from THIS
+    // device's own export, since CloudKit echoes every push back as a change
+    // notification — and the Event CloudSyncMonitor observes carries no
+    // changed-record count, so shouldReactTo can't tell that apart from a real
+    // import. Without this check, a single-device Pro user would clear
+    // lastInsightCheckDay (and pay the synchronous 90-day PatternEngine pass +
+    // HealthSnapshot join) on every one of their own writes instead of once a
+    // day, defeating the whole point of the throttle.
     @MainActor
     static func applyRemoteImport(context: ModelContext) {
         let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
@@ -231,7 +242,28 @@ struct CadenceApp: App {
             logs: logs,
             activeFlare: DashboardViewModel.activeFlare(in: context)
         )
-        UserDefaults.standard.removeObject(forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        let fingerprint = importFingerprint(logs: logs)
+        let previousFingerprint = UserDefaults.standard.string(forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+        if previousFingerprint != fingerprint {
+            UserDefaults.standard.removeObject(forKey: UserDefaultsKey.lastInsightCheckDay)
+        }
+        UserDefaults.standard.set(fingerprint, forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+    }
+
+    // Cheap signature of "did the log data actually change": count, the
+    // latest date, and how many logs are complete. Deliberately NOT a hash of
+    // every field — this intentionally does NOT catch an edit to an EXISTING
+    // day that changes none of those three (e.g. a symptom added to a log
+    // that was already complete and isn't the latest date). That's an
+    // accepted trade, not an oversight: those insights still surface, just on
+    // the next calendar day's regular foreground check rather than
+    // immediately, and the alternative (comparing every field of every log on
+    // every import) is exactly the cost this throttle exists to avoid.
+    private static func importFingerprint(logs: [DailyLog]) -> String {
+        let latestDate = logs.map(\.date).max()?.timeIntervalSinceReferenceDate ?? 0
+        let completedCount = logs.filter { $0.isComplete }.count
+        return "\(logs.count)|\(latestDate)|\(completedCount)"
     }
 
     var body: some Scene {
