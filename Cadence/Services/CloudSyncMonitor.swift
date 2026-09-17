@@ -41,6 +41,15 @@ final class CloudSyncMonitor {
         return .error(errorDescription ?? String(localized: "Sync failed"))
     }
 
+    // Which events deserve a refresh, kept pure and separate from the display
+    // fold above. An export is this device's own write — every save path
+    // already republishes at the save site — and setup moves no data. An
+    // unfinished pass has nothing to show yet, and a failed one has nothing
+    // true to show.
+    static func shouldReactTo(isImport: Bool, finished: Bool, succeeded: Bool) -> Bool {
+        isImport && finished && succeeded
+    }
+
     // Default-arg isolation: resolve the flag inside the body (a @MainActor
     // default argument would be evaluated in a nonisolated context).
     func start(cloudBacked: Bool? = nil) {

@@ -261,6 +261,26 @@ import SwiftData
         )
         #expect(state == .error("quota exceeded"))
     }
+
+    @Test("A finished, successful import is the one event worth reacting to")
+    func reactsToFinishedSuccessfulImport() {
+        #expect(CloudSyncMonitor.shouldReactTo(isImport: true, finished: true, succeeded: true))
+    }
+
+    @Test("An export is this device's own write, so it triggers nothing")
+    func ignoresExport() {
+        #expect(!CloudSyncMonitor.shouldReactTo(isImport: false, finished: true, succeeded: true))
+    }
+
+    @Test("An in-flight import has nothing to show yet")
+    func ignoresUnfinishedImport() {
+        #expect(!CloudSyncMonitor.shouldReactTo(isImport: true, finished: false, succeeded: false))
+    }
+
+    @Test("A failed import must not trigger a refresh")
+    func ignoresFailedImport() {
+        #expect(!CloudSyncMonitor.shouldReactTo(isImport: true, finished: true, succeeded: false))
+    }
 }
 
 // MARK: - Backup across the split stores
