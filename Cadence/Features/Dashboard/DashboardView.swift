@@ -60,6 +60,9 @@ struct DashboardView: View {
             VStack(spacing: CadenceLayout.sectionSpacing) {
                 greetingHeader
                 todayCard
+                if let record = undoRecord {
+                    quickLogUndoRow(record)
+                }
                 weeklyCard
                 if let insight = vm.latestInsight {
                     insightPreviewCard(insight)
@@ -104,7 +107,51 @@ struct DashboardView: View {
         refreshTask = Task {
             guard !Task.isCancelled else { return }
             vm.refresh(logs: logs, health: healthRows, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService, menopause: healthKitService.menopausalTransitions)
+            refreshUndoOffer()
         }
+    }
+
+    // MARK: - Quick-log undo
+
+    // Siri can mishear a mood, and the check-in lands without the app ever
+    // opening — so the only place this can be offered is here, after the fact.
+    // Re-read on every refresh: the offer retires as soon as the day is edited.
+    @State private var undoRecord: QuickLogUndoRecord?
+
+    private func refreshUndoOffer() {
+        undoRecord = QuickLogUndo.availableRecord(in: modelContext)
+    }
+
+    private func quickLogUndoRow(_ record: QuickLogUndoRecord) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.uturn.backward")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            switch record.source {
+            case .siri:   Text("Logged by Siri")
+            case .watch:  Text("Logged from your watch")
+            case .widget: Text("Logged from the widget")
+            }
+            Spacer()
+            Button("Undo") {
+                QuickLogUndo.undo(record: record, in: modelContext)
+                refreshUndoOffer()
+                let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
+                DashboardViewModel.publishWidgetSummary(logs: logs, activeFlare: DashboardViewModel.activeFlare(in: modelContext))
+                // Re-publish the day to Health: publish(log:) deletes and
+                // rewrites its samples per type, so the State of Mind entry the
+                // check-in wrote goes with it. A deleted log writes nothing.
+                if let log = logs.first(where: { $0.date == record.day }) {
+                    let snapshot = DailyLogSnapshot(log)
+                    Task { await healthKitService.publish(log: snapshot) }
+                }
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(CadenceColor.accent)
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 4)
     }
 
     // MARK: - Subviews
