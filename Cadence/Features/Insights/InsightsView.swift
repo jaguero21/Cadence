@@ -27,6 +27,7 @@ struct InsightsView: View {
         _healthRows = Query(filter: #Predicate<HealthSnapshot> { $0.date >= cutoff })
     }
     @Environment(StoreService.self) private var store
+    @Environment(\.healthKitService) private var healthKitService
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -102,7 +103,7 @@ struct InsightsView: View {
     }
 
     private func refreshAndRecord() {
-        vm.refresh(logs: insightLogs, health: healthRows, medications: medications, flares: flares, trackers: customTrackers)
+        vm.refresh(logs: insightLogs, health: healthRows, medications: medications, flares: flares, trackers: customTrackers, menopause: healthKitService.menopausalTransitions)
         if store.isPro {
             InsightRecorder.record(vm.insights, context: modelContext)
         }

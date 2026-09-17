@@ -4,6 +4,7 @@ import SwiftData
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.notificationService) private var notificationService
+    @Environment(\.healthKitService) private var healthKitService
     @Query private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
@@ -102,7 +103,7 @@ struct DashboardView: View {
         refreshTask?.cancel()
         refreshTask = Task {
             guard !Task.isCancelled else { return }
-            vm.refresh(logs: logs, health: healthRows, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService)
+            vm.refresh(logs: logs, health: healthRows, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService, menopause: healthKitService.menopausalTransitions)
         }
     }
 

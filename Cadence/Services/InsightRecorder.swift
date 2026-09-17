@@ -12,7 +12,7 @@ enum InsightRecorder {
     // Canonical pipeline shared by every surface (Insights tab, foreground
     // notification check): same window, same inputs, same engine — so the
     // notification path can never advertise a pattern the tab doesn't show.
-    static func currentInsights(context: ModelContext) -> [InsightCard] {
+    static func currentInsights(context: ModelContext, menopause: [MenopausalTransition] = []) -> [InsightCard] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -PatternThreshold.insightWindowDays, to: .now) ?? .distantPast
         let logs = (try? context.fetch(
             FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date >= cutoff })
@@ -27,13 +27,14 @@ enum InsightRecorder {
             from: DailyLogSnapshot.build(from: logs, in: context),
             medications: medications.map(MedicationSnapshot.init),
             flares: flares.map(FlareSnapshot.init),
-            trackers: trackers.map(CustomTrackerSnapshot.init)
+            trackers: trackers.map(CustomTrackerSnapshot.init),
+            menopause: menopause
         )
     }
 
     @discardableResult
-    static func detectAndRecord(context: ModelContext) -> [InsightRecord] {
-        record(currentInsights(context: context), context: context)
+    static func detectAndRecord(context: ModelContext, menopause: [MenopausalTransition] = []) -> [InsightRecord] {
+        record(currentInsights(context: context, menopause: menopause), context: context)
     }
 
     // Inserts a record for each insight not seen before (keyed by the card's

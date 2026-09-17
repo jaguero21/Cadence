@@ -21,6 +21,12 @@ final class HealthKitService: HealthKitServiceProtocol {
     // one existed, could never run, and under Swift 6 was an error for reading
     // this non-Sendable token from a nonisolated deinit.
     private var foregroundObserver: NSObjectProtocol?
+    // Cached because the three places that compute insights — the Insights tab,
+    // the dashboard headline, and the doctor PDF — are synchronous, and they
+    // have to agree about which patterns exist (the canonical-pipeline rule in
+    // CLAUDE.md). A life stage changes about never, so a value refreshed at
+    // launch isn't meaningfully stale. Same shape as cachedIsAuthorized.
+    private(set) var menopausalTransitions: [MenopausalTransition] = []
     nonisolated private static let log = Logger(subsystem: "com.carpecadence", category: "HealthKit")
 
     private init() {
@@ -626,6 +632,12 @@ final class HealthKitService: HealthKitServiceProtocol {
     // Read-only context for the doctor report and the before/after insight.
     // Queried across all time, not the log window: the transition that matters
     // usually predates every logged day.
+    // Refreshed at launch; the synchronous insight paths then read
+    // `menopausalTransitions`.
+    func refreshMenopausalState() async {
+        menopausalTransitions = await fetchMenopausalState()
+    }
+
     nonisolated func fetchMenopausalState() async -> [MenopausalTransition] {
         guard #available(iOS 27.0, *),
               let type = HKObjectType.categoryType(forIdentifier: .menopausalState) else { return [] }

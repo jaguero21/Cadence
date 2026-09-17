@@ -279,6 +279,10 @@ struct CadenceApp: App {
                     // steps, morning sleep) even when the log flow isn't
                     // opened again; wakes the app when suspended via HK
                     // background delivery.
+                    // Menopausal state is read once per launch: the insight and
+                    // the doctor report need it, and a life stage doesn't change
+                    // between app opens.
+                    await HealthKitService.shared.refreshMenopausalState()
                     HealthKitService.shared.startObservingChanges {
                         await HealthDataRefresher.refreshToday(container: container)
                     }
@@ -402,7 +406,7 @@ struct ContentView: View {
         guard lastCheck != startOfToday.timeIntervalSinceReferenceDate else { return }
         UserDefaults.standard.set(startOfToday.timeIntervalSinceReferenceDate, forKey: UserDefaultsKey.lastInsightCheckDay)
 
-        let new = InsightRecorder.detectAndRecord(context: modelContext)
+        let new = InsightRecorder.detectAndRecord(context: modelContext, menopause: healthKitService.menopausalTransitions)
         if let top = new.filter({ $0.confidence >= PatternThreshold.minimumConfidence })
             .max(by: { $0.confidence < $1.confidence }) {
             notificationService.sendInsightNotification(title: top.title)
