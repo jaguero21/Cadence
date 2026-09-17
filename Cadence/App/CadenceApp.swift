@@ -255,11 +255,13 @@ struct CadenceApp: App {
     // latest date, and how many logs are complete. Deliberately NOT a hash of
     // every field — this intentionally does NOT catch an edit to an EXISTING
     // day that changes none of those three (e.g. a symptom added to a log
-    // that was already complete and isn't the latest date). That's an
-    // accepted trade, not an oversight: those insights still surface, just on
-    // the next calendar day's regular foreground check rather than
-    // immediately, and the alternative (comparing every field of every log on
-    // every import) is exactly the cost this throttle exists to avoid.
+    // that was already complete and isn't the latest date), nor a single
+    // import that both adds and deletes a log, leaving count, latest date,
+    // and completed count all unchanged. That's an accepted trade, not an
+    // oversight: those insights still surface, just on the next calendar
+    // day's regular foreground check rather than immediately, and the
+    // alternative (comparing every field of every log on every import) is
+    // exactly the cost this throttle exists to avoid.
     private static func importFingerprint(logs: [DailyLog]) -> String {
         let latestDate = logs.map(\.date).max()?.timeIntervalSinceReferenceDate ?? 0
         let completedCount = logs.filter { $0.isComplete }.count
@@ -322,9 +324,14 @@ struct CadenceApp: App {
                     PhoneConnectivityManager.shared.start(container: container)
                     // Start the sync monitor here rather than on first Settings
                     // visit: it now drives the post-import refresh, so its
-                    // observer has to exist for the whole session. start() is
-                    // idempotent (`guard observer == nil`), so SyncBackupSection's
-                    // own call stays correct and becomes a no-op.
+                    // observer has to exist for the whole session. Only the
+                    // observer registration is guarded to run once inside
+                    // start() — the account probe deliberately runs on every
+                    // call, which is why SyncBackupSection's own
+                    // `.task { syncMonitor.start() }` must stay: it's what
+                    // re-probes the account if it changed (signed into iCloud
+                    // in Settings.app) since this launch call ran. See
+                    // CloudSyncMonitor.start()'s comment for the bug this fixed.
                     CloudSyncMonitor.shared.onRemoteImport = {
                         CadenceApp.applyRemoteImport(context: container.mainContext)
                     }
@@ -417,6 +424,7 @@ struct ContentView: View {
             refreshTodayHealthData()
             openCheckInIfRequested()
             syncMedicationReminders()
+            reprobeCloudAccountStatus()
         }
         .task { seedSymptomTagsIfNeeded() }
         .task { syncMedicationReminders() }
@@ -450,6 +458,18 @@ struct ContentView: View {
     // touching the medication screen.
     private func syncMedicationReminders() {
         notificationService.reconcileMedicationReminders(context: modelContext)
+    }
+
+    // Re-probe the iCloud account on every foreground, not just at launch and
+    // on first Settings visit: the scenario CloudSyncMonitor.start() documents
+    // — Settings already shows "No iCloud account", the user signs into
+    // iCloud from Settings.app, then switches back to Cadence without ever
+    // leaving this tab — has no `.task` to re-run, since SyncBackupSection
+    // never disappears. start() itself stays safe to call repeatedly: the
+    // observer registration guards itself to run once, only the account
+    // probe below it repeats.
+    private func reprobeCloudAccountStatus() {
+        CloudSyncMonitor.shared.start()
     }
 
     // On foreground, recompute insights via the shared pipeline (same 90-day
