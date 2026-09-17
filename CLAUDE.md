@@ -911,6 +911,22 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   there you can edit but not compile. SourceKit then reports spurious
   "Cannot find type ..." / "SwiftDataMacros ... plugin not found" diagnostics
   for cross-file and macro references — treat those as indexer noise, not errors.
+- **But an identical-looking error can be a stale project, and that one is
+  real.** Xcode parses `project.pbxproj` when the project opens and does not
+  reliably re-read it when it changes on disk, so a `git` merge or branch
+  checkout that rewrites it leaves Xcode building from a stale model — with the
+  files another branch added missing from the target entirely. On 2026-09-17
+  this produced `Cannot find type 'QuickLogUndoRecord' in scope` and **ten more
+  errors cascading from it**: both `static applyQuickLog` overloads name
+  `QuickLogUndoRecord.Source` in their signatures, so both failed to typecheck
+  and left the member list, and `Self.applyQuickLog(...)` then resolved only to
+  the private *instance* method ("instance member cannot be used on type
+  'Self'"). **Telling the two apart:** a green `xcodebuild` proves nothing,
+  because it re-parses the project every run — check whether
+  `project.pbxproj` changed recently (`git log -- Cadence.xcodeproj/project.pbxproj`,
+  and its mtime) and whether the unresolved types come from files that arrived
+  on another branch. The fix is to quit Xcode (⌘Q, not just the window) and
+  reopen; true indexer noise survives that, a stale project does not.
 - **Xcode 27 is required** (Swift 6 language mode, iOS 27 SDK). Xcode 26.x can't
   build the project.
 - **CI** (`.github/workflows/ci.yml`) runs on every push, on GitHub's
