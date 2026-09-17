@@ -434,6 +434,18 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   The widget's `Provider` validates `summary.date` before trusting it:
   `loggedToday` only holds for a summary from today, and a streak survives
   exactly one day past its summary.
+- **The streak is never computed from a windowed slice.**
+  `computeStreak(from:)` walks consecutive days backward until it finds a gap,
+  so handing it the Dashboard's 90-day `@Query` capped it at the window edge —
+  a 100-day streak *displayed as 90*, and since every other publish path (Siri,
+  watch, widget queue, log save, restore, undo) fetches the unbounded table and
+  got 100, the two republished over each other and burned the system-budgeted
+  reload budget alternating. `DashboardViewModel.refresh` therefore takes a
+  `context:` and uses `computeStreak(in:)`, which fetches only what the walk
+  needs (`isComplete` logs, newest first) rather than widening the view's
+  `@Query` — the windowed-`@Query` rule above stays intact. The
+  `resolvePose` comment's "both converge" argument covers the **pose** only
+  (`MascotPoseEngine` windows internally); it never held for the streak.
 - App bundle id is **`com.carpecadence.app`** (unified with the code's
   `com.carpecadence` convention); widget is `com.carpecadence.app.CadenceWidget`.
 - **Interactive mood buttons** (`WidgetQuickLogIntent` in
@@ -626,11 +638,20 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   mirroring is built on that container) plus the CloudKit account status into
   one `SyncState`. `CadenceApp.usingCloudKitStore` records whether the
   CloudKit-backed store actually initialised (vs the local fallback) so the row
-  reads "Off — local storage" truthfully. The state fold (`stateAfterEvent`) is
-  pure and unit-tested; sync events outrank the account probe in both
-  directions — the probe only moves `.waiting` to `.noAccount` on a missing
-  account, and only moves `.noAccount` back to `.waiting` on a recovered one,
-  never touching `.synced`/`.syncing`/`.error`. `apply(...)` is `internal`
+  reads "Off — local storage" truthfully. **Both** folds are pure and
+  unit-tested — `stateAfterEvent` for sync events and
+  `stateAfterAccountProbe(available:previous:)` for the account probe. Sync
+  events outrank the probe in both directions: it only moves `.waiting` to
+  `.noAccount` on a missing account, and `.noAccount` back to `.waiting` on a
+  recovered one, never touching `.synced`/`.syncing`/`.error`/`.localOnly`.
+  That rule lived as two `if`s inside an `async` function no test could reach,
+  where a tidy-up to `state = available ? .waiting : .noAccount` would have
+  clobbered a synced row on every Settings visit with the suite still green —
+  hence the extracted fold. Because `start()` now runs on every call, probes can
+  overlap, so `accountProbeTask` is cancel-and-replace AND `refreshAccountStatus`
+  re-checks `Task.isCancelled` after the `CKContainer` round-trip: cancellation
+  can't interrupt a request already in flight, so a superseded probe has to
+  discard its own stale answer on return. `apply(...)` is `internal`
   rather than `private`, and `coalesceInterval` is a settable
   `@ObservationIgnored var` rather than a constant, purely so
   `RemoteImportRefreshTests` (`coalescesBurst`, `exportDoesNotTriggerRefresh`)
