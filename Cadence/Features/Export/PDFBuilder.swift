@@ -4,12 +4,12 @@ import Charts
 import OSLog
 
 enum PDFBuilder {
-    static func build(logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = []) async -> URL? {
+    static func build(logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = [], menopause: [MenopausalTransition] = []) async -> URL? {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
         let uid = UUID().uuidString
         let url = ExportScratch.url(for: "in-rhythm-cadence-report-\(uid).pdf")
 
-        let insights = PatternEngine.allInsights(from: logs, medications: medications, flares: flares, trackers: customTrackers)
+        let insights = PatternEngine.allInsights(from: logs, medications: medications, flares: flares, trackers: customTrackers, menopause: menopause)
         // Chart images render on the main actor (ImageRenderer requirement),
         // before the PDF context opens.
         let charts = await trendChartImages(logs: logs)
@@ -21,7 +21,7 @@ enum PDFBuilder {
         // JSON backup both get. Holding a report in memory briefly is a fair
         // price; these are hundreds of KB, not hundreds of MB.
         let data = renderer.pdfData { ctx in
-            renderReport(ctx: ctx, logs: logs, charts: charts, insights: insights, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers)
+            renderReport(ctx: ctx, logs: logs, charts: charts, insights: insights, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, menopause: menopause)
         }
         do {
             try ExportScratch.write(data, to: url)
@@ -245,7 +245,7 @@ enum PDFBuilder {
 
     // MARK: - Report
 
-    private static func renderReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot]) {
+    private static func renderReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot], menopause: [MenopausalTransition] = []) {
         let cursor = Cursor(ctx: ctx)
         cursor.beginPage()
         drawReportHeader(
@@ -403,8 +403,17 @@ enum PDFBuilder {
             }
         }
 
-        // Medications.
+        // Health context: a state the clinician should know about, read from
+        // Health and never entered in Cadence.
         let dateFmt = Date.FormatStyle().month(.abbreviated).day().year()
+        if !menopause.isEmpty {
+            cursor.section("Health context")
+            for transition in menopause.sorted(by: { $0.began < $1.began }) {
+                cursor.line("\(transition.state.rawValue.capitalized) — recorded \(transition.began.formatted(dateFmt))", font: bodyFont)
+            }
+        }
+
+        // Medications.
         if !medications.isEmpty {
             cursor.section("Medications")
             for med in medications.sorted(by: { $0.startDate > $1.startDate }) {

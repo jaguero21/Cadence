@@ -29,6 +29,10 @@ protocol HealthKitServiceProtocol: AnyObject, Sendable {
     var isAuthorized: Bool { get }
     func requestAuthorization() async throws -> Bool
     func fetchLogSnapshot() async -> HealthKitSnapshot
+    // Menopausal transitions, cached: the insight paths that need them are
+    // synchronous. Refreshed by refreshMenopausalState().
+    var menopausalTransitions: [MenopausalTransition] { get }
+    func refreshMenopausalState() async
     // Mirrors a saved day into Health (mapped symptoms + State of Mind mood).
     // Best-effort; implementations must never let this block or fail a save.
     func publish(log: DailyLogSnapshot) async

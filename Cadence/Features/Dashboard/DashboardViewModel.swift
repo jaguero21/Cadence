@@ -15,7 +15,7 @@ final class DashboardViewModel {
     // each log by date (separate local-only store since the CloudKit split) so
     // the dashboard headline is computed from the same inputs as the Insights
     // tab. Passed in rather than fetched here — see DailyLogSnapshot.build.
-    func refresh(logs: [DailyLog], health: [HealthSnapshot], reviews: [WeeklyReview], medications: [Medication] = [], flares: [Flare] = [], customTrackers: [CustomTracker] = [], notifications: (any NotificationServiceProtocol)? = nil) {
+    func refresh(logs: [DailyLog], health: [HealthSnapshot], reviews: [WeeklyReview], medications: [Medication] = [], flares: [Flare] = [], customTrackers: [CustomTracker] = [], notifications: (any NotificationServiceProtocol)? = nil, menopause: [MenopausalTransition] = []) {
         let notifications = notifications ?? NotificationService.shared
         todayLog = logs.first { Calendar.current.isDateInToday($0.date) }
         thisWeekReview = reviews.first { $0.weekStartDate.isThisWeek }
@@ -28,7 +28,8 @@ final class DashboardViewModel {
             from: DailyLogSnapshot.build(from: logs, health: health),
             medications: medications.map(MedicationSnapshot.init),
             flares: flares.map(FlareSnapshot.init),
-            trackers: customTrackers.map(CustomTrackerSnapshot.init)
+            trackers: customTrackers.map(CustomTrackerSnapshot.init),
+            menopause: menopause
         ).first
         let activeFlare = flares.first(where: \.isActive)
         mascotPose = Self.resolvePose(logs: logs, activeFlare: activeFlare, streakDays: streak)
