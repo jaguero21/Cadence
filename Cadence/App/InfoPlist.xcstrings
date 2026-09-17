@@ -1,0 +1,60 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSHealthShareUsageDescription" : {
+      "comment" : "Permission sheet text. Must match Info.plist; the catalog is what ships localized.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cadence reads your sleep, heart rate and heart rate variability, workouts and activity, respiratory rate, blood oxygen, wrist temperature, time in daylight, mindful minutes, caffeine and water intake, cycle tracking, and any symptoms or moods recorded in Health. It uses them to prefill your daily log and to find patterns in how you feel. Health access is optional — every value can be entered by hand and nothing in Cadence is gated on it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cadence lee tu sueño, tu frecuencia cardíaca y su variabilidad, tus entrenamientos y actividad, tu frecuencia respiratoria, tu oxígeno en sangre, la temperatura de la muñeca, el tiempo a la luz del día, los minutos de consciencia plena, el consumo de cafeína y agua, el seguimiento del ciclo, el estado menopáusico y cualquier síntoma o estado de ánimo registrado en Salud. Los usa para rellenar tu registro diario y para encontrar patrones en cómo te sientes. El acceso a Salud es opcional: todo se puede introducir a mano y nada en Cadence depende de ello."
+          }
+        }
+      }
+    },
+    "NSHealthUpdateUsageDescription" : {
+      "comment" : "Permission sheet text. Must match Info.plist; the catalog is what ships localized.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cadence can write the symptoms you log and your daily mood back to Health, so they sit alongside the rest of your health record. This is optional, only ever adds entries Cadence itself created, and declining it never affects logging in Cadence."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cadence puede escribir en Salud los síntomas que registres y tu estado de ánimo diario, para que estén junto al resto de tu historial de salud. Es opcional, solo añade entradas creadas por Cadence y rechazarlo nunca afecta al registro dentro de Cadence."
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Permission sheet text. Must match Info.plist; the catalog is what ships localized.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cadence uses the microphone so you can attach short voice notes to a daily log."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cadence usa el micrófono para que puedas adjuntar notas de voz breves a un registro diario."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
