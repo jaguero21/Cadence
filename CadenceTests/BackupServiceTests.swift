@@ -515,4 +515,36 @@ struct BackupHealthStoreTests {
         #expect(Calendar.current.isDateInToday(summary.date))
         #expect(summary.loggedToday == true)
     }
+
+    // CloudKit delivers one sync pass as a burst of events. WidgetCenter
+    // reloads are system-budgeted, so the burst must cost one refresh.
+    @Test("A burst of import events collapses into a single refresh")
+    func coalescesBurst() async throws {
+        let monitor = CloudSyncMonitor()
+        monitor.coalesceInterval = .milliseconds(50)
+        var calls = 0
+        monitor.onRemoteImport = { calls += 1 }
+
+        for _ in 0..<5 {
+            monitor.apply(isImport: true, finished: true, succeeded: true,
+                          endDate: .now, errorDescription: nil)
+        }
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(calls == 1)
+    }
+
+    @Test("An export never reaches the refresh callback")
+    func exportDoesNotTriggerRefresh() async throws {
+        let monitor = CloudSyncMonitor()
+        monitor.coalesceInterval = .milliseconds(50)
+        var calls = 0
+        monitor.onRemoteImport = { calls += 1 }
+
+        monitor.apply(isImport: false, finished: true, succeeded: true,
+                      endDate: .now, errorDescription: nil)
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(calls == 0)
+    }
 }

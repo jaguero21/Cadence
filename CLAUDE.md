@@ -628,6 +628,23 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   CloudKit-backed store actually initialised (vs the local fallback) so the row
   reads "Off — local storage" truthfully. The state fold (`stateAfterEvent`) is
   pure and unit-tested; sync events outrank the account probe.
+  `CloudSyncMonitor.start()` runs at **launch** (in `CadenceApp`, beside
+  `PhoneConnectivityManager.start`), not on first Settings visit as it once did:
+  it now also drives the post-import refresh, so its observer must exist for the
+  whole session. `start()` is idempotent, so `SyncBackupSection`'s call is a
+  harmless no-op. A finished, successful **import** (`shouldReactTo`, pure and
+  tested; exports are this device's own writes and setup moves no data) fires
+  `onRemoteImport`, debounced by `SyncThreshold.remoteImportCoalesceSeconds`
+  because CloudKit delivers a pass as a burst and `WidgetCenter` reloads are
+  system-budgeted. `CadenceApp.applyRemoteImport` republishes the widget summary
+  and clears `UserDefaultsKey.lastInsightCheckDay` so the next foreground
+  recomputes insights. It deliberately does **not** recompute inline: that would
+  let a background import fire a health notification at an arbitrary hour.
+  **SwiftData's `HistoryObserver` (iOS 27) was evaluated and rejected** for this
+  — it is iOS 27-only against an iOS 17 floor (so the fallback would be the
+  feature), its only output is an `eventCounter` bump carrying no more
+  information than the CloudKit event already does, and it needs a live process,
+  so it cannot help when the app isn't running. Don't reintroduce it.
 
 ## Week Reflection
 

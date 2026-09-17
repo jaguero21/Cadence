@@ -288,6 +288,15 @@ struct CadenceApp: App {
                     // sheet hands the URL to another process.
                     ExportScratch.purge()
                     PhoneConnectivityManager.shared.start(container: container)
+                    // Start the sync monitor here rather than on first Settings
+                    // visit: it now drives the post-import refresh, so its
+                    // observer has to exist for the whole session. start() is
+                    // idempotent (`guard observer == nil`), so SyncBackupSection's
+                    // own call stays correct and becomes a no-op.
+                    CloudSyncMonitor.shared.onRemoteImport = {
+                        CadenceApp.applyRemoteImport(context: container.mainContext)
+                    }
+                    CloudSyncMonitor.shared.start()
                     guard !AppLaunch.isUITesting else { return }
                     // Discoverability tips (hold-to-rate, step jumping). Not
                     // configured under UI tests — an unexpected tip popover

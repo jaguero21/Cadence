@@ -158,6 +158,14 @@ enum ChartThreshold {
     static let comparisonBadgeMinimumDelta: Double = 0.05
 }
 
+enum SyncThreshold {
+    // CloudKit delivers one sync pass as a burst of events. The post-import
+    // refresh waits this long after the last one before acting, so a burst
+    // costs a single widget reload instead of several — reloads are
+    // system-budgeted, and a wasted one is a reload the user doesn't get later.
+    static let remoteImportCoalesceSeconds: Double = 2
+}
+
 enum HealthThreshold {
     // A day's HealthKit workouts count as "Intense exercise" (auto-selecting
     // that factor chip) when they total at least this much time or energy.
