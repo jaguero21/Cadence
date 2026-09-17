@@ -46,6 +46,17 @@ final class HealthKitService: HealthKitServiceProtocol {
 
     nonisolated var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
+    // Whether asking for permission would put anything new in front of the
+    // person — true after an update adds a read type they were never asked
+    // about, which is otherwise invisible: HealthKit never reveals whether READ
+    // access was granted (authorizationStatus only reports sharing), so this is
+    // the only privacy-preserving way to know there's something to ask for.
+    func hasUnrequestedTypes() async -> Bool {
+        guard isAvailable else { return false }
+        let status = try? await store.statusForAuthorizationRequest(toShare: shareTypes, read: readTypes)
+        return status == .shouldRequest
+    }
+
     // HealthKit does not reveal granted read status (.notDetermined covers both "not asked" and
     // "granted"). We return false only when the user has explicitly denied at least one
     // READ-ONLY type (.sharingDenied), which is the strongest signal HealthKit exposes for
