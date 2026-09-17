@@ -44,7 +44,7 @@ struct LogCheckInIntent: AppIntent {
         if let energy { payload["energy"] = energy }
 
         let context = container.mainContext
-        guard PhoneConnectivityManager.applyQuickLog(payload, context: context) else {
+        guard PhoneConnectivityManager.applyQuickLog(payload, context: context, source: .siri) else {
             return .result(dialog: "The check-in couldn't be saved. Try again from the app.")
         }
         let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
