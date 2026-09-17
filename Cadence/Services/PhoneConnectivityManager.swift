@@ -47,25 +47,37 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
     // the widget queue, the Siri intent, and the tests call; it parses and
     // delegates, so QuickLogPayload is the only parser.
     @discardableResult
-    static func applyQuickLog(_ payload: [String: Any], context: ModelContext) -> Bool {
+    static func applyQuickLog(_ payload: [String: Any], context: ModelContext,
+                              source: QuickLogUndoRecord.Source = .siri) -> Bool {
         guard let parsed = QuickLogPayload(payload) else { return false }
-        return applyQuickLog(parsed, context: context)
+        return applyQuickLog(parsed, context: context, source: source)
     }
 
     @discardableResult
-    static func applyQuickLog(_ payload: QuickLogPayload, context: ModelContext) -> Bool {
+    static func applyQuickLog(_ payload: QuickLogPayload, context: ModelContext,
+                              source: QuickLogUndoRecord.Source = .siri) -> Bool {
         // Attribute the entry to the day it was recorded on the wrist.
         let day = Calendar.current.startOfDay(for: payload.date)
 
         // Upsert that day's log so a wrist entry merges with an in-progress day.
         let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == day })
         let log: DailyLog
+        let createdLog: Bool
         if let existing = try? context.fetch(descriptor).first {
             log = existing
+            createdLog = false
         } else {
             log = DailyLog(date: day)
             context.insert(log)
+            createdLog = true
         }
+
+        // Captured before the write: what the day looked like, so the app can
+        // offer Undo after a misheard Siri check-in (see QuickLogUndo).
+        let previousMood = log.mood
+        let previousDidEditMood = log.didEditMood
+        let previousEnergy = log.energy
+        let previousDidEditMetrics = log.didEditMetrics
 
         log.mood = payload.mood.clamped(to: 1...5)
         log.didEditMood = true
@@ -76,6 +88,15 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
 
         do {
             try context.save()
+            // Only after a successful save: an undo offer for a write that
+            // never landed would delete something the person did enter.
+            QuickLogUndo.store(QuickLogUndoRecord(
+                day: day, source: source, createdLog: createdLog,
+                previousMood: previousMood, previousDidEditMood: previousDidEditMood,
+                previousEnergy: previousEnergy, previousDidEditMetrics: previousDidEditMetrics,
+                appliedMood: log.mood, appliedEnergy: payload.energy.map { $0.clamped(to: 0...10) },
+                recordedAt: .now
+            ))
             return true
         } catch {
             Self.log.error("Failed to save watch quick-log: \(error.localizedDescription)")
@@ -87,7 +108,7 @@ final class PhoneConnectivityManager: NSObject, WCSessionDelegate {
     private func applyQuickLog(_ payload: QuickLogPayload) {
         guard let container else { return }
         let context = container.mainContext
-        if Self.applyQuickLog(payload, context: context) {
+        if Self.applyQuickLog(payload, context: context, source: .watch) {
             // Publish a fresh widget summary — a bare timeline reload would
             // just republish the stale App Group data.
             let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []

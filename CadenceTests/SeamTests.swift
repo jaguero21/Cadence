@@ -101,6 +101,39 @@ struct QuickLogSeamTests {
         #expect(logs.first?.energy == 0)
     }
 
+    @Test("A quick log records what the day looked like before it")
+    func quickLog_recordsPreviousState() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        let existing = DailyLog()
+        existing.mood = 2
+        existing.didEditMood = true
+        existing.energy = 7
+        existing.didEditMetrics = true
+        context.insert(existing)
+        try context.save()
+
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 5, energy: 9, daysAgo: 0), context: context, source: .siri)
+
+        let record = try #require(QuickLogUndo.stored())
+        #expect(record.createdLog == false)
+        #expect(record.previousMood == 2)
+        #expect(record.previousEnergy == 7)
+        #expect(record.previousDidEditMood)
+        #expect(record.appliedMood == 5)
+        #expect(record.source == .siri)
+    }
+
+    @Test("A quick log on a fresh day records that it created the log")
+    func quickLog_recordsCreation() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 3, daysAgo: 0), context: context, source: .watch)
+        let record = try #require(QuickLogUndo.stored())
+        #expect(record.createdLog)
+        #expect(record.source == .watch)
+    }
+
     @Test("A payload without a mood is rejected and persists nothing")
     func missingMood_isNoOp() throws {
         let context = try makeContext()
