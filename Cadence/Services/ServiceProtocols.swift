@@ -28,6 +28,9 @@ protocol HealthKitServiceProtocol: AnyObject, Sendable {
     var isAvailable: Bool { get }
     var isAuthorized: Bool { get }
     func requestAuthorization() async throws -> Bool
+    // True when an app update added a Health type the person was never asked
+    // about; drives the Settings note.
+    func hasUnrequestedTypes() async -> Bool
     func fetchLogSnapshot() async -> HealthKitSnapshot
     // Mirrors a saved day into Health (mapped symptoms + State of Mind mood).
     // Best-effort; implementations must never let this block or fail a save.

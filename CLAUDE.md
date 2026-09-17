@@ -140,6 +140,16 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   shown only when the window has a workout; the per-day map is passed in and
   scoped to the visible range, since a log no longer carries the value); in
   LogDetailView, doctor PDF, CSV, backup like every `hk*` field.
+- **A new read type is invisible to existing users until they re-authorize.**
+  HealthKit never reveals whether READ access was granted
+  (`authorizationStatus` reports sharing only), and a type added in an update
+  stays undetermined until `requestAuthorization` runs again — which only
+  happens in onboarding or Settings → Re-authorize HealthKit. So Settings shows
+  a note when `HealthKitService.hasUnrequestedTypes()` says asking would prompt
+  for something new (`statusForAuthorizationRequest(toShare:read:)` ==
+  `.shouldRequest`). It READS status and never requests: onboarding is still the
+  only place that prompts. The note is self-maintaining — add a read type in a
+  future release and it appears on its own.
 - **HealthKit is always optional.** HK values only prefill or supplement —
   the sleep sliders, the "Menstrual cycle" factor chip (auto-selected via
   `LogInputFlow.menstrualCycleFactorName` when Health has a flow entry today),
@@ -699,6 +709,14 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   a build, add its `es` value — an untranslated key silently falls back to
   English. Test with the scheme's App Language = Spanish, or
   `-AppleLanguages (es)`.
+- **Permission sheet copy lives in `Cadence/App/InfoPlist.xcstrings`.** The
+  `NS*UsageDescription` values in `Info.plist` are the base/English fallback;
+  the catalog is what actually ships localized, and it carries `en` *and* `es`
+  for all three (Health share, Health update, microphone). Change one and change
+  the other — they are duplicated by design, the way Xcode's own workflow does
+  it, and a mismatch means the Spanish sheet says something the English one
+  doesn't. Verify after a build by reading `es.lproj/InfoPlist.strings` out of
+  the built `.app`.
 - **Known English-only surfaces** (plain `String` literals that never reach
   the catalog, each a deliberate follow-up, not an accident): `PDFBuilder`
   report copy, `PatternEngine` insight titles/details, `NotificationService`
