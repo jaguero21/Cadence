@@ -140,14 +140,37 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   shown only when the window has a workout; the per-day map is passed in and
   scoped to the visible range, since a log no longer carries the value); in
   LogDetailView, doctor PDF, CSV, backup like every `hk*` field.
+- **Menopausal state (iOS 27):** `HKCategoryTypeIdentifier.menopausalState` is
+  read-only context — perimenopause or menopause and the date it began.
+  `HealthKitService.transitions(from:)` collapses Health's point-in-time samples
+  into `[MenopausalTransition]`, keeping the first record of each state and
+  dropping any a later "neither" retracts; it takes raw values so it stays pure
+  and unit-tested.
+  **It is deliberately NOT a factor chip.** `factorCorrelations` compares days
+  WITH a factor against days WITHOUT one, and once a life stage begins every day
+  has it — a chip would tag every day (noise in the log flow, the PDF's factor
+  frequency, and the CSV) and produce no comparison at all. `menopauseEffects`
+  mirrors `medicationEffects` instead: symptom load before vs after the date,
+  both directions, direction-independent key, and **14 days each side**
+  (`minimumMenopauseEffectDays`) rather than the medication rule's 5, because a
+  life stage needs more evidence than a pill.
+  Nothing is stored: the transitions are cached on `HealthKitService`
+  (`menopausalTransitions`, refreshed once per launch) because the three places
+  that compute insights are synchronous and must agree with each other, and are
+  passed into `PatternEngine.allInsights` and `PDFBuilder` the way medications
+  are. **Existing users must re-grant Health access** before the type arrives —
+  a new read type stays undetermined until `requestAuthorization` runs again,
+  which only happens in onboarding or Settings → Health.
 - **HealthKit is always optional.** HK values only prefill or supplement —
   the sleep sliders, the "Menstrual cycle" factor chip (auto-selected via
   `LogInputFlow.menstrualCycleFactorName` when Health has a flow entry today),
   and the `hk*` objective fields. Nothing is gated on Health access, prefills
   never overwrite user-entered values (`didEditMetrics` guard), and every
   loggable variable stays fully manual. Every type in
-  `HealthKitService.readTypes` must be fetched by `fetchLogSnapshot` —
-  requesting permission for data that's never read is a broken promise.
+  `HealthKitService.readTypes` must actually be fetched somewhere — requesting
+  permission for data that's never read is a broken promise. `fetchLogSnapshot`
+  covers all of them except `menopausalState`, which `fetchMenopausalState`
+  reads across all time rather than per day (see Menopausal state below).
 - **Health two-way sync:** `HealthKitService.publish(log:)` (called from
   `LogInputFlow` after every successful save, fire-and-forget) mirrors the
   day into Health — mapped symptoms as severity samples, and the mood as a
