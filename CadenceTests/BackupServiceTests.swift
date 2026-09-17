@@ -397,32 +397,79 @@ struct BackupHealthStoreTests {
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
-    // The recorded insight history is throttled to once per calendar day, so
-    // data arriving from another device after today's check would otherwise go
-    // unrecorded until tomorrow. Clearing the stamp is what lets the next
-    // foreground pass run.
+    // Every test below calls applyRemoteImport, which republishes through
+    // DashboardViewModel.publishWidgetSummary into the REAL App Group suite
+    // (group.com.carpecadence.app, via WidgetData) — CadenceTests hosts
+    // inside the app, so there is no test-only container to redirect writes
+    // to, and every run was previously leaving a fabricated summary behind
+    // for the simulator's actual widget to read, with nothing restoring it.
+    // WidgetData's only surface is write(_:)/read() -> Summary? — there is no
+    // clear/delete API to hand a nil-prior test back to "nothing stored" — so
+    // that case is handled by reaching into the same suite/key WidgetData
+    // itself uses. The key string duplicates WidgetData's own private `key`
+    // constant ("todaySummary"); that duplication is the price of restoring
+    // state correctly without adding a delete API to production code for
+    // what only this test file needs.
+    private static let widgetSummaryKey = "todaySummary"
+
+    private func restoreWidgetSummary(_ prior: WidgetData.Summary?) {
+        if let prior {
+            WidgetData.write(prior)
+        } else {
+            UserDefaults(suiteName: WidgetData.appGroup)?.removeObject(forKey: Self.widgetSummaryKey)
+        }
+    }
+
+    // Populated-store case: the normal path, where the fetch returns a real
+    // row and publishWidgetSummary has actual log data to compute
+    // loggedToday/streak/pose from. This used to be word-for-word identical
+    // to emptyStoreIsSafe below (same zero-row makeContext(), same seed, same
+    // call, same assertion) — nothing distinguished "clears the throttle"
+    // from "survives an empty store". Inserting a log here makes this test
+    // own the populated-store path exclusively, leaving emptyStoreIsSafe as
+    // the only test covering the empty one.
     @Test("A remote import clears the insight throttle so the next foreground recomputes")
     func clearsInsightThrottle() throws {
         let context = try makeContext()
+        let log = DailyLog(date: .now)
+        log.isComplete = true
+        context.insert(log)
+        try context.save()
+
         let today = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
         UserDefaults.standard.set(today, forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        // applyRemoteImport republishes the widget summary as a side effect
+        // of clearing the throttle (see suite-level comment) — snapshot/
+        // restore even though this test's focus is the throttle, or the
+        // populated log inserted above would leave a real summary behind.
+        let priorSummary = WidgetData.read()
+        defer { restoreWidgetSummary(priorSummary) }
 
         CadenceApp.applyRemoteImport(context: context)
 
         #expect(UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay) == 0)
     }
 
-    // It must survive a store with nothing in it: a first sync on a new device
-    // imports into an empty log table, and the fetch must default to `[]`
-    // rather than trap. Seeded to a nonzero value first, exactly like
-    // clearsInsightThrottle above — an UNSET key already reads back as 0, so
-    // without seeding this would still pass even if applyRemoteImport's body
-    // were deleted entirely.
+    // Empty-store case: a first sync on a new device imports into an empty
+    // log table before any DailyLog exists locally, and the fetch must
+    // default to `[]` rather than trap. Now that clearsInsightThrottle above
+    // populates its store, this is the only test left covering that empty-
+    // fetch path — the two exercise genuinely different inputs to the same
+    // function rather than duplicating each other. Seeded to a nonzero value
+    // first, same as clearsInsightThrottle — an UNSET key already reads back
+    // as 0, so without seeding this would still pass even if
+    // applyRemoteImport's body were deleted entirely.
     @Test("A remote import into an empty store does not trap")
     func emptyStoreIsSafe() throws {
         let context = try makeContext()
         let today = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
         UserDefaults.standard.set(today, forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        // Same reasoning as clearsInsightThrottle: applyRemoteImport always
+        // republishes, empty store or not, so this must restore too.
+        let priorSummary = WidgetData.read()
+        defer { restoreWidgetSummary(priorSummary) }
 
         CadenceApp.applyRemoteImport(context: context)
 
@@ -452,6 +499,12 @@ struct BackupHealthStoreTests {
         log.isComplete = true
         context.insert(log)
         try context.save()
+
+        // Captured before this test's own seed write below, not just before
+        // applyRemoteImport — the stale-summary seed is itself a write to the
+        // real App Group store that must be undone too.
+        let priorSummary = WidgetData.read()
+        defer { restoreWidgetSummary(priorSummary) }
 
         let staleDate = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
         WidgetData.write(WidgetData.Summary(date: staleDate, loggedToday: false, streak: 0, mascotPose: .welcoming))
