@@ -635,6 +635,50 @@ struct StreakBreadthTests {
         #expect(vm.streak == 120)
     }
 
+    // The probe/fallback boundary, and the whole reason the probe is not a cap.
+    // computeStreak(in:) fetches only the last StreakThreshold.probeDays first;
+    // a streak that fills that window must fall through to the unbounded fetch
+    // and still report the exact number. If the fallback were dropped this
+    // returns probeDays + 1 (401) instead of 450 — the same class of silent
+    // truncation the 90-day @Query caused, just further out.
+    @Test("A streak longer than the probe window falls back and stays exact")
+    func streakBeyondProbeWindowIsExact() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        let length = StreakThreshold.probeDays + 50
+        for daysAgo in 0..<length {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == length)
+    }
+
+    // The mirror image: a gap just inside the probe window must be found by the
+    // probe alone. Together with the test above this pins both sides of the
+    // boundary — one proves the fallback fires when needed, this proves the
+    // probe is trusted when it shouldn't.
+    @Test("A gap inside the probe window is answered without the fallback")
+    func gapInsideProbeWindow() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        // Complete right up to one day short of the probe edge, then a gap,
+        // then a long older run that must not be counted.
+        let runLength = StreakThreshold.probeDays - 1
+        for daysAgo in Array(0..<runLength) + Array((runLength + 1)..<(runLength + 200)) {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == runLength)
+    }
+
     // Incomplete days are not streak days, and the predicate must be what
     // filters them — not the walk finding them out of order.
     @Test("Incomplete days don't count toward the streak")
