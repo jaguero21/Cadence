@@ -413,11 +413,53 @@ struct BackupHealthStoreTests {
     }
 
     // It must survive a store with nothing in it: a first sync on a new device
-    // imports into an empty log table, and the fetch is a defaulted read.
+    // imports into an empty log table, and the fetch must default to `[]`
+    // rather than trap. Seeded to a nonzero value first, exactly like
+    // clearsInsightThrottle above — an UNSET key already reads back as 0, so
+    // without seeding this would still pass even if applyRemoteImport's body
+    // were deleted entirely.
     @Test("A remote import into an empty store does not trap")
     func emptyStoreIsSafe() throws {
         let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
+        UserDefaults.standard.set(today, forKey: UserDefaultsKey.lastInsightCheckDay)
+
         CadenceApp.applyRemoteImport(context: context)
+
         #expect(UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay) == 0)
+    }
+
+    // The widget republish is the OTHER reaction applyRemoteImport performs,
+    // and until now nothing asserted it — the publishWidgetSummary call could
+    // be deleted and every test here would still pass. The App Group suite is
+    // a real file that outlives a single test run, so a summary left over from
+    // an earlier pass could already equal what today's insert should produce;
+    // publishWidgetSummary's own `guard summary != WidgetData.read() else {
+    // return }` would then skip the write, and a stale-but-matching value on
+    // disk would pass this test for the wrong reason. Seeding a summary that's
+    // guaranteed to differ (an old date, not logged) rules that out: the
+    // assertions below can only hold if applyRemoteImport actually recomputed
+    // and wrote a fresh summary.
+    @Test("A remote import republishes the widget summary for today's log")
+    func republishesWidgetSummary() throws {
+        let context = try makeContext()
+        // isComplete is the flag publishWidgetSummary reads for `loggedToday`
+        // (DashboardViewModel.publishWidgetSummary: `logs.first { ... }?.isComplete
+        // == true`) — set directly, the same way DailyLogViewModel.save() and
+        // the sampleDocument() log above do; it isn't derived from the other
+        // fields.
+        let log = DailyLog(date: .now)
+        log.isComplete = true
+        context.insert(log)
+        try context.save()
+
+        let staleDate = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
+        WidgetData.write(WidgetData.Summary(date: staleDate, loggedToday: false, streak: 0, mascotPose: .welcoming))
+
+        CadenceApp.applyRemoteImport(context: context)
+
+        let summary = try #require(WidgetData.read())
+        #expect(Calendar.current.isDateInToday(summary.date))
+        #expect(summary.loggedToday == true)
     }
 }
