@@ -459,13 +459,19 @@ struct BackupHealthStoreTests {
         let priorSummary = WidgetData.read()
         defer { restoreWidgetSummary(priorSummary) }
         // Fix 1 gates the throttle clear on a fingerprint; snapshot/restore it
-        // too, or this run's fingerprint (this log's exact .now timestamp)
-        // leaks into whichever test runs next. Not force-seeded to a
-        // guaranteed-different value the way emptyStoreIsSafe below has to be
-        // — a freshly-inserted DailyLog's sub-millisecond `.now` timestamp
-        // practically never collides with a leftover value from a prior run.
+        // too, or this run's fingerprint leaks into whichever test runs next.
+        // There's no sub-millisecond timestamp to lean on here — DailyLog.init
+        // normalizes `date` to startOfDay, so this test's fingerprint is
+        // byte-identical on every run made on the same calendar day (and
+        // identical to unchangedImportDoesNotClearThrottle's). Seed a sentinel
+        // guaranteed to differ, the same way emptyStoreIsSafe below does, or a
+        // leftover value from an earlier run that died between
+        // applyRemoteImport and this defer (host crash mid-run — see
+        // BackupServiceTests' own restoration comments elsewhere) would read
+        // as "unchanged" and this assertion would flake.
         let priorFingerprint = UserDefaults.standard.string(forKey: UserDefaultsKey.lastRemoteImportFingerprint)
         defer { restoreFingerprint(priorFingerprint) }
+        UserDefaults.standard.set("sentinel-guaranteed-to-differ", forKey: UserDefaultsKey.lastRemoteImportFingerprint)
 
         CadenceApp.applyRemoteImport(context: context)
 
@@ -615,8 +621,9 @@ struct BackupHealthStoreTests {
         let today = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
         UserDefaults.standard.set(today, forKey: UserDefaultsKey.lastInsightCheckDay)
 
-        // A second day arrives from the remote import — the count (and
-        // latest date, and completed count) all change.
+        // A second day arrives from the remote import — count and completed
+        // count both change. Latest date does NOT: this log lands at -1 day,
+        // so firstLog's (today's) date stays the max() of the two.
         let secondLog = DailyLog(date: Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .distantPast)
         secondLog.isComplete = true
         context.insert(secondLog)
