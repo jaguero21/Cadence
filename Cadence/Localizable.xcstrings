@@ -4589,6 +4589,16 @@
           }
         }
       }
+    },
+    "An update added Health data Cadence hasn't asked about yet. Re-authorize to include it." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una actualización añadió datos de Salud que Cadence aún no ha solicitado. Vuelve a autorizar para incluirlos."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"
