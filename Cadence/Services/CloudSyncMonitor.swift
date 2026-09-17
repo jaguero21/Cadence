@@ -25,6 +25,13 @@ final class CloudSyncMonitor {
 
     private(set) var state: SyncState = .waiting
     private var observer: (any NSObjectProtocol)?
+    // Called after a remote import settles. Injected by CadenceApp so this
+    // class stays about sync and never learns what a widget or an insight is.
+    // @ObservationIgnored: these are wiring, not state any view renders, and
+    // an @Observable class otherwise tracks every stored property.
+    @ObservationIgnored var onRemoteImport: (() -> Void)?
+    @ObservationIgnored var coalesceInterval: Duration = .seconds(SyncThreshold.remoteImportCoalesceSeconds)
+    @ObservationIgnored private var reactTask: Task<Void, Never>?
     private static let log = Logger(subsystem: "com.carpecadence", category: "CloudSync")
 
     // Pure state fold, unit-tested in isolation. `finished` is whether the
@@ -50,6 +57,23 @@ final class CloudSyncMonitor {
         isImport && finished && succeeded
     }
 
+    // Cancel-and-restart around a sleep: the cancellation is what collapses a
+    // burst into one call. DashboardView.scheduleRefresh uses the same handle
+    // pattern with no sleep, which only coalesces triggers landing in the same
+    // runloop tick — enough for @Query publishers firing together, but CloudKit
+    // import events arrive spread over seconds, so this one has to wait.
+    private func scheduleRemoteImportReaction() {
+        reactTask?.cancel()
+        let interval = coalesceInterval
+        reactTask = Task { [self] in
+            try? await Task.sleep(for: interval)
+            // A cancelled sleep throws, which `try?` swallows — so re-check
+            // rather than treating cancellation as "time elapsed".
+            guard !Task.isCancelled else { return }
+            onRemoteImport?()
+        }
+    }
+
     // Default-arg isolation: resolve the flag inside the body (a @MainActor
     // default argument would be evaluated in a nonisolated context).
     func start(cloudBacked: Bool? = nil) {
@@ -71,8 +95,10 @@ final class CloudSyncMonitor {
             let succeeded = event.succeeded
             let endDate = event.endDate
             let errorDescription = event.error?.localizedDescription
+            let isImport = event.type == .import
             Task { @MainActor in
                 CloudSyncMonitor.shared.apply(
+                    isImport: isImport,
                     finished: finished,
                     succeeded: succeeded,
                     endDate: endDate,
@@ -84,7 +110,7 @@ final class CloudSyncMonitor {
         Task { await refreshAccountStatus() }
     }
 
-    private func apply(finished: Bool, succeeded: Bool, endDate: Date?, errorDescription: String?) {
+    func apply(isImport: Bool, finished: Bool, succeeded: Bool, endDate: Date?, errorDescription: String?) {
         // Once events are flowing, they're the truth — even if the account
         // check hasn't come back yet.
         state = Self.stateAfterEvent(
@@ -96,6 +122,9 @@ final class CloudSyncMonitor {
         )
         if case .error(let message) = state {
             Self.log.error("CloudKit sync event failed: \(message, privacy: .public)")
+        }
+        if Self.shouldReactTo(isImport: isImport, finished: finished, succeeded: succeeded) {
+            scheduleRemoteImportReaction()
         }
     }
 
