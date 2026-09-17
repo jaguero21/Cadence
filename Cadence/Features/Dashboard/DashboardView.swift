@@ -106,7 +106,7 @@ struct DashboardView: View {
         refreshTask?.cancel()
         refreshTask = Task {
             guard !Task.isCancelled else { return }
-            vm.refresh(logs: logs, health: healthRows, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService)
+            vm.refresh(logs: logs, health: healthRows, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService, menopause: healthKitService.menopausalTransitions)
             refreshUndoOffer()
         }
     }

@@ -9,6 +9,7 @@ struct ExportView: View {
     @Query(sort: \Flare.startDate, order: .reverse) private var flares: [Flare]
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.healthKitService) private var healthKitService
     @Environment(StoreService.self) private var store
     @Environment(AppState.self) private var appState
     @State private var startDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: .now) ?? .now
@@ -182,6 +183,9 @@ struct ExportView: View {
             .map(FlareSnapshot.init)
         let trackerSnapshots = customTrackers.map(CustomTrackerSnapshot.init)
 
+        // Read on the main actor before the detached task: the builder takes
+        // values, never services.
+        let menopause = healthKitService.menopausalTransitions
         generationTask?.cancel()
         generationTask = Task.detached {
             let url = await PDFBuilder.build(
@@ -189,7 +193,8 @@ struct ExportView: View {
                 reviews: reviewSnapshots,
                 medications: medicationSnapshots,
                 flares: flareSnapshots,
-                customTrackers: trackerSnapshots
+                customTrackers: trackerSnapshots,
+                menopause: menopause
             )
             guard !Task.isCancelled else { return }
             await MainActor.run {

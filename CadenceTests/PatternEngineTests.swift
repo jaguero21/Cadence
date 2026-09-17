@@ -1469,3 +1469,65 @@ struct SharedStatisticsTests {
         #expect(zip(cards, cards.dropFirst()).allSatisfy { $0.confidence >= $1.confidence })
     }
 }
+
+// MARK: - Menopause effects
+
+// Mirrors medicationEffects: a state that begins on a date is compared before
+// against after. It can't be compared day-with against day-without the way
+// factorCorrelations works, because once it begins every day has it.
+@Suite("PatternEngine – menopause effects")
+struct MenopauseEffectsTests {
+
+    private func logs(symptomsBefore: Int, symptomsAfter: Int, daysEachSide: Int, start: Date) -> [DailyLogSnapshot] {
+        let cal = Calendar.current
+        var result: [DailyLogSnapshot] = []
+        for offset in 1...daysEachSide {
+            let before = cal.date(byAdding: .day, value: -offset, to: start) ?? start
+            result.append(DailyLogSnapshot(date: before, symptoms: (0..<symptomsBefore).map {
+                SymptomEntry(name: "S\($0)", severity: 5, emoji: "🤒")
+            }))
+            let after = cal.date(byAdding: .day, value: offset, to: start) ?? start
+            result.append(DailyLogSnapshot(date: after, symptoms: (0..<symptomsAfter).map {
+                SymptomEntry(name: "S\($0)", severity: 5, emoji: "🤒")
+            }))
+        }
+        return result
+    }
+
+    @Test("More symptoms after the transition surfaces a card")
+    func moreSymptomsAfter() throws {
+        let start = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+        let cards = PatternEngine.menopauseEffects(
+            transitions: [MenopausalTransition(state: .perimenopause, began: start)],
+            logs: logs(symptomsBefore: 1, symptomsAfter: 3, daysEachSide: 20, start: start))
+        let card = try #require(cards.first)
+        #expect(card.key == "menopause-effect:perimenopause")
+        #expect(card.title.contains("More symptoms"))
+        #expect(card.title.contains("perimenopause"))
+    }
+
+    @Test("Fewer symptoms after uses the same key, opposite title")
+    func fewerSymptomsAfter() throws {
+        let start = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+        let cards = PatternEngine.menopauseEffects(
+            transitions: [MenopausalTransition(state: .menopause, began: start)],
+            logs: logs(symptomsBefore: 3, symptomsAfter: 1, daysEachSide: 20, start: start))
+        let card = try #require(cards.first)
+        #expect(card.key == "menopause-effect:menopause")
+        #expect(card.title.contains("Fewer symptoms"))
+    }
+
+    @Test("Too few logged days on either side surfaces nothing")
+    func tooFewDays() {
+        let start = Calendar.current.date(byAdding: .day, value: -10, to: .now) ?? .now
+        let cards = PatternEngine.menopauseEffects(
+            transitions: [MenopausalTransition(state: .perimenopause, began: start)],
+            logs: logs(symptomsBefore: 1, symptomsAfter: 4, daysEachSide: 5, start: start))
+        #expect(cards.isEmpty)
+    }
+
+    @Test("No transitions, no cards")
+    func noTransitions() {
+        #expect(PatternEngine.menopauseEffects(transitions: [], logs: []).isEmpty)
+    }
+}

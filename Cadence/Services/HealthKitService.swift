@@ -3,6 +3,15 @@ import SwiftData
 import UIKit
 import OSLog
 
+// When a menopausal state began. Health records point-in-time samples — one per
+// change, not a value per day — so this is a transition, not an hk* field on
+// HealthSnapshot.
+struct MenopausalTransition: Sendable, Equatable {
+    enum State: String, Sendable { case perimenopause, menopause }
+    let state: State
+    let began: Date
+}
+
 @MainActor
 final class HealthKitService: HealthKitServiceProtocol {
     static let shared = HealthKitService()
@@ -12,6 +21,12 @@ final class HealthKitService: HealthKitServiceProtocol {
     // one existed, could never run, and under Swift 6 was an error for reading
     // this non-Sendable token from a nonisolated deinit.
     private var foregroundObserver: NSObjectProtocol?
+    // Cached because the three places that compute insights — the Insights tab,
+    // the dashboard headline, and the doctor PDF — are synchronous, and they
+    // have to agree about which patterns exist (the canonical-pipeline rule in
+    // CLAUDE.md). A life stage changes about never, so a value refreshed at
+    // launch isn't meaningfully stale. Same shape as cachedIsAuthorized.
+    private(set) var menopausalTransitions: [MenopausalTransition] = []
     nonisolated private static let log = Logger(subsystem: "com.carpecadence", category: "HealthKit")
 
     private init() {
@@ -80,6 +95,12 @@ final class HealthKitService: HealthKitServiceProtocol {
         types.insert(HKObjectType.workoutType())
         if #available(iOS 18.0, *) {
             types.insert(HKObjectType.stateOfMindType())
+        }
+        // Read-only context for the doctor report and the before/after insight.
+        // Fetched by fetchMenopausalState rather than fetchLogSnapshot: it's a
+        // transition date, not a daily measurement.
+        if #available(iOS 27.0, *), let menopausalState = HKObjectType.categoryType(forIdentifier: .menopausalState) {
+            types.insert(menopausalState)
         }
         return types
     }()
@@ -597,6 +618,51 @@ final class HealthKitService: HealthKitServiceProtocol {
             return topZoneMinutes >= HealthThreshold.intenseZoneMinutes
         }
         return isIntenseExercise(totalMinutes: totalMinutes, totalKilocalories: totalKilocalories)
+    }
+
+    // Raw values rather than HKCategoryValueMenopausalState so this stays pure
+    // and testable; the enum is applied at the query boundary.
+    // 1 = perimenopause, 2 = menopause, 3 = none.
+    nonisolated static func transitions(from samples: [(date: Date, rawValue: Int)]) -> [MenopausalTransition] {
+        var began: [MenopausalTransition.State: Date] = [:]
+        for sample in samples.sorted(by: { $0.date < $1.date }) {
+            switch sample.rawValue {
+            case 1: began[.perimenopause] = began[.perimenopause] ?? sample.date
+            case 2: began[.menopause] = began[.menopause] ?? sample.date
+            // An explicit "neither" retracts what came before it: the person is
+            // telling Health the earlier state no longer applies.
+            case 3: began.removeAll()
+            default: continue
+            }
+        }
+        return began
+            .map { MenopausalTransition(state: $0.key, began: $0.value) }
+            .sorted { $0.began < $1.began }
+    }
+
+    // Read-only context for the doctor report and the before/after insight.
+    // Queried across all time, not the log window: the transition that matters
+    // usually predates every logged day.
+    // Refreshed at launch; the synchronous insight paths then read
+    // `menopausalTransitions`.
+    func refreshMenopausalState() async {
+        menopausalTransitions = await fetchMenopausalState()
+    }
+
+    nonisolated func fetchMenopausalState() async -> [MenopausalTransition] {
+        guard #available(iOS 27.0, *),
+              let type = HKObjectType.categoryType(forIdentifier: .menopausalState) else { return [] }
+        return await withCheckedContinuation { cont in
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: HKObjectQueryNoLimit,
+                                      sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]) { _, samples, error in
+                if let error { Self.log.error("fetchMenopausalState failed: \(error, privacy: .public)") }
+                guard error == nil, let categorySamples = samples as? [HKCategorySample] else {
+                    cont.resume(returning: []); return
+                }
+                cont.resume(returning: Self.transitions(from: categorySamples.map { ($0.startDate, $0.value) }))
+            }
+            store.execute(query)
+        }
     }
 
     // Whether any menstrual-flow sample (of any intensity) overlaps the window.

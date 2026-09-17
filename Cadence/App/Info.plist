@@ -25,7 +25,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Cadence reads your sleep, heart rate and heart rate variability, workouts and activity, respiratory rate, blood oxygen, wrist temperature, time in daylight, mindful minutes, caffeine and water intake, cycle tracking, and any symptoms or moods recorded in Health. It uses them to prefill your daily log and to find patterns in how you feel. Health access is optional — every value can be entered by hand and nothing in Cadence is gated on it.</string>
+	<string>Cadence reads your sleep, heart rate and heart rate variability, workouts and activity, respiratory rate, blood oxygen, wrist temperature, time in daylight, mindful minutes, caffeine and water intake, cycle tracking, menopausal state, and any symptoms or moods recorded in Health. It uses them to prefill your daily log and to find patterns in how you feel. Health access is optional — every value can be entered by hand and nothing in Cadence is gated on it.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Cadence can write the symptoms you log and your daily mood back to Health, so they sit alongside the rest of your health record. This is optional, only ever adds entries Cadence itself created, and declining it never affects logging in Cadence.</string>
 	<key>NSMicrophoneUsageDescription</key>
