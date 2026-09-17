@@ -58,6 +58,11 @@ enum UserDefaultsKey {
     static let dailyReminderMinute  = "dailyReminderMinute"
     static let weeklyReminderEnabled = "weeklyReminderEnabled"
     static let lastInsightCheckDay    = "lastInsightCheckDay"   // startOfDay interval; foreground insight check runs once per day
+    // Cheap signature (log count | latest date | completed count) of the data
+    // seen by the last CadenceApp.applyRemoteImport call. Compared against the
+    // freshly computed one so a no-op CloudKit import — including the import
+    // this device's own export triggers — doesn't clear lastInsightCheckDay.
+    static let lastRemoteImportFingerprint = "lastRemoteImportFingerprint"
     // Latched the first time a PERSISTENT store opens. Read only when the app
     // has fallen back to in-memory storage, to decide whether "reinstalling is
     // safe" is true advice or the thing that destroys the user's history.

@@ -76,34 +76,48 @@ final class CloudSyncMonitor {
 
     // Default-arg isolation: resolve the flag inside the body (a @MainActor
     // default argument would be evaluated in a nonisolated context).
+    //
+    // The observer registration is still guarded to run once (NotificationCenter
+    // would otherwise stack a duplicate closure on every call), but the account
+    // probe below is NOT — it runs on every call. `start()` used to be called
+    // only when the user opened Settings, so probing there was also the only
+    // time the row could go stale. Now CadenceApp's launch `.task` calls
+    // `start()` first, so the old `guard observer == nil else { return }`
+    // covering the whole function turned SyncBackupSection's own
+    // `.task { syncMonitor.start() }` into a silent no-op: sign out of
+    // iCloud, launch (state settles on .noAccount), sign back in from
+    // Settings.app, return to Cadence's Settings — the row was stuck reading
+    // "No iCloud account" for the rest of the session because nothing ever
+    // probed again.
     func start(cloudBacked: Bool? = nil) {
-        guard observer == nil else { return }
         guard cloudBacked ?? CadenceApp.usingCloudKitStore else {
             state = .localOnly
             return
         }
 
-        observer = NotificationCenter.default.addObserver(
-            forName: NSPersistentCloudKitContainer.eventChangedNotification,
-            object: nil,
-            queue: nil
-        ) { note in
-            guard let event = note.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
-                    as? NSPersistentCloudKitContainer.Event else { return }
-            // Extract plain Sendable values before hopping actors — Event isn't Sendable.
-            let finished = event.endDate != nil
-            let succeeded = event.succeeded
-            let endDate = event.endDate
-            let errorDescription = event.error?.localizedDescription
-            let isImport = event.type == .import
-            Task { @MainActor in
-                CloudSyncMonitor.shared.apply(
-                    isImport: isImport,
-                    finished: finished,
-                    succeeded: succeeded,
-                    endDate: endDate,
-                    errorDescription: errorDescription
-                )
+        if observer == nil {
+            observer = NotificationCenter.default.addObserver(
+                forName: NSPersistentCloudKitContainer.eventChangedNotification,
+                object: nil,
+                queue: nil
+            ) { note in
+                guard let event = note.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+                        as? NSPersistentCloudKitContainer.Event else { return }
+                // Extract plain Sendable values before hopping actors — Event isn't Sendable.
+                let finished = event.endDate != nil
+                let succeeded = event.succeeded
+                let endDate = event.endDate
+                let errorDescription = event.error?.localizedDescription
+                let isImport = event.type == .import
+                Task { @MainActor in
+                    CloudSyncMonitor.shared.apply(
+                        isImport: isImport,
+                        finished: finished,
+                        succeeded: succeeded,
+                        endDate: endDate,
+                        errorDescription: errorDescription
+                    )
+                }
             }
         }
 
@@ -134,6 +148,17 @@ final class CloudSyncMonitor {
         // that already arrived is stronger evidence than the account probe.
         if status != .available, state == .waiting {
             state = .noAccount
+        }
+        // Recovery direction: the account came back after we'd already
+        // stranded the row on .noAccount (signed back into iCloud in
+        // Settings.app, then returned to Cadence). Now that start() re-probes
+        // on every call instead of only once at launch, this branch is what
+        // actually gets hit — go back to .waiting for the first sync event,
+        // same as a fresh launch with an account already signed in. A sync
+        // event still outranks the probe in both directions: don't overwrite
+        // .synced/.syncing/.error, only the .noAccount holding pattern.
+        if status == .available, state == .noAccount {
+            state = .waiting
         }
     }
 }
