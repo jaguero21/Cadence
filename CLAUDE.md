@@ -436,16 +436,34 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   exactly one day past its summary.
 - **The streak is never computed from a windowed slice.**
   `computeStreak(from:)` walks consecutive days backward until it finds a gap,
-  so handing it the Dashboard's 90-day `@Query` capped it at the window edge —
-  a 100-day streak *displayed as 90*, and since every other publish path (Siri,
-  watch, widget queue, log save, restore, undo) fetches the unbounded table and
-  got 100, the two republished over each other and burned the system-budgeted
-  reload budget alternating. `DashboardViewModel.refresh` therefore takes a
-  `context:` and uses `computeStreak(in:)`, which fetches only what the walk
-  needs (`isComplete` logs, newest first) rather than widening the view's
-  `@Query` — the windowed-`@Query` rule above stays intact. The
-  `resolvePose` comment's "both converge" argument covers the **pose** only
-  (`MascotPoseEngine` windows internally); it never held for the streak.
+  so handing it the Dashboard's 90-day `@Query` capped it at the window edge.
+  The predicate is `date >= today - 90` inclusive, i.e. 91 days, so the badge
+  could never read higher than 91 — and since `StreakBadge.milestones` is
+  `[7, 14, 30, 50, 100, 200, 365]`, **three of the seven celebrations were
+  unreachable**: the gold flame and "day streak!" copy never fired for 100, 200
+  or 365, and anyone past 100 days saw the badge frozen at 91 forever. Every
+  other publish path (Siri, watch, widget queue, log save, restore, undo)
+  fetches the unbounded table and got the true number, so the two republished
+  over each other and burned the system-budgeted reload budget alternating.
+  `DashboardViewModel.refresh` therefore takes a `context:` and uses
+  `computeStreak(in:)` rather than widening the view's `@Query` — the
+  windowed-`@Query` rule above stays intact. The `resolvePose` comment's "both
+  converge" argument covers the **pose** only (`MascotPoseEngine` windows
+  internally); it never held for the streak.
+- **`computeStreak(in:)` probes before it falls back — the probe is not a cap.**
+  It first fetches only the last `StreakThreshold.probeDays` (400); if the walk
+  stopped before that edge it found a real gap and the answer is final. A streak
+  that fills the window falls through to an unbounded fetch and still reports
+  the exact number. Keep both halves: dropping the fallback reintroduces the
+  same silent truncation the 90-day window caused, just further out (pinned by
+  `StreakBreadthTests`, which tests both sides of the boundary). The reason is
+  cost, measured over 2000 complete logs (~5.5 years of daily logging): the
+  unbounded fetch was **~92% of the entire dashboard refresh** (38ms of 40ms)
+  and the only term that grew with lifetime history — everything else is pinned
+  by the 90-day window. The probe brings that fetch to ~5.5ms.
+  **`propertiesToFetch` does not help here** and was measured, not assumed:
+  34.9ms vs 33.7ms fetching 2 of `DailyLog`'s 27 properties across 2000 rows.
+  Row count is the cost, not column count — don't "optimize" it back in.
 - App bundle id is **`com.carpecadence.app`** (unified with the code's
   `com.carpecadence` convention); widget is `com.carpecadence.app.CadenceWidget`.
 - **Interactive mood buttons** (`WidgetQuickLogIntent` in
