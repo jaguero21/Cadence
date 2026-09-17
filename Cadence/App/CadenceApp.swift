@@ -216,6 +216,24 @@ struct CadenceApp: App {
         UserDefaults.standard.set(true, forKey: UserDefaultsKey.persistentStoreOpened)
     }
 
+    // A remote import changed the store behind our back. Two things downstream
+    // don't refresh themselves. The widget's App Group summary is republished
+    // here because the foreground handler never does it and DashboardView only
+    // does it while that view is alive — so today it is fresh by coincidence.
+    // The recorded insight history is throttled to once per calendar day, so we
+    // clear the stamp rather than recompute: marking it dirty lets the existing
+    // foreground path do the work, which is what keeps a background import from
+    // firing a health notification at an arbitrary hour.
+    @MainActor
+    static func applyRemoteImport(context: ModelContext) {
+        let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
+        DashboardViewModel.publishWidgetSummary(
+            logs: logs,
+            activeFlare: DashboardViewModel.activeFlare(in: context)
+        )
+        UserDefaults.standard.removeObject(forKey: UserDefaultsKey.lastInsightCheckDay)
+    }
+
     var body: some Scene {
         WindowGroup {
             if let container {

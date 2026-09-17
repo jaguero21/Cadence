@@ -385,3 +385,39 @@ struct BackupHealthStoreTests {
         #expect(try target.fetch(FetchDescriptor<HealthSnapshot>()).isEmpty)
     }
 }
+
+// MARK: - Reacting to a CloudKit import
+
+@MainActor
+@Suite struct RemoteImportRefreshTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self, HealthSnapshot.self])
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    // The recorded insight history is throttled to once per calendar day, so
+    // data arriving from another device after today's check would otherwise go
+    // unrecorded until tomorrow. Clearing the stamp is what lets the next
+    // foreground pass run.
+    @Test("A remote import clears the insight throttle so the next foreground recomputes")
+    func clearsInsightThrottle() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
+        UserDefaults.standard.set(today, forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        CadenceApp.applyRemoteImport(context: context)
+
+        #expect(UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay) == 0)
+    }
+
+    // It must survive a store with nothing in it: a first sync on a new device
+    // imports into an empty log table, and the fetch is a defaulted read.
+    @Test("A remote import into an empty store does not trap")
+    func emptyStoreIsSafe() throws {
+        let context = try makeContext()
+        CadenceApp.applyRemoteImport(context: context)
+        #expect(UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay) == 0)
+    }
+}
