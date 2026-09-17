@@ -4590,6 +4590,46 @@
         }
       }
     },
+    "Logged by Siri" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrado por Siri"
+          }
+        }
+      }
+    },
+    "Logged from your watch" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrado desde tu reloj"
+          }
+        }
+      }
+    },
+    "Logged from the widget" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrado desde el widget"
+          }
+        }
+      }
+    },
+    "Undo" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deshacer"
+          }
+        }
+      }
+    },
     "An update added Health data Cadence hasn't asked about yet. Re-authorize to include it." : {
       "localizations" : {
         "es" : {
