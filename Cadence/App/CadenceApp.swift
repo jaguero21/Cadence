@@ -448,7 +448,7 @@ struct ContentView: View {
         var appliedDays: Set<Date> = []
         var failed: [WidgetData.PendingQuickLog] = []
         for entry in pending {
-            if PhoneConnectivityManager.applyQuickLog(entry.payload, context: modelContext) {
+            if PhoneConnectivityManager.applyQuickLog(entry.payload, context: modelContext, source: .widget) {
                 appliedDays.insert(Calendar.current.startOfDay(for: entry.date))
             } else {
                 failed.append(entry)
