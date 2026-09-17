@@ -50,6 +50,8 @@ enum CadenceURL {
 }
 
 enum UserDefaultsKey {
+    // The state a quick check-in overwrote, so the app can offer Undo.
+    static let lastQuickLogUndo = "lastQuickLogUndo"
     static let onboarded            = "cadence.onboarded"
     static let symptomTagsSeeded    = "cadence.symptomTagsSeeded"
     static let dailyReminderHour    = "dailyReminderHour"
