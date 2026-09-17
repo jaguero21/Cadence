@@ -22,6 +22,14 @@ enum MoodOption: Int, AppEnum {
     ]
 }
 
+// Deliberately NOT UndoableIntent. Undoing a check-in is handled by the
+// dashboard's Undo row (see QuickLogUndo), for two reasons Apple's own docs
+// give: app intents never call undo() themselves — "Your app initiates undo and
+// redo operations in response to interactions with its menus or interface" —
+// and `undoManager` is nil when no suitable manager exists, which is the usual
+// case when Siri launches the app in the background to run this. Adopting it
+// would also pin this intent to iOS 26+, taking the Siri check-in away from
+// everyone below that, in exchange for shake-to-undo that mostly no-ops.
 struct LogCheckInIntent: AppIntent {
     static let title: LocalizedStringResource = "Log a Check-In"
     static let description = IntentDescription("Records your mood — and optionally energy — for today without opening the app.")

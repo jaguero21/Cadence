@@ -458,6 +458,20 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   `PhoneConnectivityManager.applyQuickLog` + `publishWidgetSummary` — every
   quick-log surface (watch, widget, Siri) funnels through that one tested
   upsert. Phrases live in `CadenceShortcuts: AppShortcutsProvider`.
+- **Undo for a quick check-in** is app-side, not `UndoableIntent`. Apple's docs
+  say app intents never call `undo()` themselves ("Your app initiates undo and
+  redo operations in response to interactions with its menus or interface"), and
+  `undoManager` is nil when no suitable manager exists — the usual case when
+  Siri launches the app in the background. Adopting the protocol would also pin
+  `LogCheckInIntent` to iOS 26+, removing the Siri check-in for everyone below.
+  Instead `applyQuickLog` records what the day looked like before it wrote
+  (`QuickLogUndoRecord` in `UserDefaults`, local only, keyed by source so the row
+  can name Siri / watch / widget), and the dashboard offers Undo under Today's
+  Log. `QuickLogUndo.availableRecord` only offers it while the check-in is still
+  the last word on today — once the day is edited by hand the offer retires
+  itself rather than throwing away newer work. Undo deletes the log when the
+  check-in created it, and the caller re-publishes to Health afterwards so the
+  State of Mind entry goes with it.
 - `CadenceApp.sharedModelContainer` is **static** so intents (which run outside
   the SwiftUI scene) reach the same container the UI uses.
 
