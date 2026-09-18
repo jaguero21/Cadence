@@ -1,39 +1,106 @@
 import SwiftUI
 import SwiftData
+import Foundation
 import UserNotifications
 import WidgetKit
 import TipKit
 import OSLog
+import os
 
 
 @main
 struct CadenceApp: App {
     @State private var appState = AppState()
     @State private var store = StoreService.shared
+    // Mirrors the static so a successful retry from StorageFatalErrorView
+    // re-renders the scene into the real app.
+    @State private var container: ModelContainer? = CadenceApp.sharedModelContainer
 
+    // The storage statics below are `nonisolated`, unlike the rest of this type.
+    // Conforming to App infers @MainActor onto every member, but the store is
+    // opened by whoever touches it first — which is LogCheckInIntent's own
+    // context, not the scene, when Siri logs a check-in from a cold start. The
+    // annotations describe what already happens; without them the retry can't
+    // leave the main thread (see retryMakingContainer).
+    //
+    // What happened while opening the store. Written by makeContainer(), which
+    // can run off the main actor, and read by the scene, so it lives inside a
+    // lock that owns the state rather than in two nonisolated(unsafe) vars.
+    // Deliberately NOT containerLock: makeContainer() runs inside that lock (the
+    // lazy initialiser fires within sharedModelContainer's withLock), and NSLock
+    // isn't re-entrant — taking it again here would deadlock on first launch.
+    private struct StorageFlags: Sendable {
+        var usingFallbackStorage = false
+        var usingCloudKitStore = false
+    }
+    nonisolated private static let storageFlags = OSAllocatedUnfairLock(initialState: StorageFlags())
     // Set when the persistent store failed and we fell back to in-memory storage.
-    static private(set) var usingFallbackStorage = false
-    // Set when even the in-memory fallback failed; app runs without SwiftData.
-    static private(set) var containerFailed = false
+    nonisolated static var usingFallbackStorage: Bool {
+        storageFlags.withLock { $0.usingFallbackStorage }
+    }
     // Set when the CloudKit-mirrored store initialised (vs the local-only
     // fallback). CloudSyncMonitor uses this to show a truthful sync status.
-    static private(set) var usingCloudKitStore = false
+    nonisolated static var usingCloudKitStore: Bool {
+        storageFlags.withLock { $0.usingCloudKitStore }
+    }
     // Whether a PERSISTENT store has ever opened on this device. Recorded the
     // first time one does, and read only when we've fallen back to in-memory:
     // it's the difference between "you have nothing saved yet, reinstalling is
     // harmless" and "your entries are on disk, deleting the app destroys them".
     // Getting that advice backwards is how a recoverable failure becomes
     // permanent data loss, so it is worth one UserDefaults flag.
-    static var hadPersistentStore: Bool {
+    nonisolated static var hadPersistentStore: Bool {
         UserDefaults.standard.bool(forKey: UserDefaultsKey.persistentStoreOpened)
     }
 
-    private static let log = Logger(subsystem: "com.carpecadence", category: "Storage")
+    nonisolated private static let log = Logger(subsystem: "com.carpecadence", category: "Storage")
 
-    // Static so App Intents (which run outside the SwiftUI scene) reach the
-    // same container the UI uses; `static let` keeps it single-init even if
-    // the App struct is re-created.
-    static let sharedModelContainer: ModelContainer? = {
+    // Static so App Intents (which run outside the SwiftUI scene) reach the same
+    // container the UI uses, and built exactly once for the process — the lazy
+    // initialiser below runs under swift_once no matter who touches it first.
+    //
+    // It has to be a `var` because StorageFatalErrorView can rebuild it (see
+    // `retryMakingContainer`), which costs the race-freedom `let` gave by
+    // construction: LogCheckInIntent reads it from the intent's own context,
+    // not the main actor, while the retry writes it from the scene — and a torn
+    // read there is the container a Siri check-in writes the user's mood
+    // through. Hence the lock: every read and the one write go through it.
+    // (Swift 6 can't see that the lock guards `_sharedModelContainer`, which is
+    // why the backing var is nonisolated(unsafe); the accessor is the only way
+    // in.)
+    nonisolated private static let containerLock = NSLock()
+    nonisolated(unsafe) private static var _sharedModelContainer: ModelContainer? = makeContainer()
+    nonisolated static var sharedModelContainer: ModelContainer? {
+        containerLock.withLock { _sharedModelContainer }
+    }
+
+    // Retry hook for StorageFatalErrorView. Every tier below can fail for a
+    // reason that is gone a moment later — a device that just booted has not
+    // made protected files readable yet — and before this the only recovery a
+    // user could reach was force-quitting the app themselves. Returns nil when
+    // the rebuild failed too, so the caller can say so instead of re-rendering
+    // an identical screen.
+    //
+    // `async` + a detached task on purpose: makeContainer() opens (and may
+    // migrate) the store synchronously and can block for seconds, and this
+    // hangs off a button. Running it inline on the MainActor froze the UI, and
+    // with no disabled state impatient taps stacked those freezes — the heavy
+    // pattern is warranted here for the same reason ExportView's generationTask
+    // uses it.
+    nonisolated static func retryMakingContainer() async -> ModelContainer? {
+        if let existing = sharedModelContainer { return existing }
+        storageFlags.withLock { $0.usingFallbackStorage = false }
+        let rebuilt = await Task.detached(priority: .userInitiated) { makeContainer() }.value
+        return containerLock.withLock {
+            // Only fill an empty slot: a concurrent first-access from an intent
+            // may have won the race, and that container is the one already
+            // handed out.
+            if _sharedModelContainer == nil { _sharedModelContainer = rebuilt }
+            return _sharedModelContainer
+        }
+    }
+
+    nonisolated private static func makeContainer() -> ModelContainer? {
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
@@ -58,10 +125,29 @@ struct CadenceApp: App {
         let localSchema  = Schema(localModels)
         let fullSchema   = Schema(syncedModels + localModels)
 
-        // UI tests get an isolated in-memory store so runs are deterministic.
-        if AppLaunch.isUITesting {
-            let testConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
-            return try? ModelContainer(for: fullSchema, configurations: [testConfig])
+        // Tests — UI and unit alike — get an isolated in-memory store so runs are
+        // deterministic. Unit tests run inside this app, so before they were
+        // included here the host opened the real CloudKit-mirrored store; with no
+        // iCloud account the mirroring delegate tore stores down mid-run and the
+        // tests' own containers died with it (see AppLaunch.isRunningUnitTests).
+        //
+        // do/catch, not `try?`, for the same reason as the tiers below: this
+        // returns out of the whole function, so a swallowed failure here put the
+        // smoke test on StorageFatalErrorView with nothing in the log and a
+        // Try Again button that could only ever fail the same silent way.
+        if AppLaunch.isTesting {
+            // cloudKitDatabase: .none matters as much as the in-memory flag:
+            // ModelConfiguration defaults to .automatic, so even an in-memory store
+            // starts CloudKit mirroring. With no iCloud account in a simulator the
+            // mirroring delegate fails setup, retries, and tears stores down, which
+            // breaks unrelated containers in the same process.
+            let testConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+            do {
+                return try ModelContainer(for: fullSchema, configurations: [testConfig])
+            } catch {
+                log.error("UI-test in-memory container failed: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
         }
 
         // Named, so it lands in its own file alongside the main store. The
@@ -88,7 +174,7 @@ struct CadenceApp: App {
         let cloudConfig = ModelConfiguration(schema: syncedSchema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
         do {
             let container = try ModelContainer(for: fullSchema, configurations: [cloudConfig, healthConfig])
-            CadenceApp.usingCloudKitStore = true
+            storageFlags.withLock { $0.usingCloudKitStore = true }
             CadenceApp.recordPersistentStoreOpened()
             return container
         } catch {
@@ -112,28 +198,79 @@ struct CadenceApp: App {
             // only diagnostic that will exist.
             log.error("Persistent store failed to open, falling back to in-memory: \(error.localizedDescription, privacy: .public)")
         }
-        CadenceApp.usingFallbackStorage = true
+        storageFlags.withLock { $0.usingFallbackStorage = true }
         let fallbackConfig = ModelConfiguration(schema: fullSchema, isStoredInMemoryOnly: true)
         do {
             return try ModelContainer(for: fullSchema, configurations: [fallbackConfig])
         } catch {
             log.error("In-memory fallback container failed: \(error.localizedDescription, privacy: .public)")
         }
-        CadenceApp.containerFailed = true
         return nil
-    }()
+    }
 
     // Latches the flag `hadPersistentStore` reads. Never cleared: once real
     // entries have been written to disk, "reinstalling is safe" stops being
     // true for this device even if a later launch opens the store fine.
-    private static func recordPersistentStoreOpened() {
+    nonisolated private static func recordPersistentStoreOpened() {
         guard !AppLaunch.isUITesting else { return }
         UserDefaults.standard.set(true, forKey: UserDefaultsKey.persistentStoreOpened)
     }
 
+    // A remote import changed the store behind our back. Two things downstream
+    // don't refresh themselves. The widget's App Group summary is republished
+    // here because the foreground handler never does it and DashboardView only
+    // does it while that view is alive — so today it is fresh by coincidence.
+    // The recorded insight history is throttled to once per calendar day, so we
+    // clear the stamp rather than recompute: marking it dirty lets the existing
+    // foreground path do the work, which is what keeps a background import from
+    // firing a health notification at an arbitrary hour.
+    //
+    // The throttle clear is gated on a fingerprint, not unconditional.
+    // NSPersistentCloudKitContainer reports succeeded == true for an import
+    // pass that changed nothing — including the import that fires from THIS
+    // device's own export, since CloudKit echoes every push back as a change
+    // notification — and the Event CloudSyncMonitor observes carries no
+    // changed-record count, so shouldReactTo can't tell that apart from a real
+    // import. Without this check, a single-device Pro user would clear
+    // lastInsightCheckDay (and pay the synchronous 90-day PatternEngine pass +
+    // HealthSnapshot join) on every one of their own writes instead of once a
+    // day, defeating the whole point of the throttle.
+    @MainActor
+    static func applyRemoteImport(context: ModelContext) {
+        let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
+        DashboardViewModel.publishWidgetSummary(
+            logs: logs,
+            activeFlare: DashboardViewModel.activeFlare(in: context)
+        )
+
+        let fingerprint = importFingerprint(logs: logs)
+        let previousFingerprint = UserDefaults.standard.string(forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+        if previousFingerprint != fingerprint {
+            UserDefaults.standard.removeObject(forKey: UserDefaultsKey.lastInsightCheckDay)
+        }
+        UserDefaults.standard.set(fingerprint, forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+    }
+
+    // Cheap signature of "did the log data actually change": count, the
+    // latest date, and how many logs are complete. Deliberately NOT a hash of
+    // every field — this intentionally does NOT catch an edit to an EXISTING
+    // day that changes none of those three (e.g. a symptom added to a log
+    // that was already complete and isn't the latest date), nor a single
+    // import that both adds and deletes a log, leaving count, latest date,
+    // and completed count all unchanged. That's an accepted trade, not an
+    // oversight: those insights still surface, just on the next calendar
+    // day's regular foreground check rather than immediately, and the
+    // alternative (comparing every field of every log on every import) is
+    // exactly the cost this throttle exists to avoid.
+    private static func importFingerprint(logs: [DailyLog]) -> String {
+        let latestDate = logs.map(\.date).max()?.timeIntervalSinceReferenceDate ?? 0
+        let completedCount = logs.filter { $0.isComplete }.count
+        return "\(logs.count)|\(latestDate)|\(completedCount)"
+    }
+
     var body: some Scene {
         WindowGroup {
-            if let container = Self.sharedModelContainer {
+            if let container {
                 Group {
                     if appState.hasCompletedOnboarding {
                         ContentView()
@@ -185,6 +322,20 @@ struct CadenceApp: App {
                     // sheet hands the URL to another process.
                     ExportScratch.purge()
                     PhoneConnectivityManager.shared.start(container: container)
+                    // Start the sync monitor here rather than on first Settings
+                    // visit: it now drives the post-import refresh, so its
+                    // observer has to exist for the whole session. Only the
+                    // observer registration is guarded to run once inside
+                    // start() — the account probe deliberately runs on every
+                    // call, which is why SyncBackupSection's own
+                    // `.task { syncMonitor.start() }` must stay: it's what
+                    // re-probes the account if it changed (signed into iCloud
+                    // in Settings.app) since this launch call ran. See
+                    // CloudSyncMonitor.start()'s comment for the bug this fixed.
+                    CloudSyncMonitor.shared.onRemoteImport = {
+                        CadenceApp.applyRemoteImport(context: container.mainContext)
+                    }
+                    CloudSyncMonitor.shared.start()
                     guard !AppLaunch.isUITesting else { return }
                     // Discoverability tips (hold-to-rate, step jumping). Not
                     // configured under UI tests — an unexpected tip popover
@@ -194,12 +345,20 @@ struct CadenceApp: App {
                     // steps, morning sleep) even when the log flow isn't
                     // opened again; wakes the app when suspended via HK
                     // background delivery.
+                    // Menopausal state is read once per launch: the insight and
+                    // the doctor report need it, and a life stage doesn't change
+                    // between app opens.
+                    await HealthKitService.shared.refreshMenopausalState()
                     HealthKitService.shared.startObservingChanges {
                         await HealthDataRefresher.refreshToday(container: container)
                     }
                 }
             } else {
-                StorageFatalErrorView()
+                StorageFatalErrorView {
+                    let rebuilt = await CadenceApp.retryMakingContainer()
+                    container = rebuilt
+                    return rebuilt != nil
+                }
             }
         }
     }
@@ -265,6 +424,7 @@ struct ContentView: View {
             refreshTodayHealthData()
             openCheckInIfRequested()
             syncMedicationReminders()
+            reprobeCloudAccountStatus()
         }
         .task { seedSymptomTagsIfNeeded() }
         .task { syncMedicationReminders() }
@@ -279,10 +439,6 @@ struct ContentView: View {
         .alert("Storage Unavailable", isPresented: $showStorageWarning) {
             Button("OK", role: .cancel) {}
         } message: {
-            // Two messages, not one with a ternary: `Text(cond ? "a" : "b")`
-            // resolves to the non-localizing StringProtocol initializer and
-            // would drop both strings out of the catalog.
-            //
             // The old single message said "your data is safe" and then advised
             // deleting and reinstalling the app — the one action that turns a
             // recoverable failure (a store that wouldn't migrate) into
@@ -304,6 +460,18 @@ struct ContentView: View {
         notificationService.reconcileMedicationReminders(context: modelContext)
     }
 
+    // Re-probe the iCloud account on every foreground, not just at launch and
+    // on first Settings visit: the scenario CloudSyncMonitor.start() documents
+    // — Settings already shows "No iCloud account", the user signs into
+    // iCloud from Settings.app, then switches back to Cadence without ever
+    // leaving this tab — has no `.task` to re-run, since SyncBackupSection
+    // never disappears. start() itself stays safe to call repeatedly: the
+    // observer registration guards itself to run once, only the account
+    // probe below it repeats.
+    private func reprobeCloudAccountStatus() {
+        CloudSyncMonitor.shared.start()
+    }
+
     // On foreground, recompute insights via the shared pipeline (same 90-day
     // window and inputs as the Insights tab, so a notification can never
     // advertise a pattern the tab doesn't show), persist newly-emerged ones,
@@ -317,7 +485,7 @@ struct ContentView: View {
         guard lastCheck != startOfToday.timeIntervalSinceReferenceDate else { return }
         UserDefaults.standard.set(startOfToday.timeIntervalSinceReferenceDate, forKey: UserDefaultsKey.lastInsightCheckDay)
 
-        let new = InsightRecorder.detectAndRecord(context: modelContext)
+        let new = InsightRecorder.detectAndRecord(context: modelContext, menopause: healthKitService.menopausalTransitions)
         if let top = new.filter({ $0.confidence >= PatternThreshold.minimumConfidence })
             .max(by: { $0.confidence < $1.confidence }) {
             notificationService.sendInsightNotification(title: top.title)
@@ -363,7 +531,7 @@ struct ContentView: View {
         var appliedDays: Set<Date> = []
         var failed: [WidgetData.PendingQuickLog] = []
         for entry in pending {
-            if PhoneConnectivityManager.applyQuickLog(entry.payload, context: modelContext) {
+            if PhoneConnectivityManager.applyQuickLog(entry.payload, context: modelContext, source: .widget) {
                 appliedDays.insert(Calendar.current.startOfDay(for: entry.date))
             } else {
                 failed.append(entry)
@@ -407,7 +575,7 @@ struct ContentView: View {
         // second device seeding before its first sync completes can still race;
         // name-based dedup here covers every case where the data is visible.
         let existingNames = Set(((try? modelContext.fetch(FetchDescriptor<SymptomTag>())) ?? []).map(\.name))
-        for tag in SymptomTag.defaults where !existingNames.contains(tag.name) {
+        for tag in SymptomTag.makeDefaults() where !existingNames.contains(tag.name) {
             modelContext.insert(tag)
         }
         do {
@@ -424,6 +592,21 @@ struct ContentView: View {
 
 // Shown when both the persistent and in-memory ModelContainer fail to initialise.
 struct StorageFatalErrorView: View {
+    // Without this the screen is a dead end: no focusable element for VoiceOver
+    // or Switch Control, and no way to recover from a failure that is often
+    // transient. Returns whether the store actually opened — a retry that fails
+    // leaves this view on screen re-rendered byte-identically, so without an
+    // answer to report the button reads as broken. Defaulted so previews still
+    // construct the view bare.
+    var onRetry: () async -> Bool = { false }
+
+    @State private var isRetrying = false
+    @State private var retryFailed = false
+    // The retry leaves focus on the button, so a VoiceOver user would get no
+    // signal at all that it failed — the screen renders identically. Move focus
+    // to the message instead.
+    @AccessibilityFocusState private var failureFocused: Bool
+
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "externaldrive.badge.exclamationmark")
@@ -435,19 +618,53 @@ struct StorageFatalErrorView: View {
                     .font(.title2.bold())
                 // Never advise reinstalling here: this screen appears when the
                 // store could not be opened, which is usually recoverable, and
-                // deleting the app is what makes it permanent.
-                Text("Cadence's data storage wouldn't start. Please force-quit and reopen. If you've logged entries before, they're still on this device — don't delete Cadence, that would erase them. Update to the latest version if this keeps happening.")
+                // deleting the app is what makes it permanent. It used to send
+                // the user off to force-quit instead, which contradicted the
+                // Try Again button sitting right under it.
+                Text("Cadence's data storage wouldn't start. Tap Try Again — this often clears on its own, especially just after a restart. If you've logged entries before, they're still on this device — don't delete Cadence, that would erase them. Update to the latest version if this keeps happening.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
-            Button("Force Quit") {
-                exit(1)
+            Button {
+                guard !isRetrying else { return }
+                isRetrying = true
+                retryFailed = false
+                Task {
+                    let recovered = await onRetry()
+                    // On success the scene swaps this view out; only a failure
+                    // gets to land back here.
+                    isRetrying = false
+                    retryFailed = !recovered
+                }
+            } label: {
+                Group {
+                    if isRetrying {
+                        ProgressView()
+                    } else {
+                        Text("Try Again")
+                    }
+                }
+                .font(.body.bold())
+                .frame(maxWidth: 220)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.red)
+            .controlSize(.large)
+            .tint(CadenceColor.accent)
+            .disabled(isRetrying)
+
+            if retryFailed {
+                Text("Still couldn't open your data. Wait a moment and try again, or restart the device. Your saved entries aren't affected by this.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+                    .accessibilityFocused($failureFocused)
+                    .onAppear { failureFocused = true }
+            }
         }
+        .animation(CadenceAnimation.smooth, value: retryFailed)
         .padding(32)
     }
 }

@@ -56,3 +56,8 @@ docs/superpowers/
 
 # Editor
 .vscode/
+*.code-workspace
+
+# Reflection eval harness: build product and run output (see Tools/ReflectionEval)
+Tools/ReflectionEval/refl-eval
+Tools/ReflectionEval/runs.json

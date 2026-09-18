@@ -80,7 +80,9 @@ struct TrendChartView: View {
 
     // Snap a scrub position to the nearest plotted day — custom trackers skip
     // unlogged days, so the raw x-position rarely hits a point exactly.
-    static func nearestPoint(to target: Date, in points: [(date: Date, value: Double)]) -> (date: Date, value: Double)? {
+    // nonisolated for the same reason as HistoryView.logMatches: a pure helper on
+    // a View is otherwise @MainActor, and its closure traps when called off-main.
+    nonisolated static func nearestPoint(to target: Date, in points: [(date: Date, value: Double)]) -> (date: Date, value: Double)? {
         points.min { abs($0.date.timeIntervalSince(target)) < abs($1.date.timeIntervalSince(target)) }
     }
 
@@ -249,7 +251,7 @@ struct TrendChartView: View {
     private var average: Double? { Self.mean(logs.compactMap { series.value($0) }) }
     private var previousAverage: Double? { Self.mean(previousLogs.compactMap { series.value($0) }) }
 
-    static func mean(_ values: [Double]) -> Double? {
+    nonisolated static func mean(_ values: [Double]) -> Double? {
         guard !values.isEmpty else { return nil }
         return values.reduce(0, +) / Double(values.count)
     }

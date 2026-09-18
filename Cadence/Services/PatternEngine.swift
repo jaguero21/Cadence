@@ -14,7 +14,10 @@ enum PatternEngine {
         from logs: [DailyLogSnapshot],
         medications: [MedicationSnapshot] = [],
         flares: [FlareSnapshot] = [],
-        trackers: [CustomTrackerSnapshot] = []
+        trackers: [CustomTrackerSnapshot] = [],
+        // Fetched from Health at the call site rather than stored, like
+        // medications are passed in rather than read here.
+        menopause: [MenopausalTransition] = []
     ) -> [InsightCard] {
         guard logs.count >= PatternThreshold.minimumLogs else { return [] }
         let sorted = logs.sorted { $0.date < $1.date }
@@ -28,6 +31,7 @@ enum PatternEngine {
         if let card = workoutMoodCorrelation(logs: sorted) { cards.append(card) }
         if let card = workoutRecoveryPattern(logs: sorted) { cards.append(card) }
         cards.append(contentsOf: medicationEffects(medications: medications, logs: sorted))
+        cards.append(contentsOf: menopauseEffects(transitions: menopause, logs: sorted))
         cards.append(contentsOf: factorCorrelations(logs: sorted))
         cards.append(contentsOf: trackerCorrelations(trackers: trackers, logs: sorted))
         cards.append(contentsOf: flarePrecursors(flares: flares, logs: sorted))
@@ -272,6 +276,48 @@ enum PatternEngine {
                     : "More symptoms since starting \(med.name)",
                 detail: "Your average daily symptoms went from \(String(format: "%.1f", comparison.meanA)) to \(String(format: "%.1f", comparison.meanB)) after you started \(med.displayLabel).",
                 icon: "pills.fill",
+                color: improved ? CadenceColor.successGreen : CadenceColor.stressRed,
+                confidence: comparativeConfidence(delta: abs(delta), sampleSize: comparison.sampleSize),
+                category: .symptom
+            ))
+        }
+        return cards
+    }
+
+    // Symptom load before vs after a menopausal transition. Same shape as
+    // medicationEffects, and for the same reason: a state that begins on a date
+    // can't be compared day-with against day-without, because once it begins
+    // every day has it. Awareness, not diagnosis — the tab and the PDF both
+    // carry the "not medical advice" line.
+    static func menopauseEffects(transitions: [MenopausalTransition], logs: [DailyLogSnapshot]) -> [InsightCard] {
+        guard !transitions.isEmpty else { return [] }
+        let cal = Calendar.current
+        let sorted = logs.sorted { $0.date < $1.date }
+        var cards: [InsightCard] = []
+
+        for transition in transitions {
+            let start = cal.startOfDay(for: transition.began)
+            let before = sorted.filter { $0.date < start }
+            let after = sorted.filter { $0.date >= start }
+            guard let comparison = compareMeans(
+                before.map { Double($0.symptoms.count) },
+                after.map { Double($0.symptoms.count) },
+                minimumPerSide: PatternThreshold.minimumMenopauseEffectDays
+            ) else { continue }
+            let delta = comparison.delta   // positive = fewer symptoms after
+            guard abs(delta) >= PatternThreshold.menopauseSymptomDeltaThreshold else { continue }
+
+            let improved = delta > 0
+            let state = transition.state.rawValue
+            cards.append(InsightCard(
+                // Direction-independent, like med-effect: a flip updates the same
+                // record instead of announcing a new pattern.
+                key: "menopause-effect:\(state)",
+                title: improved
+                    ? "Fewer symptoms since you recorded \(state)"
+                    : "More symptoms since you recorded \(state)",
+                detail: "Your average daily symptoms went from \(String(format: "%.1f", comparison.meanA)) to \(String(format: "%.1f", comparison.meanB)) after \(state) was recorded in Health.",
+                icon: "calendar.badge.clock",
                 color: improved ? CadenceColor.successGreen : CadenceColor.stressRed,
                 confidence: comparativeConfidence(delta: abs(delta), sampleSize: comparison.sampleSize),
                 category: .symptom

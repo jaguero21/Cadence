@@ -12,6 +12,8 @@
 		1382864E5B8432AD840590BD /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF69CCB307CE7D5B6C39FDC1 /* HistoryView.swift */; };
 		1C70D1D1A3D941C21FB5FFAD /* WeeklyReviewViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E81365F433003269081917 /* WeeklyReviewViewModel.swift */; };
 		1D96522AE7200D9F795F68E8 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A292713D8D2930BB2E51C28C /* NotificationService.swift */; };
+		31E34D9E2B2519748C1E2031 /* QuickLogUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D4A58854263572E368BAE1 /* QuickLogUndo.swift */; };
+		9500444BE62608168A1CCBF4 /* CrisisLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0781F8E626569D71B7F0718 /* CrisisLanguage.swift */; };
 		20230AD97F5885D21E64CA05 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D51242137B1F8597625745E /* View+Extensions.swift */; };
 		23239E42D1F3B3CA44C8ECEF /* Charts in Frameworks */ = {isa = PBXBuildFile; fileRef = D6A78715684ABBEB502D55E2 /* Charts */; };
 		233F59322A7A81F6487EF3DF /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 445D893A69E7D38B6B8C7E75 /* InsightsView.swift */; };
@@ -85,6 +87,7 @@
 		C7A67B11D453A48F3C8FD239 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C644D07CF96C2AFA00637E3B /* SettingsView.swift */; };
 		C7F20E34EA5B3C5F84042DA4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91AC27A765654C1A1DFFBD5 /* AppState.swift */; };
 		CCAADDEE00000000000000B1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CCAADDEE00000000000000F1 /* Localizable.xcstrings */; };
+		9DEBC4F4DCA07A0515680BC0 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7F263077568AEF2BFCACA887 /* InfoPlist.xcstrings */; };
 		CCAADDEE00000000000000B2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CCAADDEE00000000000000F2 /* PrivacyInfo.xcprivacy */; };
 		D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0989CA66FE09F78B729A4E /* PatternEngine.swift */; };
 		AABBCCDD0000000000000301 /* MascotPoseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDD0000000000000302 /* MascotPoseEngine.swift */; };
@@ -187,6 +190,8 @@
 		A0D01DD5A2B033204335261E /* SwiftUI */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* ProPaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProPaywallView.swift; path = ./Cadence/Features/Settings/ProPaywallView.swift; sourceTree = "<absolute>"; };
 		A292713D8D2930BB2E51C28C /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotificationService.swift; path = ./Cadence/Services/NotificationService.swift; sourceTree = "<absolute>"; };
+		F8D4A58854263572E368BAE1 /* QuickLogUndo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = QuickLogUndo.swift; path = ./Cadence/Services/QuickLogUndo.swift; sourceTree = "<absolute>"; };
+		B0781F8E626569D71B7F0718 /* CrisisLanguage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CrisisLanguage.swift; path = ./Cadence/Services/CrisisLanguage.swift; sourceTree = "<absolute>"; };
 		A54B34C3966B1BD7CE976D7F /* Cadence.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cadence.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA11BB22CC33DD44EE55FF01 /* PatternEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PatternEngineTests.swift; path = ./CadenceTests/PatternEngineTests.swift; sourceTree = "<absolute>"; };
 		AABBCCDD0000000000000304 /* MascotPoseEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MascotPoseEngineTests.swift; path = ./CadenceTests/MascotPoseEngineTests.swift; sourceTree = "<absolute>"; };
@@ -234,6 +239,7 @@
 		C7E81365F433003269081917 /* WeeklyReviewViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WeeklyReviewViewModel.swift; path = ./Cadence/Features/WeeklyReview/WeeklyReviewViewModel.swift; sourceTree = "<absolute>"; };
 		C91AC27A765654C1A1DFFBD5 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = ./Cadence/App/AppState.swift; sourceTree = "<absolute>"; };
 		CCAADDEE00000000000000F1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = Cadence/Localizable.xcstrings; sourceTree = "<group>"; };
+		7F263077568AEF2BFCACA887 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = InfoPlist.xcstrings; path = Cadence/App/InfoPlist.xcstrings; sourceTree = "<group>"; };
 		CCAADDEE00000000000000F2 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Cadence/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D55E0D4A1C0EC289C9F389C4 /* Constants.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Constants.swift; path = ./Cadence/Shared/Constants.swift; sourceTree = "<absolute>"; };
 		D6A78715684ABBEB502D55E2 /* Charts */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
@@ -457,6 +463,7 @@
 				25762D602FEDDCD400A132C8 /* CadenceWidgetExtension.entitlements */,
 				2549A45B2FC8EF0A006CD546 /* Assets.xcassets */,
 				CCAADDEE00000000000000F1 /* Localizable.xcstrings */,
+				7F263077568AEF2BFCACA887 /* InfoPlist.xcstrings */,
 				CCAADDEE00000000000000F2 /* PrivacyInfo.xcprivacy */,
 				25762D1A2FEDD6A000A132C8 /* CadenceWidget */,
 				25762D662FEDDF5200A132C8 /* CadenceWidget Watch App */,
@@ -547,6 +554,8 @@
 			children = (
 				1A7F46C62532314DD37DC860 /* HealthKitService.swift */,
 				A292713D8D2930BB2E51C28C /* NotificationService.swift */,
+				F8D4A58854263572E368BAE1 /* QuickLogUndo.swift */,
+				B0781F8E626569D71B7F0718 /* CrisisLanguage.swift */,
 				3F0989CA66FE09F78B729A4E /* PatternEngine.swift */,
 				AABBCCDD0000000000000302 /* MascotPoseEngine.swift */,
 				AABBCCDD000000000000010F /* PhoneConnectivityManager.swift */,
@@ -759,6 +768,7 @@
 			files = (
 				2549A45C2FC8EF0A006CD546 /* Assets.xcassets in Resources */,
 				CCAADDEE00000000000000B1 /* Localizable.xcstrings in Resources */,
+				9DEBC4F4DCA07A0515680BC0 /* InfoPlist.xcstrings in Resources */,
 				CCAADDEE00000000000000B2 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -838,6 +848,8 @@
 				E1B2C3D4F5A6B7C8D9E0F1A2 /* ProPaywallView.swift in Sources */,
 				D7C825C8710DDE261D377518 /* HealthKitService.swift in Sources */,
 				1D96522AE7200D9F795F68E8 /* NotificationService.swift in Sources */,
+				31E34D9E2B2519748C1E2031 /* QuickLogUndo.swift in Sources */,
+				9500444BE62608168A1CCBF4 /* CrisisLanguage.swift in Sources */,
 				D34167FEC6764BB077D2EC46 /* PatternEngine.swift in Sources */,
 				AABBCCDD0000000000000301 /* MascotPoseEngine.swift in Sources */,
 				AABBCCDD000000000000020F /* PhoneConnectivityManager.swift in Sources */,
@@ -987,7 +999,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -1025,7 +1037,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -1065,7 +1077,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 26.2;
 			};
@@ -1104,7 +1116,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				VALIDATE_PRODUCT = YES;
 				WATCHOS_DEPLOYMENT_TARGET = 26.2;
@@ -1317,7 +1329,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.9;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -1348,7 +1360,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.9;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;

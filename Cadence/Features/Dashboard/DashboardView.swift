@@ -4,6 +4,7 @@ import SwiftData
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.notificationService) private var notificationService
+    @Environment(\.healthKitService) private var healthKitService
     @Query private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
@@ -59,6 +60,9 @@ struct DashboardView: View {
             VStack(spacing: CadenceLayout.sectionSpacing) {
                 greetingHeader
                 todayCard
+                if let record = undoRecord {
+                    quickLogUndoRow(record)
+                }
                 weeklyCard
                 if let insight = vm.latestInsight {
                     insightPreviewCard(insight)
@@ -74,7 +78,10 @@ struct DashboardView: View {
             .readableColumn()
         }
         .background(AmbientMeshBackground())
-        .navigationTitle("")
+        // Text(verbatim:), not "": a bare empty literal is a LocalizedStringKey
+        // and extracts an empty key into the catalog, where it sits forever as
+        // an untranslated string nobody can translate.
+        .navigationTitle(Text(verbatim: ""))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -99,8 +106,52 @@ struct DashboardView: View {
         refreshTask?.cancel()
         refreshTask = Task {
             guard !Task.isCancelled else { return }
-            vm.refresh(logs: logs, health: healthRows, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService)
+            vm.refresh(logs: logs, health: healthRows, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, notifications: notificationService, menopause: healthKitService.menopausalTransitions, context: modelContext)
+            refreshUndoOffer()
         }
+    }
+
+    // MARK: - Quick-log undo
+
+    // Siri can mishear a mood, and the check-in lands without the app ever
+    // opening — so the only place this can be offered is here, after the fact.
+    // Re-read on every refresh: the offer retires as soon as the day is edited.
+    @State private var undoRecord: QuickLogUndoRecord?
+
+    private func refreshUndoOffer() {
+        undoRecord = QuickLogUndo.availableRecord(in: modelContext)
+    }
+
+    private func quickLogUndoRow(_ record: QuickLogUndoRecord) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.uturn.backward")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            switch record.source {
+            case .siri:   Text("Logged by Siri")
+            case .watch:  Text("Logged from your watch")
+            case .widget: Text("Logged from the widget")
+            }
+            Spacer()
+            Button("Undo") {
+                QuickLogUndo.undo(record: record, in: modelContext)
+                refreshUndoOffer()
+                let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
+                DashboardViewModel.publishWidgetSummary(logs: logs, activeFlare: DashboardViewModel.activeFlare(in: modelContext))
+                // Re-publish the day to Health: publish(log:) deletes and
+                // rewrites its samples per type, so the State of Mind entry the
+                // check-in wrote goes with it. A deleted log writes nothing.
+                if let log = logs.first(where: { $0.date == record.day }) {
+                    let snapshot = DailyLogSnapshot(log)
+                    Task { await healthKitService.publish(log: snapshot) }
+                }
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(CadenceColor.accent)
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 4)
     }
 
     // MARK: - Subviews
@@ -153,7 +204,9 @@ struct DashboardView: View {
                     Text("Today's Log")
                         .font(.headline)
                     if let log = vm.todayLog {
-                        Text(log.isComplete ? "Completed" : "In progress — tap to finish")
+                        (log.isComplete
+                            ? Text("Completed")
+                            : Text("In progress — tap to finish"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     } else {
@@ -195,7 +248,9 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Weekly Review")
                         .font(.headline)
-                    Text(vm.thisWeekReview?.isComplete == true ? "Completed this week" : "Ready to review")
+                    (vm.thisWeekReview?.isComplete == true
+                        ? Text("Completed this week")
+                        : Text("Ready to review"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -209,8 +264,8 @@ struct DashboardView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(vm.thisWeekReview?.isComplete == true
-            ? "Weekly Review, completed this week"
-            : "Weekly Review, ready to review")
+            ? Text("Weekly Review, completed this week")
+            : Text("Weekly Review, ready to review"))
         .sheet(isPresented: $showingWeeklyReview) {
             ReviewFlowView(existingReview: vm.thisWeekReview, logs: logs)
         }
@@ -336,20 +391,25 @@ struct DashboardView: View {
         .cadenceCard()
     }
 
+    // Built with String(localized:) rather than returned as bare literals: a
+    // plain String reaches Text/.accessibilityLabel through the non-localizing
+    // StringProtocol overload, so these never entered the catalog at all.
     private var todayCardAccessibilityLabel: String {
         if let log = vm.todayLog {
-            return log.isComplete ? "Today's Log, completed" : "Today's Log, in progress"
+            return log.isComplete
+                ? String(localized: "Today's Log, completed")
+                : String(localized: "Today's Log, in progress")
         }
-        return "Today's Log, not started. Takes about 90 seconds."
+        return String(localized: "Today's Log, not started. Takes about 90 seconds.")
     }
 
     private var greetingText: String {
         let hour = Calendar.current.component(.hour, from: .now)
         switch hour {
-        case 5..<12:  return "Good morning"
-        case 12..<17: return "Good afternoon"
-        case 17..<21: return "Good evening"
-        default:      return "Good night"
+        case 5..<12:  return String(localized: "Good morning")
+        case 12..<17: return String(localized: "Good afternoon")
+        case 17..<21: return String(localized: "Good evening")
+        default:      return String(localized: "Good night")
         }
     }
 }

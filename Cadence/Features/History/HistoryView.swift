@@ -2,11 +2,29 @@ import SwiftUI
 import SwiftData
 
 enum HistoryFilter: String, CaseIterable, Identifiable {
-    case all         = "All days"
-    case completed   = "Completed"
-    case inProgress  = "In progress"
-    case hasSymptoms = "Has symptoms"
+    // rawValue is identity only, never display copy. The picker used to render
+    // it with Text($0.rawValue), which takes the non-localizing StringProtocol
+    // initializer — so all four options showed English, and two of them ("All
+    // days", "Has symptoms") were never in the catalog to translate.
+    case all         = "all"
+    case completed   = "completed"
+    case inProgress  = "inProgress"
+    case hasSymptoms = "hasSymptoms"
     var id: String { rawValue }
+
+    // Keys distinct from the per-day status labels in DailyLogView /
+    // DashboardView on purpose: the subject here is "days" (plural), where
+    // those describe a single log. Spanish needs "Días completados", not the
+    // singular "Completado" — the same reason the weekly review got its own
+    // review.status.* keys rather than sharing one "Complete".
+    var title: LocalizedStringKey {
+        switch self {
+        case .all:         return "All days"
+        case .completed:   return "Completed days"
+        case .inProgress:  return "Days in progress"
+        case .hasSymptoms: return "Has symptoms"
+        }
+    }
 }
 
 struct HistoryView: View {
@@ -33,7 +51,10 @@ struct HistoryView: View {
     }
 
     // Pure match predicate, extracted so it's unit-testable without a ModelContext.
-    static func logMatches(isComplete: Bool, symptomNames: [String], factors: [String], note: String, filter: HistoryFilter, query: String) -> Bool {
+    // nonisolated because it IS pure: as a member of a View it was implicitly
+    // @MainActor, and under Swift 6's runtime isolation checks the closure inside
+    // trapped the moment a test called it off the main thread.
+    nonisolated static func logMatches(isComplete: Bool, symptomNames: [String], factors: [String], note: String, filter: HistoryFilter, query: String) -> Bool {
         let passesFilter: Bool
         switch filter {
         case .all:         passesFilter = true
@@ -96,7 +117,7 @@ struct HistoryView: View {
     private var filterMenu: some View {
         Menu {
             Picker("Filter", selection: $filter) {
-                ForEach(HistoryFilter.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(HistoryFilter.allCases) { Text($0.title).tag($0) }
             }
         } label: {
             Image(systemName: filter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
@@ -235,7 +256,7 @@ struct HistoryView: View {
         .zoomTransitionSource(id: day, in: detailZoom)
         .disabled(isFuture || log == nil)
         .accessibilityLabel(dayCellLabel(day: day, log: log, isToday: isToday))
-        .accessibilityHint(log != nil && !isFuture ? "Double-tap to view details" : "")
+        .accessibilityHint(log != nil && !isFuture ? Text("Double-tap to view details") : Text(verbatim: ""))
     }
 
     private func dayCellLabel(day: Date, log: DailyLog?, isToday: Bool) -> String {

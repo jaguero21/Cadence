@@ -15,18 +15,30 @@ final class SymptomTag {
         self.sortOrder = sortOrder
     }
 
-    static let defaults: [SymptomTag] = [
-        SymptomTag(name: "Headache",  emoji: "🤕", isDefault: true, sortOrder: 0),
-        SymptomTag(name: "Fatigue",   emoji: "😴", isDefault: true, sortOrder: 1),
-        SymptomTag(name: "Anxiety",   emoji: "😰", isDefault: true, sortOrder: 2),
-        SymptomTag(name: "Brain Fog", emoji: "🌫️", isDefault: true, sortOrder: 3),
-        SymptomTag(name: "Pain",      emoji: "⚡️", isDefault: true, sortOrder: 4),
+    // The seeded defaults, as plain values. This used to be a `static let` array
+    // of @Model INSTANCES: one process-wide set of objects that seeding inserted
+    // into a context, and that HealthKitService then read `.emoji` from off the
+    // main actor. Never hold @Model instances in a static; readers take the
+    // seeds, and seeding builds fresh models with makeDefaults(). Array order is
+    // the seeded sortOrder.
+    static let defaultSeeds: [(name: String, emoji: String)] = [
+        ("Headache",  "🤕"),
+        ("Fatigue",   "😴"),
+        ("Anxiety",   "😰"),
+        ("Brain Fog", "🌫️"),
+        ("Pain",      "⚡️"),
     ]
+
+    static func makeDefaults() -> [SymptomTag] {
+        defaultSeeds.enumerated().map { index, seed in
+            SymptomTag(name: seed.name, emoji: seed.emoji, isDefault: true, sortOrder: index)
+        }
+    }
 
     // The optional symptom library, toggleable in Settings → Symptoms. Every
     // name here resolves to a HealthKit symptom type (pinned by a unit test),
     // so an enabled symptom syncs both ways with Health. Kept separate from
-    // `defaults` — these are opt-in, not seeded.
+    // `defaultSeeds` — these are opt-in, not seeded.
     static let optionalCatalog: [(name: String, emoji: String)] = [
         ("Nausea",                  "🤢"),
         ("Vomiting",                "🤮"),
