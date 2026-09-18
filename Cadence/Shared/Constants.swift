@@ -50,12 +50,19 @@ enum CadenceURL {
 }
 
 enum UserDefaultsKey {
+    // The state a quick check-in overwrote, so the app can offer Undo.
+    static let lastQuickLogUndo = "lastQuickLogUndo"
     static let onboarded            = "cadence.onboarded"
     static let symptomTagsSeeded    = "cadence.symptomTagsSeeded"
     static let dailyReminderHour    = "dailyReminderHour"
     static let dailyReminderMinute  = "dailyReminderMinute"
     static let weeklyReminderEnabled = "weeklyReminderEnabled"
     static let lastInsightCheckDay    = "lastInsightCheckDay"   // startOfDay interval; foreground insight check runs once per day
+    // Cheap signature (log count | latest date | completed count) of the data
+    // seen by the last CadenceApp.applyRemoteImport call. Compared against the
+    // freshly computed one so a no-op CloudKit import — including the import
+    // this device's own export triggers — doesn't clear lastInsightCheckDay.
+    static let lastRemoteImportFingerprint = "lastRemoteImportFingerprint"
     // Latched the first time a PERSISTENT store opens. Read only when the app
     // has fallen back to in-memory storage, to decide whether "reinstalling is
     // safe" is true advice or the thing that destroys the user's history.
@@ -96,6 +103,10 @@ enum PatternThreshold {
     // symptom count worth surfacing.
     static let minimumMedEffectDays: Int = 5
     static let medSymptomDeltaThreshold: Double = 0.5
+    // A life stage needs more evidence than a pill: symptoms fluctuate week to
+    // week, and the "before" side can stretch back months.
+    static let minimumMenopauseEffectDays: Int = 14
+    static let menopauseSymptomDeltaThreshold: Double = 0.5
 
     // Factor (trigger) correlation: minimum days with and without a factor before
     // comparing, and the smallest increase in average daily symptom count on
@@ -152,16 +163,41 @@ enum ChartThreshold {
     static let comparisonBadgeMinimumDelta: Double = 0.05
 }
 
+enum SyncThreshold {
+    // CloudKit delivers one sync pass as a burst of events. The post-import
+    // refresh waits this long after the last one before acting, so a burst
+    // costs a single widget reload instead of several — reloads are
+    // system-budgeted, and a wasted one is a reload the user doesn't get later.
+    static let remoteImportCoalesceSeconds: Double = 2
+}
+
 enum HealthThreshold {
     // A day's HealthKit workouts count as "Intense exercise" (auto-selecting
     // that factor chip) when they total at least this much time or energy.
     static let intenseWorkoutMinutes: Double = 45
     static let intenseWorkoutKilocalories: Double = 400
+    // Minutes in the top two heart-rate zones before a day counts as intense
+    // exercise. Ten is the usual line for vigorous effort, and it reads the same
+    // whether someone configured three zones or five.
+    static let intenseZoneMinutes: Double = 10
     // Logged dietary caffeine (mg) that auto-selects the "Caffeine" factor —
     // roughly half a cup of coffee; trace amounts don't count.
     static let caffeineMilligrams: Double = 50
     // Logged dietary water (litres) that auto-checks the "Hydration" basic.
     static let hydrationLiters: Double = 1.5
+}
+
+enum StreakThreshold {
+    // How far back DashboardViewModel.computeStreak(in:) looks before it
+    // falls back to fetching the whole table. The streak has to be exact, so
+    // this is not a cap — a streak that actually runs this long pays for the
+    // unbounded fetch and still reports the true number. It exists because
+    // everything else in the dashboard refresh is bounded by the 90-day
+    // window, so an unbounded streak fetch was ~92% of that refresh and the
+    // only part that grew with the user's lifetime history. Measured over
+    // 2000 complete logs: 32ms unbounded vs 5.5ms at this window.
+    // 400 days is past a full year, so the fallback is effectively unreachable.
+    static let probeDays: Int = 400
 }
 
 enum MascotThreshold {
@@ -180,4 +216,21 @@ enum AppLaunch {
     // in-memory store, fresh onboarding, and no permission prompts so UI tests
     // are deterministic and never blocked by system dialogs.
     static let isUITesting = ProcessInfo.processInfo.arguments.contains("--uitest")
+
+    // True when the app is hosting a unit-test bundle. Xcode sets this variable
+    // in the host process for every unit-test run.
+    //
+    // Unit tests run inside this app, so without it the app opens the REAL
+    // CloudKit-mirrored store while the tests work with their own in-memory
+    // containers. With no iCloud account in the simulator, the mirroring
+    // delegate fails setup, retries, and tears stores down mid-run; the next
+    // fetch in ANY container then throws NSInternalInconsistencyException
+    // ("No eligible connection available"), an uncaught ObjC exception that
+    // kills the whole bundle and reports every test as failed. That is timing
+    // dependent — the same commit passed locally and in CI the day before it
+    // started failing on every run.
+    static let isRunningUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
+    // Either kind of test run: no CloudKit, no permission prompts, no disk store.
+    static var isTesting: Bool { isUITesting || isRunningUnitTests }
 }

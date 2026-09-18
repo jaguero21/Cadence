@@ -14,7 +14,7 @@ import SwiftData
         // now (it lives in a separate local-only store in the app), so a
         // container without it would not exercise the real restore path.
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self, HealthSnapshot.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
@@ -261,6 +261,56 @@ import SwiftData
         )
         #expect(state == .error("quota exceeded"))
     }
+
+    // The account probe's fold. These pin the rule that a sync event outranks
+    // the probe — without it, a later simplification to
+    // `state = available ? .waiting : .noAccount` would clobber a .synced row
+    // on every Settings visit and nothing would fail.
+
+    @Test("No iCloud account, while still waiting, reads as noAccount")
+    func probeWithoutAccountWhileWaiting() {
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: false, previous: .waiting) == .noAccount)
+    }
+
+    // The mid-session recovery: signed out at launch, signed back in from
+    // Settings.app, returned to Cadence. Without this the row stayed on
+    // .noAccount for the rest of the session.
+    @Test("An account appearing rescues a row stranded on noAccount")
+    func probeWithAccountAfterNoAccount() {
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: true, previous: .noAccount) == .waiting)
+    }
+
+    @Test("A sync event outranks the probe — synced survives a failed probe")
+    func probeDoesNotClobberSynced() {
+        let end = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: false, previous: .synced(end)) == .synced(end))
+    }
+
+    @Test("A probe never disturbs a store that isn't cloud-backed")
+    func probeLeavesLocalOnly() {
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: true, previous: .localOnly) == .localOnly)
+        #expect(CloudSyncMonitor.stateAfterAccountProbe(available: false, previous: .localOnly) == .localOnly)
+    }
+
+    @Test("A finished, successful import is the one event worth reacting to")
+    func reactsToFinishedSuccessfulImport() {
+        #expect(CloudSyncMonitor.shouldReactTo(isImport: true, finished: true, succeeded: true))
+    }
+
+    @Test("An export is this device's own write, so it triggers nothing")
+    func ignoresExport() {
+        #expect(!CloudSyncMonitor.shouldReactTo(isImport: false, finished: true, succeeded: true))
+    }
+
+    @Test("An in-flight import has nothing to show yet")
+    func ignoresUnfinishedImport() {
+        #expect(!CloudSyncMonitor.shouldReactTo(isImport: true, finished: false, succeeded: false))
+    }
+
+    @Test("A failed import must not trigger a refresh")
+    func ignoresFailedImport() {
+        #expect(!CloudSyncMonitor.shouldReactTo(isImport: true, finished: true, succeeded: false))
+    }
 }
 
 // MARK: - Backup across the split stores
@@ -283,7 +333,7 @@ struct BackupHealthStoreTests {
         let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self,
                              Medication.self, Flare.self, CustomTracker.self,
                              InsightRecord.self, HealthSnapshot.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
@@ -363,5 +413,282 @@ struct BackupHealthStoreTests {
 
         #expect(try target.fetch(FetchDescriptor<DailyLog>()).count == 1)
         #expect(try target.fetch(FetchDescriptor<HealthSnapshot>()).isEmpty)
+    }
+}
+
+// MARK: - Reacting to a CloudKit import
+
+@MainActor
+@Suite struct RemoteImportRefreshTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self, HealthSnapshot.self])
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    // Every test below calls applyRemoteImport, which republishes through
+    // DashboardViewModel.publishWidgetSummary into the REAL App Group suite
+    // (group.com.carpecadence.app, via WidgetData) — CadenceTests hosts
+    // inside the app, so there is no test-only container to redirect writes
+    // to, and every run was previously leaving a fabricated summary behind
+    // for the simulator's actual widget to read, with nothing restoring it.
+    // A nil prior means nothing was stored, which `write` can't express (its
+    // Summary is non-optional), so that case goes through WidgetData.clear().
+    // This used to hand-copy WidgetData's private `key` and reach into the
+    // suite directly — a duplicate that would have stopped restoring silently,
+    // with every test still green, if that key were ever renamed.
+    private func restoreWidgetSummary(_ prior: WidgetData.Summary?) {
+        if let prior {
+            WidgetData.write(prior)
+        } else {
+            WidgetData.clear()
+        }
+    }
+
+    // applyRemoteImport now also writes UserDefaultsKey.lastRemoteImportFingerprint
+    // (see Fix 1) into the same real, process-wide UserDefaults.standard the
+    // throttle key already lives in — same restoration need as the widget
+    // summary above, for the same reason: a leftover value from an earlier
+    // run must not leak into this one.
+    private func restoreFingerprint(_ prior: String?) {
+        if let prior {
+            UserDefaults.standard.set(prior, forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+        } else {
+            UserDefaults.standard.removeObject(forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+        }
+    }
+
+    // Populated-store case: the normal path, where the fetch returns a real
+    // row and publishWidgetSummary has actual log data to compute
+    // loggedToday/streak/pose from. This used to be word-for-word identical
+    // to emptyStoreIsSafe below (same zero-row makeContext(), same seed, same
+    // call, same assertion) — nothing distinguished "clears the throttle"
+    // from "survives an empty store". Inserting a log here makes this test
+    // own the populated-store path exclusively, leaving emptyStoreIsSafe as
+    // the only test covering the empty one.
+    @Test("A remote import clears the insight throttle so the next foreground recomputes")
+    func clearsInsightThrottle() throws {
+        let context = try makeContext()
+        let log = DailyLog(date: .now)
+        log.isComplete = true
+        context.insert(log)
+        try context.save()
+
+        let today = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
+        UserDefaults.standard.set(today, forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        // applyRemoteImport republishes the widget summary as a side effect
+        // of clearing the throttle (see suite-level comment) — snapshot/
+        // restore even though this test's focus is the throttle, or the
+        // populated log inserted above would leave a real summary behind.
+        let priorSummary = WidgetData.read()
+        defer { restoreWidgetSummary(priorSummary) }
+        // Fix 1 gates the throttle clear on a fingerprint; snapshot/restore it
+        // too, or this run's fingerprint leaks into whichever test runs next.
+        // There's no sub-millisecond timestamp to lean on here — DailyLog.init
+        // normalizes `date` to startOfDay, so this test's fingerprint is
+        // byte-identical on every run made on the same calendar day (and
+        // identical to unchangedImportDoesNotClearThrottle's). Seed a sentinel
+        // guaranteed to differ, the same way emptyStoreIsSafe below does, or a
+        // leftover value from an earlier run that died between
+        // applyRemoteImport and this defer (host crash mid-run — see
+        // BackupServiceTests' own restoration comments elsewhere) would read
+        // as "unchanged" and this assertion would flake.
+        let priorFingerprint = UserDefaults.standard.string(forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+        defer { restoreFingerprint(priorFingerprint) }
+        UserDefaults.standard.set("sentinel-guaranteed-to-differ", forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+
+        CadenceApp.applyRemoteImport(context: context)
+
+        #expect(UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay) == 0)
+    }
+
+    // Empty-store case: a first sync on a new device imports into an empty
+    // log table before any DailyLog exists locally, and the fetch must
+    // default to `[]` rather than trap. Now that clearsInsightThrottle above
+    // populates its store, this is the only test left covering that empty-
+    // fetch path — the two exercise genuinely different inputs to the same
+    // function rather than duplicating each other. Seeded to a nonzero value
+    // first, same as clearsInsightThrottle — an UNSET key already reads back
+    // as 0, so without seeding this would still pass even if
+    // applyRemoteImport's body were deleted entirely.
+    @Test("A remote import into an empty store does not trap")
+    func emptyStoreIsSafe() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
+        UserDefaults.standard.set(today, forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        // Same reasoning as clearsInsightThrottle: applyRemoteImport always
+        // republishes, empty store or not, so this must restore too.
+        let priorSummary = WidgetData.read()
+        defer { restoreWidgetSummary(priorSummary) }
+
+        // Unlike clearsInsightThrottle, an empty store's fingerprint
+        // ("0 logs | no date | 0 complete") is the SAME every single run —
+        // there's no `.now` timestamp to make it differ. A leftover value
+        // from an earlier run of this exact test would already match, the
+        // guard in applyRemoteImport would see "unchanged", and the throttle
+        // would wrongly stay set — for the same reason
+        // republishesWidgetSummary below seeds a stale widget summary, seed a
+        // sentinel here that's guaranteed to differ from the real empty-store
+        // fingerprint.
+        let priorFingerprint = UserDefaults.standard.string(forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+        defer { restoreFingerprint(priorFingerprint) }
+        UserDefaults.standard.set("sentinel-guaranteed-to-differ", forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+
+        CadenceApp.applyRemoteImport(context: context)
+
+        #expect(UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay) == 0)
+    }
+
+    // The widget republish is the OTHER reaction applyRemoteImport performs,
+    // and until now nothing asserted it — the publishWidgetSummary call could
+    // be deleted and every test here would still pass. The App Group suite is
+    // a real file that outlives a single test run, so a summary left over from
+    // an earlier pass could already equal what today's insert should produce;
+    // publishWidgetSummary's own `guard summary != WidgetData.read() else {
+    // return }` would then skip the write, and a stale-but-matching value on
+    // disk would pass this test for the wrong reason. Seeding a summary that's
+    // guaranteed to differ (an old date, not logged) rules that out: the
+    // assertions below can only hold if applyRemoteImport actually recomputed
+    // and wrote a fresh summary.
+    @Test("A remote import republishes the widget summary for today's log")
+    func republishesWidgetSummary() throws {
+        let context = try makeContext()
+        // isComplete is the flag publishWidgetSummary reads for `loggedToday`
+        // (DashboardViewModel.publishWidgetSummary: `logs.first { ... }?.isComplete
+        // == true`) — set directly, the same way DailyLogViewModel.save() and
+        // the sampleDocument() log above do; it isn't derived from the other
+        // fields.
+        let log = DailyLog(date: .now)
+        log.isComplete = true
+        context.insert(log)
+        try context.save()
+
+        // Captured before this test's own seed write below, not just before
+        // applyRemoteImport — the stale-summary seed is itself a write to the
+        // real App Group store that must be undone too.
+        let priorSummary = WidgetData.read()
+        defer { restoreWidgetSummary(priorSummary) }
+        // Widget republish is unconditional (see Fix 1 comment on
+        // applyRemoteImport), so this test doesn't depend on the fingerprint
+        // at all — restored purely so this run doesn't leave a value behind
+        // for a later test to trip over.
+        let priorFingerprint = UserDefaults.standard.string(forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+        defer { restoreFingerprint(priorFingerprint) }
+
+        let staleDate = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
+        WidgetData.write(WidgetData.Summary(date: staleDate, loggedToday: false, streak: 0, mascotPose: .welcoming))
+
+        CadenceApp.applyRemoteImport(context: context)
+
+        let summary = try #require(WidgetData.read())
+        #expect(Calendar.current.isDateInToday(summary.date))
+        #expect(summary.loggedToday == true)
+    }
+
+    // Fix 1: NSPersistentCloudKitContainer reports succeeded == true for an
+    // import pass that changed nothing — including the pass that fires from
+    // THIS device's own export, since CloudKit echoes every push back as a
+    // change notification. Without the fingerprint check in
+    // applyRemoteImport, a single-device Pro user would clear
+    // lastInsightCheckDay (and pay the synchronous 90-day PatternEngine pass)
+    // on every one of their own writes instead of once a day.
+    @Test("A second import with unchanged data does not clear the insight throttle")
+    func unchangedImportDoesNotClearThrottle() throws {
+        let context = try makeContext()
+        let log = DailyLog(date: .now)
+        log.isComplete = true
+        context.insert(log)
+        try context.save()
+
+        let priorSummary = WidgetData.read()
+        defer { restoreWidgetSummary(priorSummary) }
+        let priorFingerprint = UserDefaults.standard.string(forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+        defer { restoreFingerprint(priorFingerprint) }
+        let priorCheckDay = UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay)
+        defer { UserDefaults.standard.set(priorCheckDay, forKey: UserDefaultsKey.lastInsightCheckDay) }
+
+        // First pass establishes the fingerprint baseline for this exact log
+        // set (and, incidentally, clears the throttle — that's covered by
+        // clearsInsightThrottle above, not the point here).
+        CadenceApp.applyRemoteImport(context: context)
+
+        // Simulate the state a real device is in right after that first
+        // import let the foreground path run: today's date is stamped.
+        let today = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
+        UserDefaults.standard.set(today, forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        // React to the SAME data again — the no-op pass this device's own
+        // export triggers. Must not clear the throttle.
+        CadenceApp.applyRemoteImport(context: context)
+
+        #expect(UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay) == today)
+    }
+
+    @Test("An import that adds a log clears the insight throttle")
+    func addedLogClearsThrottle() throws {
+        let context = try makeContext()
+        let firstLog = DailyLog(date: .now)
+        firstLog.isComplete = true
+        context.insert(firstLog)
+        try context.save()
+
+        let priorSummary = WidgetData.read()
+        defer { restoreWidgetSummary(priorSummary) }
+        let priorFingerprint = UserDefaults.standard.string(forKey: UserDefaultsKey.lastRemoteImportFingerprint)
+        defer { restoreFingerprint(priorFingerprint) }
+        let priorCheckDay = UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay)
+        defer { UserDefaults.standard.set(priorCheckDay, forKey: UserDefaultsKey.lastInsightCheckDay) }
+
+        // Baseline fingerprint for the first log only.
+        CadenceApp.applyRemoteImport(context: context)
+        let today = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
+        UserDefaults.standard.set(today, forKey: UserDefaultsKey.lastInsightCheckDay)
+
+        // A second day arrives from the remote import — count and completed
+        // count both change. Latest date does NOT: this log lands at -1 day,
+        // so firstLog's (today's) date stays the max() of the two.
+        let secondLog = DailyLog(date: Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .distantPast)
+        secondLog.isComplete = true
+        context.insert(secondLog)
+        try context.save()
+
+        CadenceApp.applyRemoteImport(context: context)
+
+        #expect(UserDefaults.standard.double(forKey: UserDefaultsKey.lastInsightCheckDay) == 0)
+    }
+
+    // CloudKit delivers one sync pass as a burst of events. WidgetCenter
+    // reloads are system-budgeted, so the burst must cost one refresh.
+    @Test("A burst of import events collapses into a single refresh")
+    func coalescesBurst() async throws {
+        let monitor = CloudSyncMonitor()
+        monitor.coalesceInterval = .milliseconds(50)
+        var calls = 0
+        monitor.onRemoteImport = { calls += 1 }
+
+        for _ in 0..<5 {
+            monitor.apply(isImport: true, finished: true, succeeded: true,
+                          endDate: .now, errorDescription: nil)
+        }
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(calls == 1)
+    }
+
+    @Test("An export never reaches the refresh callback")
+    func exportDoesNotTriggerRefresh() async throws {
+        let monitor = CloudSyncMonitor()
+        monitor.coalesceInterval = .milliseconds(50)
+        var calls = 0
+        monitor.onRemoteImport = { calls += 1 }
+
+        monitor.apply(isImport: false, finished: true, succeeded: true,
+                      endDate: .now, errorDescription: nil)
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(calls == 0)
     }
 }

@@ -66,6 +66,10 @@ struct SettingsView: View {
         .task { await store.loadProducts() }
         .task { appState.notificationsAuthorized = await notificationService.checkAuthorizationStatus() }
         .task { appState.healthKitAuthorized = healthKitService.isAuthorized }
+        // READS request status; never requests. Onboarding is still the only
+        // place that prompts (see CLAUDE.md), so this only tells the person
+        // there is something to re-authorize.
+        .task { hasUnrequestedHealthTypes = await healthKitService.hasUnrequestedTypes() }
         .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
         .alert("Purchase Error", isPresented: .init(
             get: { purchaseError != nil },
@@ -279,14 +283,28 @@ struct SettingsView: View {
         }
     }
 
+    @State private var hasUnrequestedHealthTypes = false
+
     private var healthKitSection: some View {
         Section {
             Button("Re-authorize HealthKit") {
                 Task {
                     appState.healthKitAuthorized = (try? await healthKitService.requestAuthorization()) ?? healthKitService.isAuthorized
+                    hasUnrequestedHealthTypes = await healthKitService.hasUnrequestedTypes()
                 }
             }
             .foregroundStyle(CadenceColor.accent)
+            // An app update can add a Health type nobody was ever asked about —
+            // menopausal state did — and HealthKit never reveals whether READ
+            // access was granted, so without this the new data stays silently
+            // missing for everyone who already finished onboarding. Shown only
+            // when there is genuinely something new to ask for.
+            if hasUnrequestedHealthTypes {
+                Label("An update added Health data Cadence hasn't asked about yet. Re-authorize to include it.",
+                      systemImage: "sparkles")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         } header: {
             Label("HealthKit", systemImage: "heart.fill")
         } footer: {

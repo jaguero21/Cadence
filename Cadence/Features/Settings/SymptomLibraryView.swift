@@ -18,7 +18,7 @@ struct SymptomLibraryView: View {
 
     // Defaults first (their familiar order), then the optional library.
     private var library: [(name: String, emoji: String)] {
-        SymptomTag.defaults.map { ($0.name, $0.emoji) } + SymptomTag.optionalCatalog
+        SymptomTag.defaultSeeds + SymptomTag.optionalCatalog
     }
 
     // User-created tags that aren't part of the library — managed by deletion,
@@ -92,7 +92,7 @@ struct SymptomLibraryView: View {
         if enabled {
             // Save-time dedup: a tag may already exist (CloudKit sync, rapid taps).
             guard !tags.contains(where: { $0.name.localizedCaseInsensitiveCompare(item.name) == .orderedSame }) else { return }
-            let defaultIndex = SymptomTag.defaults.firstIndex { $0.name == item.name }
+            let defaultIndex = SymptomTag.defaultSeeds.firstIndex { $0.name == item.name }
             let catalogIndex = SymptomTag.optionalCatalog.firstIndex { $0.name == item.name }
             // Defaults keep their seeded order; library entries sort after them.
             let sortOrder = defaultIndex ?? (100 + (catalogIndex ?? 0))

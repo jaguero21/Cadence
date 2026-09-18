@@ -67,6 +67,17 @@ enum WidgetData {
         return try? JSONDecoder().decode(Summary.self, from: data)
     }
 
+    // Returns the suite to "nothing stored", which `write` cannot express —
+    // its Summary is non-optional. Only the tests need it: they snapshot
+    // `read()` before perturbing the summary and restore it afterwards, and a
+    // nil snapshot means nothing was there. Without this they reached into
+    // `UserDefaults(suiteName:)` with a hand-copied duplicate of `key`, which
+    // would silently stop restoring if `key` were ever renamed — leaving
+    // fabricated state in the App Group the real widget reads.
+    static func clear() {
+        store?.removeObject(forKey: key)
+    }
+
     // Resolves a stored summary against the current moment. The stored value
     // describes the day it was written, so after midnight it must be
     // reinterpreted rather than displayed as-is: "logged today" only holds for

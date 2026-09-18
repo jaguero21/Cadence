@@ -10,10 +10,20 @@ struct ProPaywallView: View {
     @State private var errorMessage: String?
     @State private var pendingMessage: String?
 
+    // String(localized:) at the literal, not bare strings: these are read back
+    // out as tuple members and rendered with Text(feature.title), which takes
+    // the non-localizing StringProtocol overload — as bare literals the whole
+    // paywall stayed English in every language.
     private let features: [(icon: String, title: String, detail: String)] = [
-        ("sparkles",              "Pattern Insights",    "Correlation detection across sleep, mood, stress, and symptoms."),
-        ("doc.richtext.fill",     "PDF Export",          "Doctor-ready reports and personal summaries."),
-        ("chart.line.uptrend.xyaxis", "90-Day Trends",   "Full trend history across all your health metrics."),
+        ("sparkles",
+         String(localized: "Pattern Insights"),
+         String(localized: "Correlation detection across sleep, mood, stress, and symptoms.")),
+        ("doc.richtext.fill",
+         String(localized: "PDF Export"),
+         String(localized: "Doctor-ready reports and personal summaries.")),
+        ("chart.line.uptrend.xyaxis",
+         String(localized: "90-Day Trends"),
+         String(localized: "Full trend history across all your health metrics.")),
     ]
 
     var body: some View {
@@ -79,7 +89,9 @@ struct ProPaywallView: View {
 
     private var featureList: some View {
         VStack(spacing: 0) {
-            ForEach(features, id: \.title) { feature in
+            // Keyed by icon, not title: the titles are localized now, so they
+            // are the wrong thing to hang view identity on.
+            ForEach(features, id: \.icon) { feature in
                 HStack(alignment: .top, spacing: 16) {
                     Image(systemName: feature.icon)
                         .font(.title3)
@@ -92,7 +104,7 @@ struct ProPaywallView: View {
                     Spacer()
                 }
                 .padding(.vertical, 12)
-                if feature.title != features.last?.title {
+                if feature.icon != features.last?.icon {
                     Divider().padding(.leading, 44)
                 }
             }

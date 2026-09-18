@@ -202,7 +202,7 @@ struct LogInputFlow: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(step.title)
                 .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
-                .accessibilityHint(isCurrent ? "Current step" : "Jump to this step")
+                .accessibilityHint(isCurrent ? Text("Current step") : Text("Jump to this step"))
             }
         }
         .padding(.horizontal, 8)
@@ -256,14 +256,17 @@ struct LogInputFlow: View {
         MoodScale.emoji(for: value)
     }
 
+    // String(localized:) at the return, not a bare literal: .accessibilityLabel
+    // takes the non-localizing StringProtocol overload for a plain String, so
+    // these five labels never reached the catalog.
     private func moodLabel(_ value: Int) -> String {
         switch value {
-        case 1: return "Very sad, 1 of 5"
-        case 2: return "Sad, 2 of 5"
-        case 3: return "Neutral, 3 of 5"
-        case 4: return "Happy, 4 of 5"
-        case 5: return "Very happy, 5 of 5"
-        default: return "Neutral"
+        case 1: return String(localized: "Very sad, 1 of 5")
+        case 2: return String(localized: "Sad, 2 of 5")
+        case 3: return String(localized: "Neutral, 3 of 5")
+        case 4: return String(localized: "Happy, 4 of 5")
+        case 5: return String(localized: "Very happy, 5 of 5")
+        default: return String(localized: "Neutral")
         }
     }
 
@@ -586,7 +589,9 @@ struct LogInputFlow: View {
         .padding(.top, 32)
     }
 
-    private func summaryPill(label: String, value: String, color: Color) -> some View {
+    // label is a LocalizedStringKey for the same reason as BodyMetricRow's;
+    // `value` stays a String because it's a formatted number or an emoji.
+    private func summaryPill(label: LocalizedStringKey, value: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value).font(.headline).foregroundStyle(color)
             Text(label).font(.caption).foregroundStyle(.secondary)
@@ -629,7 +634,7 @@ struct LogInputFlow: View {
                     vm.nextStep()
                 } label: {
                     HStack {
-                        Text(vm.currentStep == .reflection ? "Finish" : "Next")
+                        (vm.currentStep == .reflection ? Text("Finish") : Text("Next"))
                             .font(.body.bold())
                         if vm.currentStep != .reflection {
                             Image(systemName: "chevron.right")
@@ -895,8 +900,13 @@ private struct AttachmentControls: View {
 
 private struct LogSectionHeader: View {
     let icon: String
-    let title: String
-    let time: String
+    // LocalizedStringKey, not String: as plain Strings these reached
+    // Label(_:systemImage:) and Text through their non-localizing StringProtocol
+    // overloads, so every step header in the log flow ("BODY METRICS", "~60
+    // sec", …) stayed English in every language and never entered the catalog.
+    // `icon` stays a String — it's an SF Symbol name, not user-facing copy.
+    let title: LocalizedStringKey
+    let time: LocalizedStringKey
 
     var body: some View {
         HStack {
@@ -951,6 +961,8 @@ private struct SleepHoursRow: View {
 }
 
 private struct CustomMetricRow: View {
+    // A String, deliberately: this is the tracker name the user typed, so it
+    // must NOT be looked up in the catalog.
     let label: String
     let unit: String
     let range: ClosedRange<Int>
@@ -987,7 +999,11 @@ private struct CustomMetricRow: View {
 }
 
 private struct BodyMetricRow: View {
-    let label: String
+    // LocalizedStringKey so the five literal labels at the call site extract and
+    // localize — as a String they reached both Text and .accessibilityLabel
+    // through the non-localizing overloads. Contrast CustomMetricRow.label,
+    // which is a String on purpose: that one is a name the user typed.
+    let label: LocalizedStringKey
     @Binding var value: Int
     // Slider-only edit callback — same rationale as SleepHoursRow.onEdit, and
     // the same shape CustomMetricRow's caller already uses for its binding.

@@ -17,7 +17,7 @@ struct QuickLogSeamTests {
 
     private func makeContext() throws -> ModelContext {
         let schema = Schema([DailyLog.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return ModelContext(try ModelContainer(for: schema, configurations: [config]))
     }
 
@@ -101,6 +101,39 @@ struct QuickLogSeamTests {
         #expect(logs.first?.energy == 0)
     }
 
+    @Test("A quick log records what the day looked like before it")
+    func quickLog_recordsPreviousState() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        let existing = DailyLog()
+        existing.mood = 2
+        existing.didEditMood = true
+        existing.energy = 7
+        existing.didEditMetrics = true
+        context.insert(existing)
+        try context.save()
+
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 5, energy: 9, daysAgo: 0), context: context, source: .siri)
+
+        let record = try #require(QuickLogUndo.stored())
+        #expect(record.createdLog == false)
+        #expect(record.previousMood == 2)
+        #expect(record.previousEnergy == 7)
+        #expect(record.previousDidEditMood)
+        #expect(record.appliedMood == 5)
+        #expect(record.source == .siri)
+    }
+
+    @Test("A quick log on a fresh day records that it created the log")
+    func quickLog_recordsCreation() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 3, daysAgo: 0), context: context, source: .watch)
+        let record = try #require(QuickLogUndo.stored())
+        #expect(record.createdLog)
+        #expect(record.source == .watch)
+    }
+
     @Test("A payload without a mood is rejected and persists nothing")
     func missingMood_isNoOp() throws {
         let context = try makeContext()
@@ -108,6 +141,55 @@ struct QuickLogSeamTests {
         #expect(saved == false)
         let logs = try context.fetch(FetchDescriptor<DailyLog>())
         #expect(logs.isEmpty)
+    }
+}
+
+// MARK: Watch payload → Sendable value
+
+// WCSessionDelegate hands us `[String: Any]`, which can't cross to the main
+// actor under Swift 6. QuickLogPayload is the Sendable form, parsed on the
+// delegate side. It does TYPE EXTRACTION ONLY: clamping stays in the upsert
+// (covered by QuickLogSeamTests.outOfRangeValues_areClamped above).
+@Suite("QuickLogPayload – parsing")
+struct QuickLogPayloadTests {
+
+    @Test("A complete payload keeps mood, energy, and date")
+    func completePayload_keepsAllFields() throws {
+        let recorded = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let parsed = try #require(QuickLogPayload(["mood": 4, "energy": 6, "date": recorded.timeIntervalSinceReferenceDate]))
+        #expect(parsed.mood == 4)
+        #expect(parsed.energy == 6)
+        #expect(parsed.date == recorded)
+    }
+
+    @Test("A payload without a mood doesn't parse")
+    func missingMood_isNil() {
+        #expect(QuickLogPayload(["energy": 6]) == nil)
+    }
+
+    @Test("A non-integer mood doesn't parse")
+    func nonIntegerMood_isNil() {
+        #expect(QuickLogPayload(["mood": "3"]) == nil)
+    }
+
+    @Test("A non-integer energy is dropped, not fatal")
+    func nonIntegerEnergy_isIgnored() throws {
+        let parsed = try #require(QuickLogPayload(["mood": 2, "energy": "high"]))
+        #expect(parsed.mood == 2)
+        #expect(parsed.energy == nil)
+    }
+
+    @Test("A payload without a date is stamped now")
+    func missingDate_isNow() throws {
+        let parsed = try #require(QuickLogPayload(["mood": 3]))
+        #expect(abs(parsed.date.timeIntervalSinceNow) < 1)
+    }
+
+    @Test("Out-of-range values pass through unclamped")
+    func outOfRange_isNotClamped() throws {
+        let parsed = try #require(QuickLogPayload(["mood": 99, "energy": -3]))
+        #expect(parsed.mood == 99)
+        #expect(parsed.energy == -3)
     }
 }
 
@@ -275,7 +357,7 @@ struct PendingQuickLogTests {
         WidgetData.stashPendingQuickLog(mood: 2, date: yesterday, defaults: defaults)
 
         let schema = Schema([DailyLog.self])
-        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let context = ModelContext(try ModelContainer(for: schema, configurations: [config]))
 
         for entry in WidgetData.consumePendingQuickLogs(defaults: defaults) {
@@ -394,4 +476,238 @@ struct SevenDayStatsTests {
     func emptyInputIsEmpty() {
         #expect(DashboardViewModel.sevenDayStats(from: [], referenceDate: today) == DashboardViewModel.SevenDayStats())
     }
+}
+
+// MARK: Undo for a quick check-in
+
+// The offer has to retire itself: undoing after the person has edited the day
+// would throw away work they did by hand.
+@Suite("QuickLogUndo – offering and applying")
+@MainActor
+struct QuickLogUndoTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([DailyLog.self])
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    private func payload(mood: Int, energy: Int? = nil) -> [String: Any] {
+        var p: [String: Any] = ["mood": mood, "date": Date.now.timeIntervalSinceReferenceDate]
+        if let energy { p["energy"] = energy }
+        return p
+    }
+
+    @Test("Undo restores the mood and energy the day had before")
+    func undo_restoresPreviousValues() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        let existing = DailyLog()
+        existing.mood = 2; existing.didEditMood = true
+        existing.energy = 7; existing.didEditMetrics = true
+        context.insert(existing); try context.save()
+
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 5, energy: 9), context: context, source: .siri)
+        let record = try #require(QuickLogUndo.availableRecord(in: context))
+        QuickLogUndo.undo(record: record, in: context)
+
+        let logs = try context.fetch(FetchDescriptor<DailyLog>())
+        #expect(logs.count == 1)
+        #expect(logs.first?.mood == 2)
+        #expect(logs.first?.energy == 7)
+        #expect(QuickLogUndo.stored() == nil)
+    }
+
+    @Test("Undo deletes the log the quick check-in created")
+    func undo_deletesCreatedLog() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 4), context: context, source: .siri)
+        let record = try #require(QuickLogUndo.availableRecord(in: context))
+        QuickLogUndo.undo(record: record, in: context)
+        #expect(try context.fetch(FetchDescriptor<DailyLog>()).isEmpty)
+    }
+
+    @Test("Editing the day by hand retires the offer")
+    func manualEdit_retiresRecord() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        PhoneConnectivityManager.applyQuickLog(payload(mood: 4), context: context, source: .siri)
+        let log = try #require(try context.fetch(FetchDescriptor<DailyLog>()).first)
+        log.mood = 1                       // the person changed it themselves
+        try context.save()
+        #expect(QuickLogUndo.availableRecord(in: context) == nil)
+    }
+
+    @Test("A record from another day is never offered")
+    func staleDay_isNotOffered() throws {
+        QuickLogUndo.clear()
+        let context = try makeContext()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: .now)) ?? .now
+        QuickLogUndo.store(QuickLogUndoRecord(day: yesterday, source: .siri, createdLog: true,
+                                              previousMood: 3, previousDidEditMood: false,
+                                              previousEnergy: 5, previousDidEditMetrics: false,
+                                              appliedMood: 4, appliedEnergy: nil, recordedAt: yesterday))
+        #expect(QuickLogUndo.availableRecord(in: context) == nil)
+    }
+}
+
+// MARK: - Streak breadth
+
+// The Dashboard's @Query is capped at 90 days, and computeStreak walks
+// consecutive days backward until a gap, so reading the streak off that slice
+// silently truncated it at the window edge. Every other publish path fetches
+// the unbounded table, so the Dashboard and the widget disagreed about a long
+// streak and each republish undid the other's stored summary.
+@MainActor
+@Suite("DashboardViewModel – streak breadth")
+struct StreakBreadthTests {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([DailyLog.self, WeeklyReview.self, SymptomTag.self, Medication.self, Flare.self, CustomTracker.self, InsightRecord.self, HealthSnapshot.self])
+        let config = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    // 120 consecutive complete days — comfortably past the 90-day window, so a
+    // window-limited walk would stop at 90 and this would fail at exactly that
+    // boundary rather than by some arbitrary amount.
+    @Test("A streak longer than the Dashboard's 90-day window is not truncated")
+    func streakSurvivesPastTheQueryWindow() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        for daysAgo in 0..<120 {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == 120)
+    }
+
+    // The walk must still stop at a real gap — otherwise the fix above would
+    // "pass" by counting every complete log regardless of adjacency.
+    @Test("The streak still stops at the first missing day")
+    func streakStopsAtAGap() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        // Days 0-2 complete, day 3 missing, days 4-100 complete.
+        for daysAgo in Array(0...2) + Array(4...100) {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == 3)
+    }
+
+    // The actual regression. The three tests above exercise computeStreak(in:)
+    // directly, which is new code — none of them could have failed before this
+    // fix, because the function didn't exist. THIS one pins the bug: refresh
+    // receives the view's 90-day slice as `logs`, exactly as DashboardView
+    // passes it, and the streak it publishes must still be the true one. Swap
+    // `computeStreak(in: context)` back to `computeStreak(from: logs)` in
+    // refresh and this returns 90.
+    @Test("refresh reports the true streak even though its logs are a 90-day slice")
+    func refreshIgnoresTheWindowForStreak() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        var all: [DailyLog] = []
+        for daysAgo in 0..<120 {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+            all.append(log)
+        }
+        try context.save()
+
+        // What DashboardView's @Query would hand over: the newest 90 days only.
+        let windowed = Array(all.prefix(90))
+        let vm = DashboardViewModel()
+        vm.refresh(logs: windowed, health: [], reviews: [],
+                   notifications: StreakFakeNotificationService(), context: context)
+
+        #expect(vm.streak == 120)
+    }
+
+    // The probe/fallback boundary, and the whole reason the probe is not a cap.
+    // computeStreak(in:) fetches only the last StreakThreshold.probeDays first;
+    // a streak that fills that window must fall through to the unbounded fetch
+    // and still report the exact number. If the fallback were dropped this
+    // returns probeDays + 1 (401) instead of 450 — the same class of silent
+    // truncation the 90-day @Query caused, just further out.
+    @Test("A streak longer than the probe window falls back and stays exact")
+    func streakBeyondProbeWindowIsExact() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        let length = StreakThreshold.probeDays + 50
+        for daysAgo in 0..<length {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == length)
+    }
+
+    // The mirror image: a gap just inside the probe window must be found by the
+    // probe alone. Together with the test above this pins both sides of the
+    // boundary — one proves the fallback fires when needed, this proves the
+    // probe is trusted when it shouldn't.
+    @Test("A gap inside the probe window is answered without the fallback")
+    func gapInsideProbeWindow() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        // Complete right up to one day short of the probe edge, then a gap,
+        // then a long older run that must not be counted.
+        let runLength = StreakThreshold.probeDays - 1
+        for daysAgo in Array(0..<runLength) + Array((runLength + 1)..<(runLength + 200)) {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = true
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == runLength)
+    }
+
+    // Incomplete days are not streak days, and the predicate must be what
+    // filters them — not the walk finding them out of order.
+    @Test("Incomplete days don't count toward the streak")
+    func incompleteDaysExcluded() throws {
+        let context = try makeContext()
+        let today = Calendar.current.startOfDay(for: .now)
+        for daysAgo in 0..<5 {
+            guard let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let log = DailyLog(date: date)
+            log.isComplete = (daysAgo != 2)
+            context.insert(log)
+        }
+        try context.save()
+
+        #expect(DashboardViewModel.computeStreak(in: context) == 2)
+    }
+}
+
+/// Keeps refresh's streak-risk scheduling out of the real notification centre
+/// during the streak-breadth tests.
+@MainActor
+private final class StreakFakeNotificationService: NotificationServiceProtocol {
+    func requestAuthorization() async -> Bool { true }
+    func checkAuthorizationStatus() async -> Bool { true }
+    func scheduleDailyReminder(at hour: Int, minute: Int) {}
+    func scheduleWeeklyReviewReminder(weekday: Int, hour: Int) {}
+    func scheduleStreakAtRisk() {}
+    func sendInsightNotification(title: String) {}
+    func syncMedicationReminders(_ medications: [MedicationSnapshot]) async {}
+    func removeNotification(id: String) {}
+    func removeAll() {}
 }

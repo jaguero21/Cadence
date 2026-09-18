@@ -108,7 +108,7 @@ struct ReviewRowView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(review.weekLabel).font(.headline)
-                Text(review.isComplete ? "Complete" : "In progress")
+                statusText
                     .font(.caption)
                     .foregroundStyle(review.isComplete ? CadenceColor.successGreen : CadenceColor.energyOrange)
             }
@@ -117,6 +117,21 @@ struct ReviewRowView: View {
                 StarRatingDisplayView(rating: review.overallRating, font: .caption, spacing: 2)
             }
         }
+    }
+
+    // A weekly review and a daily log both read "Complete" in English, but they
+    // cannot share a catalog key: the Spanish subject differs in gender
+    // (Revisión, feminine vs Registro, masculine), and one key can only carry
+    // one translation. Explicit keys with an English defaultValue keep them
+    // apart — see also review.button.complete, where the same word is a verb.
+    private var statusText: Text {
+        review.isComplete
+            ? Text(String(localized: "review.status.complete",
+                          defaultValue: "Complete",
+                          comment: "Status on a finished weekly review row."))
+            : Text(String(localized: "review.status.inProgress",
+                          defaultValue: "In progress",
+                          comment: "Status on a weekly review row that isn't finished yet."))
     }
 }
 
