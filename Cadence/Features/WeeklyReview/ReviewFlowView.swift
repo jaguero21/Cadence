@@ -33,6 +33,7 @@ struct ReviewFlowView: View {
                             }
                             .padding()
                         }
+                        .scrollDismissesKeyboard(.interactively)
                         navBar
                     }
                 }
@@ -100,6 +101,8 @@ struct ReviewFlowView: View {
             }
         }
         .frame(height: 3)
+        // Decorative: the "N of M" text in each card already states progress.
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder

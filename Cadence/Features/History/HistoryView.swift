@@ -181,6 +181,7 @@ struct HistoryView: View {
             } label: {
                 Image(systemName: "chevron.left")
                     .foregroundStyle(CadenceColor.accent)
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .accessibilityLabel("Previous month")
             Spacer()
@@ -192,6 +193,7 @@ struct HistoryView: View {
             } label: {
                 Image(systemName: "chevron.right")
                     .foregroundStyle(canGoForward ? CadenceColor.accent : .secondary)
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .disabled(!canGoForward)
             .accessibilityLabel("Next month")

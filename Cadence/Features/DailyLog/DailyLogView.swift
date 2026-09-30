@@ -47,6 +47,7 @@ struct DailyLogView: View {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
                     }
+                    .accessibilityLabel("Start today's log")
                 }
             }
             .sheet(item: $activeSheet) { sheet in
@@ -116,6 +117,11 @@ struct DailyLogView: View {
     private var recentLogs: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recent").font(.headline)
+            if pastLogs.isEmpty {
+                Text("Earlier days will show up here once you've logged them.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
             ForEach(pastLogs) { log in
                 Button {
                     activeSheet = .viewingLog(log)
@@ -153,8 +159,14 @@ struct LogRowView: View {
             Spacer()
 
             HStack(spacing: 8) {
-                ScoreBadge(value: log.mood, total: 5, color: CadenceColor.moodBlue)
-                ScoreBadge(value: log.energy, total: 10, color: CadenceColor.energyOrange)
+                // Only what was actually entered: an in-progress log still
+                // carries the model's defaults (mood 3, energy 5).
+                if log.didEditMood {
+                    ScoreBadge(value: log.mood, total: 5, color: CadenceColor.moodBlue, label: "Mood")
+                }
+                if log.didEditMetrics {
+                    ScoreBadge(value: log.energy, total: 10, color: CadenceColor.energyOrange, label: "Energy")
+                }
             }
         }
         .cadenceCard()

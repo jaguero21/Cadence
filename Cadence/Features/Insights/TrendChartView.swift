@@ -267,16 +267,30 @@ enum ChartMetric: CaseIterable {
             color: color,
             yDomain: yDomain,
             higherIsBetter: higherIsBetter,
-            value: { [self] log in value(for: log) }
+            // nil for a day the user never set this value: DailyLog's defaults
+            // (mood 3, energy 5, …) are not measurements, and drawing them
+            // would plot a flat line of invented data. PatternEngine and the
+            // dashboard averages already gate on the same two flags.
+            value: { [self] log in isRecorded(in: log) ? value(for: log) : nil }
         )
     }
 
+    // String(localized:), not bare literals: the label reaches Label(_:) as a
+    // plain String, which would skip the catalog.
     var label: String {
         switch self {
-        case .mood:   return "Mood"
-        case .energy: return "Energy"
-        case .sleep:  return "Sleep Quality"
-        case .stress: return "Stress"
+        case .mood:   return String(localized: "Mood")
+        case .energy: return String(localized: "Energy")
+        case .sleep:  return String(localized: "Sleep Quality")
+        case .stress: return String(localized: "Stress")
+        }
+    }
+
+    // Mood has its own edit flag; every slider metric shares didEditMetrics.
+    func isRecorded(in log: DailyLog) -> Bool {
+        switch self {
+        case .mood: return log.didEditMood
+        case .energy, .sleep, .stress: return log.didEditMetrics
         }
     }
 

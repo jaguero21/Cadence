@@ -55,8 +55,17 @@ struct ScoreBadge: View {
     let value: Int
     let total: Int
     let color: Color
+    // What the number measures; without it VoiceOver reads a bare "3".
+    var label: LocalizedStringKey? = nil
 
     var body: some View {
+        badge
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label ?? "")
+            .accessibilityValue(Text("\(value) of \(total)"))
+    }
+
+    private var badge: some View {
         ZStack {
             Circle()
                 .stroke(color.opacity(0.2), lineWidth: 4)
