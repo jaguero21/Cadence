@@ -6,7 +6,7 @@ import TipKit
 // first time a severity slider is actually opened.
 private struct RateSeverityTip: Tip {
     var title: Text { Text("Rate how bad it is") }
-    var message: Text? { Text("Touch and hold a selected symptom to rate its severity from 1\u{2013}10.") }
+    var message: Text? { Text("Tap a symptom, then drag the slider to rate its severity from 1\u{2013}10.") }
     var image: Image? { Image(systemName: "hand.tap.fill") }
 }
 
@@ -19,7 +19,7 @@ struct SymptomPickerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Tap to select, hold to rate severity")
+            Text("Tap to select, then set how strong it is")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
@@ -175,6 +175,7 @@ struct SymptomPickerView: View {
     private func updateSeverity(name: String, value: Int) {
         if let idx = selectedSymptoms.firstIndex(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
             selectedSymptoms[idx].severity = value.clamped(to: 1...10)
+            RateSeverityTip().invalidate(reason: .actionPerformed)
         }
     }
 }

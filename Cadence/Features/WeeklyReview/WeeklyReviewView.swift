@@ -45,6 +45,7 @@ struct WeeklyReviewView: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                     }
+                    .accessibilityLabel("Start this week's review")
                 }
             }
             .sheet(item: $activeSheet) { sheet in
@@ -152,6 +153,14 @@ struct ReviewDetailView: View {
                         Text(response.response.isEmpty ? "—" : response.response)
                             .font(.body)
                             .foregroundStyle(response.response.isEmpty ? .tertiary : .primary)
+                    }
+                }
+                // Written in the review flow, so it has to be readable back here
+                // (it previously only surfaced in the PDF).
+                if !review.intentionsForTomorrow.isEmpty {
+                    Section("Intentions") {
+                        Text(review.intentionsForTomorrow)
+                            .font(.body)
                     }
                 }
                 if review.overallRating > 0 {
