@@ -267,7 +267,7 @@ enum PDFBuilder {
             cursor.line("No patterns detected from the current log set.", font: bodyFont, color: inkSecondary)
         } else {
             for insight in insights {
-                cursor.line("\(insight.title) — \(Int(insight.confidence * 100))% confidence",
+                cursor.line("\(insight.title) — \(InsightStrength(confidence: insight.confidence).plainLabel) signal",
                             font: .systemFont(ofSize: 11, weight: .semibold), spacing: 2)
                 cursor.line(insight.detail, font: bodyFont, color: inkSecondary, x: 60, width: 495, spacing: 10)
             }

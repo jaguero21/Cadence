@@ -21,7 +21,7 @@ struct InsightHistoryView: View {
                             .foregroundStyle(.secondary)
                         HStack(spacing: 8) {
                             Text("First seen \(record.firstSeen.formatted(date: .abbreviated, time: .omitted))")
-                            Text("· \(Int(record.confidence * 100))% confidence")
+                            Text("· \(Text(InsightStrength(confidence: record.confidence).label)) signal")
                         }
                         .font(.caption2)
                         .foregroundStyle(.tertiary)

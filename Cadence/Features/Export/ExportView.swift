@@ -22,75 +22,73 @@ struct ExportView: View {
     @State private var exportError: String?
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Date Range") {
-                    DatePicker("From", selection: $startDate, in: ...endDate, displayedComponents: .date)
-                    DatePicker("To",   selection: $endDate,   in: startDate..., displayedComponents: .date)
-                }
+        Form {
+            Section("Date Range") {
+                DatePicker("From", selection: $startDate, in: ...endDate, displayedComponents: .date)
+                DatePicker("To",   selection: $endDate,   in: startDate..., displayedComponents: .date)
+            }
 
-                Section {
-                    includes
-                } header: {
-                    Text("Includes")
-                } footer: {
-                    Text("Your personal insights and patterns — a warm look back at what you've logged, for reflection and self-discovery.")
-                }
+            Section {
+                includes
+            } header: {
+                Text("Includes")
+            } footer: {
+                Text("Your personal insights and patterns — a warm look back at what you've logged, for reflection and self-discovery.")
+            }
 
-                Section {
-                    // PDF is a generated, doctor-ready report — the "polished
-                    // output" that stays Pro.
-                    if store.isPro {
-                        Button {
-                            generate()
-                        } label: {
-                            HStack {
-                                Label("Generate Report", systemImage: "doc.richtext.fill")
-                                Spacer()
-                                if isGenerating {
-                                    ProgressView().progressViewStyle(.circular)
-                                }
+            Section {
+                // PDF is a generated, doctor-ready report — the "polished
+                // output" that stays Pro.
+                if store.isPro {
+                    Button {
+                        generate()
+                    } label: {
+                        HStack {
+                            Label("Generate Report", systemImage: "doc.richtext.fill")
+                            Spacer()
+                            if isGenerating {
+                                ProgressView().progressViewStyle(.circular)
                             }
                         }
-                        .disabled(isGenerating)
-                    } else {
-                        proPrompt
-                    }
-
-                    // CSV is a raw dump of the user's own data — free, on the
-                    // same "users own their data" principle that keeps JSON
-                    // backup ungated.
-                    Button {
-                        exportCSV()
-                    } label: {
-                        Label("Export Spreadsheet (CSV)", systemImage: "tablecells")
                     }
                     .disabled(isGenerating)
+                } else {
+                    proPrompt
                 }
-            }
-            .navigationTitle("Export")
-            .sheet(isPresented: $showingShare) {
-                if let url = shareItem {
-                    ShareSheet(items: [url])
+
+                // CSV is a raw dump of the user's own data — free, on the
+                // same "users own their data" principle that keeps JSON
+                // backup ungated.
+                Button {
+                    exportCSV()
+                } label: {
+                    Label("Export Spreadsheet (CSV)", systemImage: "tablecells")
                 }
+                .disabled(isGenerating)
             }
-            // PDFs open in a preview first — check the report before handing
-            // it to anyone; sharing happens from the preview's toolbar.
-            .sheet(item: $previewItem) { item in
-                ReportPreviewSheet(url: item.url)
+        }
+        .navigationTitle("Export")
+        .sheet(isPresented: $showingShare) {
+            if let url = shareItem {
+                ShareSheet(items: [url])
             }
-            .onDisappear { generationTask?.cancel() }
-            // Both builders return nil on failure. Without this the spinner
-            // just stopped and no sheet appeared, which reads as the button
-            // being broken rather than the export failing.
-            .alert("Export Failed", isPresented: .init(
-                get: { exportError != nil },
-                set: { if !$0 { exportError = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(exportError ?? "")
-            }
+        }
+        // PDFs open in a preview first — check the report before handing
+        // it to anyone; sharing happens from the preview's toolbar.
+        .sheet(item: $previewItem) { item in
+            ReportPreviewSheet(url: item.url)
+        }
+        .onDisappear { generationTask?.cancel() }
+        // Both builders return nil on failure. Without this the spinner
+        // just stopped and no sheet appeared, which reads as the button
+        // being broken rather than the export failing.
+        .alert("Export Failed", isPresented: .init(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportError ?? "")
         }
     }
 

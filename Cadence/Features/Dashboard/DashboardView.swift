@@ -5,6 +5,7 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.notificationService) private var notificationService
     @Environment(\.healthKitService) private var healthKitService
+    @Environment(AppState.self) private var appState
     @Query private var logs: [DailyLog]
     @Query(sort: \WeeklyReview.weekStartDate, order: .reverse) private var reviews: [WeeklyReview]
     @Query(sort: \Medication.startDate, order: .reverse) private var medications: [Medication]
@@ -136,8 +137,7 @@ struct DashboardView: View {
             Button("Undo") {
                 QuickLogUndo.undo(record: record, in: modelContext)
                 refreshUndoOffer()
-                let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
-                DashboardViewModel.publishWidgetSummary(logs: logs, activeFlare: DashboardViewModel.activeFlare(in: modelContext))
+                let logs = DashboardViewModel.publishWidgetSummary(in: modelContext)
                 // Re-publish the day to Health: publish(log:) deletes and
                 // rewrites its samples per type, so the State of Mind entry the
                 // check-in wrote goes with it. A deleted log writes nothing.
@@ -272,13 +272,13 @@ struct DashboardView: View {
     }
 
     private func insightPreviewCard(_ insight: InsightCard) -> some View {
-        NavigationLink {
-            InsightsView()
+        Button {
+            appState.requestedTab = .insights
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "sparkles")
                     .font(.title2)
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(CadenceColor.energyOrange)
                 VStack(alignment: .leading, spacing: 4) {
                     // "Top Pattern", not "New Insight" — cards are ranked by
                     // confidence, and this one may be weeks old. Don't claim
@@ -339,7 +339,7 @@ struct DashboardView: View {
         value.map { String(format: "%.1f", $0) } ?? "—"
     }
 
-    private func statPill(label: String, value: String, color: Color, suffix: String = "/ 10") -> some View {
+    private func statPill(label: LocalizedStringKey, value: String, color: Color, suffix: LocalizedStringKey = "/ 10") -> some View {
         VStack(spacing: 6) {
             Text(label)
                 .font(.caption)
@@ -357,8 +357,9 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(CadenceColor.cardBG, in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label): \(value) \(suffix)")
+        // Combine, not ignore-and-rebuild: the label and suffix are
+        // LocalizedStringKeys, which can't be interpolated into a string.
+        .accessibilityElement(children: .combine)
     }
 
     // Gated purely on `logs.isEmpty`, so `vm.mascotPose` here is always

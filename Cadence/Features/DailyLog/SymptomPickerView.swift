@@ -67,6 +67,13 @@ struct SymptomPickerView: View {
                 Text(name)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(isSelected ? .white : .primary)
+                // The recorded severity is always visible once selected, so the
+                // default of 5 is never a silent value the person can't see.
+                if isSelected {
+                    Text("Severity: \(severity)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
@@ -83,6 +90,7 @@ struct SymptomPickerView: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(name)
+            .accessibilityValue(isSelected ? Text("Severity: \(severity)") : Text(verbatim: ""))
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
             .accessibilityHint(isSelected
                 ? Text("Double-tap and hold to adjust severity")
@@ -93,8 +101,6 @@ struct SymptomPickerView: View {
 
             if isSelected && expandedTag == name {
                 VStack(spacing: 4) {
-                    Text("Severity: \(severity)")
-                        .font(.caption.bold())
                     Slider(
                         value: Binding(
                             get: { Double(severity) },
@@ -130,7 +136,15 @@ struct SymptomPickerView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Add custom symptom")
         .sheet(isPresented: $showingAddSheet) {
-            AddSymptomSheet(onSave: { _, _ in showingAddSheet = false })
+            // The symptom was just created for today's log, so select it (and
+            // open its severity slider) instead of making the person find it.
+            AddSymptomSheet(onSave: { name, emoji in
+                showingAddSheet = false
+                if !selectedSymptoms.contains(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+                    selectedSymptoms.append(SymptomEntry(name: name, severity: 5, emoji: emoji))
+                    expandedTag = name
+                }
+            })
         }
     }
 
@@ -152,6 +166,9 @@ struct SymptomPickerView: View {
             if expandedTag == name { expandedTag = nil }
         } else {
             selectedSymptoms.append(SymptomEntry(name: name, severity: 5, emoji: emoji))
+            // Open the slider right away: severity shouldn't hinge on
+            // discovering the hold gesture (which still works as a toggle).
+            withAnimation(CadenceAnimation.spring) { expandedTag = name }
         }
     }
 
@@ -186,7 +203,7 @@ struct AddSymptomSheet: View {
                 if isDuplicate {
                     Text("A symptom named \"\(trimmedName)\" already exists.")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(CadenceColor.stressRed)
                 }
                 Section("Emoji") {
                     TextField("Emoji", text: $emoji)

@@ -15,12 +15,49 @@ struct InsightCard: Identifiable {
     var category: InsightCategory
 }
 
+// Qualitative reading of `InsightCard.confidence`. The 0–1 score is a
+// heuristic (effect size shrunk for sample size), not a probability, so showing
+// it as "62%" invites being read as one. Bands keep the ordering without the
+// false precision.
+enum InsightStrength {
+    case emerging, moderate, strong
+
+    init(confidence: Double) {
+        switch confidence {
+        case ..<0.4: self = .emerging
+        case ..<0.7: self = .moderate
+        default:     self = .strong
+        }
+    }
+
+    var label: LocalizedStringKey {
+        switch self {
+        case .emerging: return "Emerging"
+        case .moderate: return "Moderate"
+        case .strong:   return "Strong"
+        }
+    }
+
+    // English-only surfaces (PDF report copy).
+    var plainLabel: String {
+        switch self {
+        case .emerging: return "emerging"
+        case .moderate: return "moderate"
+        case .strong:   return "strong"
+        }
+    }
+}
+
 enum InsightCategory: String {
     case sleep   = "Sleep"
     case mood    = "Mood"
     case energy  = "Energy"
     case symptom = "Symptom"
     case stress  = "Stress"
+
+    // rawValue is persisted (InsightRecord.category) so it stays English; this
+    // is the display lookup.
+    var label: LocalizedStringKey { LocalizedStringKey(rawValue) }
 }
 
 @MainActor

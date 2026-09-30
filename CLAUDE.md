@@ -183,7 +183,8 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   handler.
 - **Symptom library:** `SymptomTag.optionalCatalog` (~34 entries) is the
   toggleable symptom list in Settings → Symptoms (`SymptomLibraryView`, free —
-  only free-text custom symptoms are Pro). A toggle inserts/deletes the
+  free-text custom symptoms are free too, since `929e390`; Pro is insights,
+  90-day trends and the PDF). A toggle inserts/deletes the
   `SymptomTag` row itself (name-deduped at save time), not an `isEnabled`
   flag, so the picker's `@Query` is untouched. Every catalog name must resolve
   via `HealthKitService.symptomTypeIdentifier` (unit-test-pinned) so enabled
@@ -398,6 +399,15 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   reference pattern to copy. Standard `Form`/`List`/`Button(label:)` rows get
   this for free and need nothing extra. Matters more than usual here since
   Cadence is a health app.
+
+## Navigation
+
+- **A view that is pushed must not wrap its own `NavigationStack`.** `SettingsView`
+  and `ExportView` are pushed from the Dashboard/Settings, so they have none; a
+  nested stack gives a second nav bar and broken back/title behavior. Tab roots
+  (`InsightsView`, etc.) and sheets do own one, which is why a tab root must
+  never be pushed — the Dashboard's Top Pattern card sets
+  `AppState.requestedTab = .insights` and `ContentView` switches the tab instead.
 
 ## iPad
 
