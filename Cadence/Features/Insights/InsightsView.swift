@@ -111,11 +111,10 @@ struct InsightsView: View {
 
     private var rangeSelector: some View {
         @Bindable var vm = vm
-        let availableRanges = InsightsViewModel.ChartRange.allCases.filter {
-            $0 != .ninetyDay || store.isPro
-        }
+        // 90D is always listed; choosing it without Pro bounces back and opens
+        // the paywall, so the longer view is visible rather than hidden.
         return Picker("Range", selection: $vm.chartRange) {
-            ForEach(availableRanges, id: \.self) { range in
+            ForEach(InsightsViewModel.ChartRange.allCases, id: \.self) { range in
                 Text(range.rawValue).tag(range)
                     .accessibilityLabel(range.voiceLabel)
             }
@@ -124,6 +123,12 @@ struct InsightsView: View {
         // Don't let the segmented control stretch across the whole
         // two-chart-wide iPad column.
         .frame(maxWidth: CadenceLayout.readableColumnWidth)
+        .onChange(of: vm.chartRange) { _, range in
+            if range == .ninetyDay && !store.isPro {
+                vm.chartRange = .thirtyDay
+                appState.showingProPaywall = true
+            }
+        }
         .onChange(of: store.isPro) { _, isPro in
             if !isPro && vm.chartRange == .ninetyDay {
                 vm.chartRange = .thirtyDay
@@ -233,10 +238,19 @@ struct InsightsView: View {
             Text("Pattern Insights")
                 .font(.headline)
             if vm.insights.isEmpty {
-                Text("Log at least \(PatternThreshold.minimumLogs) days to start seeing patterns.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .cadenceCard()
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Log at least \(PatternThreshold.minimumLogs) days to start seeing patterns.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    ProgressView(value: min(Double(insightLogs.count), Double(PatternThreshold.minimumLogs)),
+                                 total: Double(PatternThreshold.minimumLogs))
+                        .tint(CadenceColor.accent)
+                        .accessibilityHidden(true)
+                    Text("\(min(insightLogs.count, PatternThreshold.minimumLogs)) of \(PatternThreshold.minimumLogs) days logged")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .cadenceCard()
             } else {
                 LazyVGrid(columns: gridColumns, spacing: 12) {
                     ForEach(vm.insights) { insight in
@@ -255,9 +269,16 @@ struct InsightsView: View {
         VStack(spacing: 16) {
             Image(systemName: "sparkles")
                 .font(.system(size: 40))
-                .foregroundStyle(.yellow)
+                .foregroundStyle(CadenceColor.energyOrange)
             Text("Pattern Insights — Pro")
                 .font(.headline)
+            // Free users' logs are analysed too, so say what's waiting. Only
+            // the count is shown; the patterns themselves stay behind Pro.
+            if !vm.insights.isEmpty {
+                Text("Patterns found in your logs: \(vm.insights.count). Unlock Pro to see what they are.")
+                    .font(.subheadline.weight(.medium))
+                    .multilineTextAlignment(.center)
+            }
             Text("Unlock correlation detection, trend annotations, and the full 90-day view.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -288,27 +309,28 @@ struct CorrelationCardView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 4) {
-                    Text("Confidence")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                // Category and strength share a row under the copy, so a long
+                // title keeps the full card width instead of sharing it with
+                // a trailing pill.
+                HStack(spacing: 8) {
+                    Text(insight.category.label)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(insight.color.opacity(0.15), in: Capsule())
+                        .foregroundStyle(insight.color)
                     ProgressView(value: insight.confidence)
                         .tint(insight.color)
-                        .frame(width: 80)
-                    Text("\(Int(insight.confidence * 100))%")
-                        .font(.caption2.monospacedDigit())
+                        .frame(width: 56)
+                        .accessibilityHidden(true)
+                    Text(InsightStrength(confidence: insight.confidence).label)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
-
-            Spacer()
-            Text(insight.category.rawValue)
-                .font(.caption2.weight(.semibold))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(insight.color.opacity(0.15), in: Capsule())
-                .foregroundStyle(insight.color)
+            Spacer(minLength: 0)
         }
         .cadenceCard()
+        .accessibilityElement(children: .combine)
     }
 }

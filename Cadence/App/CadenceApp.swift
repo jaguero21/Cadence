@@ -415,6 +415,11 @@ struct ContentView: View {
         .adaptableTabBar()
         // iOS 26: the tab bar tucks away while scrolling charts/history.
         .minimizableTabBar()
+        .onChange(of: appState.requestedTab) { _, tab in
+            guard let tab else { return }
+            selectedTab = tab
+            appState.requestedTab = nil
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             let startOfToday = Calendar.current.startOfDay(for: .now)
