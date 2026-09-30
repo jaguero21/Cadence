@@ -51,36 +51,6 @@ struct MetricSlider: View {
     }
 }
 
-struct ScoreBadge: View {
-    let value: Int
-    let total: Int
-    let color: Color
-    // What the number measures; without it VoiceOver reads a bare "3".
-    var label: LocalizedStringKey? = nil
-
-    var body: some View {
-        badge
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(label ?? "")
-            .accessibilityValue(Text("\(value) of \(total)"))
-    }
-
-    private var badge: some View {
-        ZStack {
-            Circle()
-                .stroke(color.opacity(0.2), lineWidth: 4)
-            Circle()
-                .trim(from: 0, to: Double(value) / Double(total))
-                .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text("\(value)")
-                .font(.caption.bold())
-                .foregroundStyle(color)
-        }
-        .frame(width: 36, height: 36)
-    }
-}
-
 struct StreakBadge: View {
     let count: Int
 

@@ -28,7 +28,7 @@ private final class FakeNotificationService: NotificationServiceProtocol {
 
     func requestAuthorization() async -> Bool { true }
     func checkAuthorizationStatus() async -> Bool { true }
-    func scheduleDailyReminder(at hour: Int, minute: Int) {}
+    func scheduleDailyReminder(at hour: Int, minute: Int, skipToday: Bool) {}
     func scheduleWeeklyReviewReminder(weekday: Int, hour: Int) {}
     func scheduleStreakAtRisk() {}
     func sendInsightNotification(title: String) {}
@@ -83,6 +83,33 @@ struct DailyLogViewModelSaveTests {
         _ = vm.save(log: log, context: context, notifications: notifications)
 
         #expect(notifications.removedIDs.contains(NotificationID.streakRisk))
+    }
+
+    @Test("Completing today's log cancels today's check-in reminder")
+    func save_today_clearsDailyReminder() throws {
+        let context = try makeContext()
+        let vm = DailyLogViewModel()
+        let log = DailyLog()
+        context.insert(log)
+        let notifications = FakeNotificationService()
+
+        _ = vm.save(log: log, context: context, notifications: notifications)
+
+        #expect(notifications.removedIDs.contains(NotificationService.dailyReminderID(for: .now)))
+    }
+
+    @Test("Backfilling an earlier day leaves today's reminder alone")
+    func save_pastDay_keepsDailyReminder() throws {
+        let context = try makeContext()
+        let vm = DailyLogViewModel()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .now
+        let log = DailyLog(date: yesterday)
+        context.insert(log)
+        let notifications = FakeNotificationService()
+
+        _ = vm.save(log: log, context: context, notifications: notifications)
+
+        #expect(!notifications.removedIDs.contains(NotificationService.dailyReminderID(for: .now)))
     }
 
     @Test("Failed save reverts isComplete and reports an error")

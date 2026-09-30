@@ -187,6 +187,16 @@ enum HealthThreshold {
     static let hydrationLiters: Double = 1.5
 }
 
+enum ReminderThreshold {
+    // How many days ahead the daily check-in reminder is scheduled. Each day is
+    // its own one-shot request (so today's can be cancelled once the log is
+    // done — a repeating trigger can't skip one occurrence), topped back up on
+    // every foreground. Kept well under iOS's 64-pending-request cap, which
+    // medication reminders share. Someone who doesn't open the app for this
+    // long stops getting nudged, which is deliberate.
+    static let dailyWindowDays: Int = 14
+}
+
 enum StreakThreshold {
     // How far back DashboardViewModel.computeStreak(in:) looks before it
     // falls back to fetching the whole table. The streak has to be exact, so

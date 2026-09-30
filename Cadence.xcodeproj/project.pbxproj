@@ -22,7 +22,6 @@
 		25762D192FEDD6A000A132C8 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25762D182FEDD6A000A132C8 /* SwiftUI.framework */; };
 		25762D262FEDD6A100A132C8 /* CadenceWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 25762D152FEDD6A000A132C8 /* CadenceWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		25762D6F2FEDDF5400A132C8 /* CadenceWidget Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 25762D652FEDDF5200A132C8 /* CadenceWidget Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		2E030EDD7DE7E2C321D0B7DE /* DailyLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2C9315ED942B187FB6B889 /* DailyLogView.swift */; };
 		30D5FC0958DF5823D7D5A9D6 /* WeeklyReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F477B83B1C570CD91200BB18 /* WeeklyReview.swift */; };
 		3831F66F2CF40135C9718707 /* SymptomTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B648EA00AEBF0DFCC18871A /* SymptomTag.swift */; };
 		3A33703C608D9B41673CD755 /* MetricSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */; };
@@ -246,7 +245,6 @@
 		DCD1D6BAE9337E36C2D398B6 /* InsightsViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InsightsViewModel.swift; path = ./Cadence/Features/Insights/InsightsViewModel.swift; sourceTree = "<absolute>"; };
 		E5E9C09A264DBCDC2F0DFEFA /* MetricSlider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricSlider.swift; path = ./Cadence/Shared/Components/MetricSlider.swift; sourceTree = "<absolute>"; };
 		E7E30F7C88B6A00D34FE6223 /* PDFKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = PDFKit; path = System/Library/Frameworks/PDFKit.framework; sourceTree = SDKROOT; };
-		EA2C9315ED942B187FB6B889 /* DailyLogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DailyLogView.swift; path = ./Cadence/Features/DailyLog/DailyLogView.swift; sourceTree = "<absolute>"; };
 		EB8A65FA882473E559C0012B /* SwiftData */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftData; path = System/Library/Frameworks/SwiftData.framework; sourceTree = SDKROOT; };
 		F2D16D6D99B17D8C2E042D3F /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DashboardView.swift; path = ./Cadence/Features/Dashboard/DashboardView.swift; sourceTree = "<absolute>"; };
 		F477B83B1C570CD91200BB18 /* WeeklyReview.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WeeklyReview.swift; path = ./Cadence/Models/WeeklyReview.swift; sourceTree = "<absolute>"; };
@@ -410,7 +408,6 @@
 		6D98C919022194518FB6B180 /* DailyLog */ = {
 			isa = PBXGroup;
 			children = (
-				EA2C9315ED942B187FB6B889 /* DailyLogView.swift */,
 				1622C330943A74E15575A681 /* DailyLogViewModel.swift */,
 				AF1F493DB10A7FFE2F5A4863 /* LogInputFlow.swift */,
 				AABBCCDD000000000000010D /* VoiceNote.swift */,
@@ -828,7 +825,6 @@
 				20230AD97F5885D21E64CA05 /* View+Extensions.swift in Sources */,
 				F5A197BE0882ED0B9566160F /* DashboardView.swift in Sources */,
 				8002299E6F1762F96BCC2BCD /* DashboardViewModel.swift in Sources */,
-				2E030EDD7DE7E2C321D0B7DE /* DailyLogView.swift in Sources */,
 				46261271D23E287938897B70 /* DailyLogViewModel.swift in Sources */,
 				BB6405EE18F6B6D698226AB6 /* LogInputFlow.swift in Sources */,
 				AABBCCDD000000000000020D /* VoiceNote.swift in Sources */,
