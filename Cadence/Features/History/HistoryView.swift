@@ -31,6 +31,9 @@ struct HistoryView: View {
     @Query(sort: \DailyLog.date, order: .reverse) private var logs: [DailyLog]
     @State private var selectedMonth: Date = Calendar.current.startOfDay(for: .now)
     @State private var selectedLog: DailyLog?
+    // A past day with no log, tapped in the calendar: opens the log flow
+    // dated to that day, so a forgotten day can still be filled in.
+    @State private var backfillDay: BackfillDay?
     @Namespace private var detailZoom
     @State private var searchText = ""
     @State private var filter: HistoryFilter = .all
@@ -110,6 +113,9 @@ struct HistoryView: View {
             .sheet(item: $selectedLog) { log in
                 LogDetailView(log: log)
                     .zoomTransition(sourceID: Calendar.current.startOfDay(for: log.date), in: detailZoom)
+            }
+            .sheet(item: $backfillDay) { item in
+                LogInputFlow(existingLog: nil, day: item.date)
             }
         }
     }
@@ -235,7 +241,11 @@ struct HistoryView: View {
         let isFuture = day > Calendar.current.startOfDay(for: .now)
 
         return Button {
-            if let log { selectedLog = log }
+            if let log {
+                selectedLog = log
+            } else if !isFuture {
+                backfillDay = BackfillDay(date: day)
+            }
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
@@ -256,16 +266,24 @@ struct HistoryView: View {
         }
         .buttonStyle(.plain)
         .zoomTransitionSource(id: day, in: detailZoom)
-        .disabled(isFuture || log == nil)
+        .disabled(isFuture)
         .accessibilityLabel(dayCellLabel(day: day, log: log, isToday: isToday))
-        .accessibilityHint(log != nil && !isFuture ? Text("Double-tap to view details") : Text(verbatim: ""))
+        .accessibilityHint(isFuture ? Text(verbatim: "")
+                           : log != nil ? Text("Double-tap to view details")
+                           : Text("Double-tap to log this day"))
     }
 
+    // String(localized:) throughout: this reaches .accessibilityLabel as a
+    // plain String, so bare literals never reached the catalog. Mood is only
+    // read out when the person actually set one.
     private func dayCellLabel(day: Date, log: DailyLog?, isToday: Bool) -> String {
-        let dateText = isToday ? "Today" : day.formatted(.dateTime.weekday(.wide).month().day())
-        guard let log else { return "\(dateText), no log" }
-        let status = log.isComplete ? "complete" : "in progress"
-        return "\(dateText), logged \(status), mood \(log.mood) of 5"
+        let dateText = isToday ? String(localized: "Today") : day.formatted(.dateTime.weekday(.wide).month().day())
+        guard let log else { return String(localized: "\(dateText), no log") }
+        let status = log.isComplete
+            ? String(localized: "\(dateText), logged, complete")
+            : String(localized: "\(dateText), logged, in progress")
+        guard log.didEditMood else { return status }
+        return String(localized: "\(status), mood \(log.mood) of 5")
     }
 
     private func cellBackground(log: DailyLog?, isSelected: Bool, isToday: Bool) -> Color {
@@ -281,7 +299,7 @@ struct HistoryView: View {
     private func cellTextColor(log: DailyLog?, isSelected: Bool, isFuture: Bool) -> Color {
         if isSelected { return .white }
         if isFuture   { return Color(.quaternaryLabel) }
-        if log == nil { return .secondary }
+        if log == nil { return .secondary }   // still tappable: opens a backfill
         return .primary
     }
 
@@ -291,10 +309,17 @@ struct HistoryView: View {
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 Text(log.dateLabel).font(.headline)
-                HStack(spacing: 20) {
-                    metricPill("Mood", value: log.mood, color: CadenceColor.moodBlue)
-                    metricPill("Energy", value: log.energy, color: CadenceColor.energyOrange)
-                    metricPill("Sleep Q", value: log.sleepQuality, color: CadenceColor.sleepPurple)
+                // Only values the person entered; the rest are model defaults.
+                if log.didEditMood || log.didEditMetrics {
+                    HStack(spacing: 20) {
+                        if log.didEditMood {
+                            metricPill("Mood", value: log.mood, color: CadenceColor.moodBlue)
+                        }
+                        if log.didEditMetrics {
+                            metricPill("Energy", value: log.energy, color: CadenceColor.energyOrange)
+                            metricPill("Sleep quality", value: log.sleepQuality, color: CadenceColor.sleepPurple)
+                        }
+                    }
                 }
                 if !log.symptoms.isEmpty {
                     Text(log.symptoms.map { "\($0.emoji) \($0.name)" }.joined(separator: "  "))
@@ -310,7 +335,7 @@ struct HistoryView: View {
         .buttonStyle(.plain)
     }
 
-    private func metricPill(_ label: String, value: Int, color: Color) -> some View {
+    private func metricPill(_ label: LocalizedStringKey, value: Int, color: Color) -> some View {
         VStack(spacing: 2) {
             Text("\(value)").font(.headline).foregroundStyle(color)
             Text(label).font(.caption2).foregroundStyle(.secondary)
@@ -344,6 +369,7 @@ struct HistoryView: View {
 struct LogDetailView: View {
     let log: DailyLog
     @Environment(\.dismiss) private var dismiss
+    @State private var editing = false
     // Objective HealthKit values live in a separate local-only store since the
     // CloudKit split, so they can't be reached through `log`. Observed via
     // @Query rather than fetched imperatively in the body — a fetch during a
@@ -368,11 +394,32 @@ struct LogDetailView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Metrics") {
-                    metricRow("Mood", value: "\(log.mood)/5", icon: "face.smiling", color: CadenceColor.moodBlue)
-                    metricRow("Energy", value: "\(log.energy)/10", icon: "bolt.fill", color: CadenceColor.energyOrange)
-                    metricRow("Sleep Quality", value: "\(log.sleepQuality)/10", icon: "moon.fill", color: CadenceColor.sleepPurple)
-                    metricRow("Anxiety", value: "\(log.stressLevel)/10", icon: "brain.head.profile", color: CadenceColor.stressRed)
+                // Gated on the edit flags: a day where the person never touched
+                // these still holds DailyLog's defaults, which aren't readings.
+                if log.didEditMood || log.didEditMetrics {
+                    Section("Metrics") {
+                        if log.didEditMood {
+                            metricRow("Mood", value: "\(log.mood)/5", icon: "face.smiling", color: CadenceColor.moodBlue)
+                        }
+                        if log.didEditMetrics {
+                            metricRow("Energy", value: "\(log.energy)/10", icon: "bolt.fill", color: CadenceColor.energyOrange)
+                            metricRow("Sleep hours", value: String(format: "%.1f", log.sleepHours), icon: "bed.double.fill", color: CadenceColor.sleepPurple)
+                            metricRow("Sleep Quality", value: "\(log.sleepQuality)/10", icon: "moon.fill", color: CadenceColor.sleepPurple)
+                            metricRow("Pain / ache", value: "\(log.painLevel)/10", icon: "bandage", color: CadenceColor.stressRed)
+                            metricRow("Brain fog", value: "\(log.brainFogLevel)/10", icon: "cloud.fog", color: CadenceColor.moodBlue)
+                            metricRow("Anxiety", value: "\(log.stressLevel)/10", icon: "brain.head.profile", color: CadenceColor.stressRed)
+                        }
+                    }
+                }
+
+                if !log.basicsCompleted.isEmpty {
+                    Section("Basics Done Today") {
+                        ForEach(log.basicsCompleted, id: \.self) { basic in
+                            // Stored names are English identities; display
+                            // goes through the catalog (manual keys).
+                            Label(LocalizedStringKey(basic), systemImage: "checkmark.circle")
+                        }
+                    }
                 }
 
                 if !log.symptoms.isEmpty {
@@ -393,8 +440,22 @@ struct LogDetailView: View {
                 if !log.factors.isEmpty {
                     Section("Possible Triggers") {
                         ForEach(log.factors, id: \.self) { factor in
-                            Label(factor, systemImage: "exclamationmark.triangle")
+                            Label(LocalizedStringKey(factor), systemImage: "exclamationmark.triangle")
                         }
+                    }
+                }
+
+                // The daily reflections were written in the log flow but never
+                // shown anywhere in the app — only in the PDF and CSV.
+                if !log.peaksAndValleysNote.isEmpty {
+                    Section("Peaks and Valleys") {
+                        Text(log.peaksAndValleysNote)
+                    }
+                }
+
+                if !log.intentionsForTomorrow.isEmpty {
+                    Section("Intentions for Tomorrow") {
+                        Text(log.intentionsForTomorrow)
                     }
                 }
 
@@ -431,37 +492,37 @@ struct LogDetailView: View {
                             Label("\(steps) steps", systemImage: "figure.walk")
                         }
                         if let hrv = health.hkHRV {
-                            Label(String(format: "HRV: %.0f ms", hrv), systemImage: "waveform.path.ecg")
+                            Label("HRV: \(hrv, specifier: "%.0f") ms", systemImage: "waveform.path.ecg")
                         }
                         if let hr = health.hkRestingHR {
-                            Label(String(format: "Resting HR: %.0f bpm", hr), systemImage: "heart.fill")
+                            Label("Resting HR: \(hr, specifier: "%.0f") bpm", systemImage: "heart.fill")
                         }
                         if let sleep = health.hkSleepHours {
-                            Label(String(format: "Sleep (measured): %.1f hrs", sleep), systemImage: "moon.zzz.fill")
+                            Label("Sleep (measured): \(sleep, specifier: "%.1f") hrs", systemImage: "moon.zzz.fill")
                         }
                         if let energy = health.hkActiveEnergy {
-                            Label(String(format: "Active energy: %.0f kcal", energy), systemImage: "flame.fill")
+                            Label("Active energy: \(energy, specifier: "%.0f") kcal", systemImage: "flame.fill")
                         }
                         if let mindful = health.hkMindfulMinutes {
-                            Label(String(format: "Mindful minutes: %.0f min", mindful), systemImage: "brain.head.profile")
+                            Label("Mindful minutes: \(mindful, specifier: "%.0f") min", systemImage: "brain.head.profile")
                         }
                         if let temp = health.hkWristTemp {
-                            Label(String(format: "Wrist temp: %.1f °C", temp), systemImage: "thermometer.medium")
+                            Label("Wrist temp: \(temp, specifier: "%.1f") °C", systemImage: "thermometer.medium")
                         }
                         if let resp = health.hkRespiratoryRate {
-                            Label(String(format: "Respiratory rate: %.1f/min", resp), systemImage: "lungs.fill")
+                            Label("Respiratory rate: \(resp, specifier: "%.1f")/min", systemImage: "lungs.fill")
                         }
                         if let spo2 = health.hkBloodOxygen {
-                            Label(String(format: "Blood oxygen: %.0f%%", spo2), systemImage: "drop.circle")
+                            Label("Blood oxygen: \(spo2, specifier: "%.0f")%", systemImage: "drop.circle")
                         }
                         if let daylight = health.hkDaylightMinutes {
-                            Label(String(format: "Daylight: %.0f min", daylight), systemImage: "sun.max")
+                            Label("Daylight: \(daylight, specifier: "%.0f") min", systemImage: "sun.max")
                         }
                         if let daytimeHR = health.hkDaytimeHR {
-                            Label(String(format: "Daytime HR: %.0f bpm", daytimeHR), systemImage: "heart.circle")
+                            Label("Daytime HR: \(daytimeHR, specifier: "%.0f") bpm", systemImage: "heart.circle")
                         }
                         if let workout = health.hkWorkoutMinutes {
-                            Label(String(format: "Workouts: %.0f min", workout), systemImage: "figure.run")
+                            Label("Workouts: \(workout, specifier: "%.0f") min", systemImage: "figure.run")
                         }
                     }
                 }
@@ -472,11 +533,18 @@ struct LogDetailView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+                // Any day can be corrected after the fact, not just today.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Edit") { editing = true }
+                }
+            }
+            .sheet(isPresented: $editing) {
+                LogInputFlow(existingLog: log)
             }
         }
     }
 
-    private func metricRow(_ label: String, value: String, icon: String, color: Color) -> some View {
+    private func metricRow(_ label: LocalizedStringKey, value: String, icon: String, color: Color) -> some View {
         HStack {
             Label(label, systemImage: icon)
                 .foregroundStyle(color)
@@ -486,4 +554,10 @@ struct LogDetailView: View {
                 .foregroundStyle(.secondary)
         }
     }
+}
+
+// Identifiable wrapper so a bare Date can drive `.sheet(item:)`.
+private struct BackfillDay: Identifiable {
+    let date: Date
+    var id: Date { date }
 }

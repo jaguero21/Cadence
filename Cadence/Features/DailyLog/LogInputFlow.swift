@@ -14,6 +14,10 @@ struct LogInputFlow: View {
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
 
     private let existingLog: DailyLog?
+    // The day this flow writes to — today for the normal check-in, an earlier
+    // day when History opens it to fill in a missed day. Midnight-normalized.
+    private let day: Date
+    private var isToday: Bool { Calendar.current.isDateInToday(day) }
 
     // Plain defaults — hydrated from existingLog in .onAppear (see body).
     // Keeping @State init out of init() avoids the SwiftUI stale-state
@@ -55,8 +59,9 @@ struct LogInputFlow: View {
 
     private static let log = Logger(subsystem: "com.carpecadence", category: "LogInputFlow")
 
-    init(existingLog: DailyLog?) {
+    init(existingLog: DailyLog?, day: Date = .now) {
         self.existingLog = existingLog
+        self.day = Calendar.current.startOfDay(for: existingLog?.date ?? day)
     }
 
     var body: some View {
@@ -67,6 +72,9 @@ struct LogInputFlow: View {
                 }
                 ScrollView {
                     VStack(spacing: 20) {
+                        if !isToday && vm.currentStep != .done {
+                            pastDayBanner
+                        }
                         switch vm.currentStep {
                         case .mood:        moodStep
                         case .bodyMetrics: bodyMetricsStep
@@ -129,7 +137,9 @@ struct LogInputFlow: View {
                     peaksAndValleysNote     = log.peaksAndValleysNote
                     intentionsForTomorrow   = log.intentionsForTomorrow
                     freeNote         = log.freeNote
-                } else {
+                } else if isToday {
+                    // Health prefill reads TODAY's samples, so it only makes
+                    // sense for today's log; a backfilled day stays manual.
                     hkTask = Task { await applyHealthKitData() }
                 }
             }
@@ -170,6 +180,20 @@ struct LogInputFlow: View {
                 CadenceColor.background
             }
         }
+    }
+
+    // Editing or filling in an earlier day: say which, on every step, so it's
+    // never mistaken for today's check-in.
+    private var pastDayBanner: some View {
+        Label {
+            Text("Logging for \(day.formatted(.dateTime.weekday(.wide).month().day()))")
+        } icon: {
+            Image(systemName: "calendar")
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(CadenceColor.accent)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
     }
 
     // MARK: - Step Indicator
@@ -590,17 +614,17 @@ struct LogInputFlow: View {
         if let existing = existingLog { return existing }
         if let created = createdLog { return created }
         // existingLog was captured when the sheet opened; with no DB-level
-        // unique constraint (CloudKit), today's log may have been created since
-        // (watch quick-log, CloudKit import). Re-fetch at save time and adopt
-        // it rather than inserting a same-date duplicate.
-        let today = Calendar.current.startOfDay(for: .now)
-        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == today })
+        // unique constraint (CloudKit), this day's log may have been created
+        // since (watch quick-log, CloudKit import). Re-fetch at save time and
+        // adopt it rather than inserting a same-date duplicate.
+        let day = self.day
+        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == day })
         if let concurrent = try? modelContext.fetch(descriptor).first {
             createdLog = concurrent
             logPersisted = true   // already in the store — never rollback-delete it
             return concurrent
         }
-        let newLog = DailyLog()
+        let newLog = DailyLog(date: day)
         createdLog = newLog
         return newLog
     }

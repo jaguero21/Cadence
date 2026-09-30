@@ -1,12 +1,212 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Earlier days will show up here once you've logged them." : {
+    "%@, logged, complete" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los días anteriores aparecerán aquí cuando los hayas registrado."
+            "value" : "%@, registrado, completo"
+          }
+        }
+      }
+    },
+    "%@, logged, in progress" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, registrado, en curso"
+          }
+        }
+      }
+    },
+    "%@, mood %lld of 5" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, estado de ánimo %lld de 5"
+          }
+        }
+      }
+    },
+    "%@, no log" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, sin registro"
+          }
+        }
+      }
+    },
+    "Active energy: %.0f kcal" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Energía activa: %.0f kcal"
+          }
+        }
+      }
+    },
+    "Blood oxygen: %.0f%%" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oxígeno en sangre: %.0f%%"
+          }
+        }
+      }
+    },
+    "Daylight: %.0f min" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luz del día: %.0f min"
+          }
+        }
+      }
+    },
+    "Daytime HR: %.0f bpm" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FC diurna: %.0f lpm"
+          }
+        }
+      }
+    },
+    "Don't break your streak" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No rompas tu racha"
+          }
+        }
+      }
+    },
+    "Double-tap to log this day" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca dos veces para registrar este día"
+          }
+        }
+      }
+    },
+    "Edit" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar"
+          }
+        }
+      }
+    },
+    "HRV: %.0f ms" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VFC: %.0f ms"
+          }
+        }
+      }
+    },
+    "Intentions for Tomorrow" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intenciones para mañana"
+          }
+        }
+      }
+    },
+    "Logging for %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrando para el %@"
+          }
+        }
+      }
+    },
+    "Medication reminder" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordatorio de medicación"
+          }
+        }
+      }
+    },
+    "Mindful minutes: %.0f min" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minutos de atención plena: %.0f min"
+          }
+        }
+      }
+    },
+    "New insight ready" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuevo patrón disponible"
+          }
+        }
+      }
+    },
+    "Peaks and Valleys" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altibajos"
+          }
+        }
+      }
+    },
+    "Respiratory rate: %.1f/min" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frecuencia respiratoria: %.1f/min"
+          }
+        }
+      }
+    },
+    "Resting HR: %.0f bpm" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FC en reposo: %.0f lpm"
+          }
+        }
+      }
+    },
+    "Sleep (measured): %.1f hrs" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sueño (medido): %.1f h"
           }
         }
       }
@@ -17,6 +217,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Calidad del sueño"
+          }
+        }
+      }
+    },
+    "Take 5 minutes to reflect and set intentions." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tómate 5 minutos para reflexionar y fijar intenciones."
+          }
+        }
+      }
+    },
+    "Time for %@." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es hora de %@."
+          }
+        }
+      }
+    },
+    "Time to check in" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hora de tu registro"
+          }
+        }
+      }
+    },
+    "Workouts: %.0f min" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrenamientos: %.0f min"
+          }
+        }
+      }
+    },
+    "Wrist temp: %.1f °C" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temp. de muñeca: %.1f °C"
+          }
+        }
+      }
+    },
+    "You haven't logged today yet — it only takes a minute." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no has registrado hoy; solo lleva un minuto."
+          }
+        }
+      }
+    },
+    "Your daily log takes under 90 seconds." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu registro diario lleva menos de 90 segundos."
+          }
+        }
+      }
+    },
+    "Your week is ready for review" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu semana está lista para revisar"
           }
         }
       }
@@ -352,18 +632,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "• activo"
-          }
-        }
-      }
-    },
-    "~90 sec" : {
-      "comment" : "A description of how long it takes to fill out a daily log.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "~90 s"
           }
         }
       }
@@ -1191,18 +1459,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hora del registro diario"
-          }
-        }
-      }
-    },
-    "Daily Log" : {
-      "comment" : "A title for a view that displays a user's daily log.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registro diario"
           }
         }
       }
@@ -3063,18 +3319,6 @@
         }
       }
     },
-    "Recent" : {
-      "comment" : "A label displayed above a list of the user's most recent logs.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recientes"
-          }
-        }
-      }
-    },
     "Record a flare when symptoms worsen for several days so you can track how often they happen and how long they last." : {
       "comment" : "A description of the purpose of the flare feature.",
       "isCommentAutoGenerated" : true,
@@ -4063,18 +4307,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Empezar la revisión de esta semana"
-          }
-        }
-      }
-    },
-    "Start today's log" : {
-      "comment" : "A button label that starts a new log.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Empezar el registro de hoy"
           }
         }
       }

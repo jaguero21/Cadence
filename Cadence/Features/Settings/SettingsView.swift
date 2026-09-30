@@ -197,7 +197,9 @@ struct SettingsView: View {
                     set: {
                         dailyHour = Calendar.current.component(.hour, from: $0)
                         dailyMinute = Calendar.current.component(.minute, from: $0)
-                        notificationService.scheduleDailyReminder(at: dailyHour, minute: dailyMinute)
+                        notificationService.scheduleDailyReminder(
+                            at: dailyHour, minute: dailyMinute,
+                            skipToday: DailyLog.hasCompletedLog(on: .now, in: modelContext))
                     }
                 ),
                 displayedComponents: .hourAndMinute

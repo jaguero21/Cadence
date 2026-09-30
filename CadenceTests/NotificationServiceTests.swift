@@ -160,3 +160,48 @@ struct MedicationReminderTests {
         await NotificationService.shared.syncMedicationReminders([])   // idempotent sweep
     }
 }
+
+// MARK: - Daily reminder window
+
+@Suite("NotificationService – daily reminder window")
+struct DailyReminderWindowTests {
+    private var calendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/Chicago") ?? .current
+        return cal
+    }
+
+    private func date(_ y: Int, _ m: Int, _ d: Int, _ h: Int = 0, _ min: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min)) ?? .distantPast
+    }
+
+    @Test("Before today's time, the window starts today")
+    func includesTodayWhenAhead() {
+        let dates = NotificationService.dailyReminderDates(from: date(2026, 9, 30, 9), hour: 20, minute: 0,
+                                                           count: 3, skipToday: false, calendar: calendar)
+        #expect(dates == [date(2026, 9, 30, 20), date(2026, 10, 1, 20), date(2026, 10, 2, 20)])
+    }
+
+    @Test("A logged day leaves today out")
+    func skipsTodayWhenLogged() {
+        let dates = NotificationService.dailyReminderDates(from: date(2026, 9, 30, 9), hour: 20, minute: 0,
+                                                           count: 3, skipToday: true, calendar: calendar)
+        #expect(dates == [date(2026, 10, 1, 20), date(2026, 10, 2, 20)])
+    }
+
+    @Test("Past today's time, today is left out rather than firing tomorrow twice")
+    func skipsTodayWhenTimePassed() {
+        let dates = NotificationService.dailyReminderDates(from: date(2026, 9, 30, 21), hour: 20, minute: 0,
+                                                           count: 2, skipToday: false, calendar: calendar)
+        #expect(dates == [date(2026, 10, 1, 20)])
+    }
+
+    @Test("IDs are keyed by calendar day, whatever the time")
+    func idIsPerDay() {
+        let morning = NotificationService.dailyReminderID(for: date(2026, 3, 7, 1), calendar: calendar)
+        let evening = NotificationService.dailyReminderID(for: date(2026, 3, 7, 23), calendar: calendar)
+        #expect(morning == evening)
+        #expect(morning == "\(NotificationID.dailyLog)-2026-03-07")
+        #expect(morning != NotificationService.dailyReminderID(for: date(2026, 3, 8, 1), calendar: calendar))
+    }
+}

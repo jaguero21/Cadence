@@ -46,7 +46,7 @@ protocol NotificationServiceProtocol: AnyObject {
     @discardableResult
     func requestAuthorization() async -> Bool
     func checkAuthorizationStatus() async -> Bool
-    func scheduleDailyReminder(at hour: Int, minute: Int)
+    func scheduleDailyReminder(at hour: Int, minute: Int, skipToday: Bool)
     func scheduleWeeklyReviewReminder(weekday: Int, hour: Int)
     func scheduleStreakAtRisk()
     func sendInsightNotification(title: String)
@@ -59,6 +59,12 @@ protocol NotificationServiceProtocol: AnyObject {
 // requirements can't carry defaults, so we expose a no-arg overload that
 // dispatches to the requirement with sensible defaults (Sunday at 7 pm).
 extension NotificationServiceProtocol {
+    // For callers that know today isn't logged yet (onboarding) or don't
+    // care; everything that can check passes skipToday explicitly.
+    func scheduleDailyReminder(at hour: Int, minute: Int) {
+        scheduleDailyReminder(at: hour, minute: minute, skipToday: false)
+    }
+
     func scheduleWeeklyReviewReminder() {
         scheduleWeeklyReviewReminder(weekday: 1, hour: 19)
     }

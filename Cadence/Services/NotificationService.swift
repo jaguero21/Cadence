@@ -1,6 +1,7 @@
 import UserNotifications
 
 enum NotificationID {
+    // Legacy repeating id, and the prefix of the per-day ids that replaced it.
     static let dailyLog     = "daily-log"
     static let weeklyReview = "weekly-review"
     static let streakRisk   = "streak-risk"
@@ -29,21 +30,66 @@ final class NotificationService: NotificationServiceProtocol {
         return settings.authorizationStatus == .authorized
     }
 
-    func scheduleDailyReminder(at hour: Int, minute: Int) {
+    // One non-repeating request per day for the next
+    // ReminderThreshold.dailyWindowDays days, instead of a single repeating
+    // trigger: a repeating trigger can't skip one occurrence, so it nagged
+    // people who had already logged. Completing today's log removes today's
+    // request (DailyLogViewModel.save); every foreground re-runs this to top
+    // the window back up. `skipToday` leaves today out when it's already done.
+    func scheduleDailyReminder(at hour: Int, minute: Int, skipToday: Bool) {
         guard (0...23).contains(hour), (0...59).contains(minute) else { return }
-        removeNotification(id: NotificationID.dailyLog)
-        var components = DateComponents()
-        components.hour = hour
-        components.minute = minute
+        let calendar = Calendar.current
+        let now = Date.now
 
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
-        let content = UNMutableNotificationContent()
-        content.title = "Time to check in"
-        content.body = "Your daily log takes under 90 seconds."
-        content.sound = .default
+        // Deterministic sweep, no async lookup needed: the legacy repeating
+        // request, plus every per-day id this or an earlier pass could have
+        // scheduled that hasn't fired yet (earlier passes started earlier, so
+        // their windows end no later than this one's).
+        let sweepDays = (-1...ReminderThreshold.dailyWindowDays).compactMap {
+            calendar.date(byAdding: .day, value: $0, to: now)
+        }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: [NotificationID.dailyLog] + sweepDays.map { Self.dailyReminderID(for: $0, calendar: calendar) }
+        )
 
-        let request = UNNotificationRequest(identifier: NotificationID.dailyLog, content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request)
+        let title = String(localized: "Time to check in")
+        let body = String(localized: "Your daily log takes under 90 seconds.")
+        for fireDate in Self.dailyReminderDates(from: now, hour: hour, minute: minute,
+                                                count: ReminderThreshold.dailyWindowDays,
+                                                skipToday: skipToday, calendar: calendar) {
+            let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            let request = UNNotificationRequest(
+                identifier: Self.dailyReminderID(for: fireDate, calendar: calendar),
+                content: content,
+                trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            )
+            UNUserNotificationCenter.current().add(request)
+        }
+    }
+
+    // Pure and unit-tested. The fire times for the window: `count` days
+    // starting today, minus today when it's skipped or its time has passed.
+    nonisolated static func dailyReminderDates(from now: Date, hour: Int, minute: Int, count: Int,
+                                               skipToday: Bool, calendar: Calendar = .current) -> [Date] {
+        let today = calendar.startOfDay(for: now)
+        return (0..<count).compactMap { offset -> Date? in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: today),
+                  let fire = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)
+            else { return nil }
+            if offset == 0 && (skipToday || fire <= now) { return nil }
+            return fire
+        }
+    }
+
+    // Pure and unit-tested. Keyed by calendar day, so the request for a given
+    // day can be found (and cancelled) without looking anything up.
+    nonisolated static func dailyReminderID(for date: Date, calendar: Calendar = .current) -> String {
+        let c = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%@-%04d-%02d-%02d", NotificationID.dailyLog, c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
     func scheduleWeeklyReviewReminder(weekday: Int = 1, hour: Int = 19) {
@@ -55,8 +101,8 @@ final class NotificationService: NotificationServiceProtocol {
 
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
         let content = UNMutableNotificationContent()
-        content.title = "Your week is ready for review"
-        content.body = "Take 5 minutes to reflect and set intentions."
+        content.title = String(localized: "Your week is ready for review")
+        content.body = String(localized: "Take 5 minutes to reflect and set intentions.")
         content.sound = .default
 
         let request = UNNotificationRequest(identifier: NotificationID.weeklyReview, content: content, trigger: trigger)
@@ -82,8 +128,8 @@ final class NotificationService: NotificationServiceProtocol {
         // session if the streak is still active and today's log is still incomplete.
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         let content = UNMutableNotificationContent()
-        content.title = "Don't break your streak"
-        content.body = "You haven't logged today yet — it only takes a minute."
+        content.title = String(localized: "Don't break your streak")
+        content.body = String(localized: "You haven't logged today yet — it only takes a minute.")
         content.sound = .default
 
         let request = UNNotificationRequest(identifier: NotificationID.streakRisk, content: content, trigger: trigger)
@@ -92,7 +138,7 @@ final class NotificationService: NotificationServiceProtocol {
 
     func sendInsightNotification(title: String) {
         let content = UNMutableNotificationContent()
-        content.title = "New insight ready"
+        content.title = String(localized: "New insight ready")
         content.body = title
         content.sound = .default
 
@@ -120,8 +166,8 @@ final class NotificationService: NotificationServiceProtocol {
                 components.minute = minute % 60
                 let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
                 let content = UNMutableNotificationContent()
-                content.title = "Medication reminder"
-                content.body = "Time for \(med.displayLabel)."
+                content.title = String(localized: "Medication reminder")
+                content.body = String(localized: "Time for \(med.displayLabel).")
                 content.sound = .default
                 let request = UNNotificationRequest(
                     identifier: Self.medicationReminderID(name: med.name, minute: minute),

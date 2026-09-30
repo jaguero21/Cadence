@@ -32,6 +32,16 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   exists. `medicationReminderID(name:minute:)` and the
   `Medication.minuteOfDay`/`timeToday` picker conversions are pure and
   unit-tested; reminders round-trip through `BackupService`.
+- **Daily check-in reminder** is a rolling window of **one-shot, per-day
+  requests** (`ReminderThreshold.dailyWindowDays`, ids from the pure
+  `NotificationService.dailyReminderID(for:)`), not one repeating trigger — a
+  repeating trigger can't skip a single occurrence, so it reminded people who
+  had already logged. Completing today's log removes today's request
+  (`DailyLogViewModel.save`); `scheduleDailyReminder(at:minute:skipToday:)`
+  sweeps the legacy `daily-log` id plus the window deterministically and
+  re-adds it, and `ContentView` re-arms it on every foreground (a lapsed user
+  stops being nudged once the window runs out — deliberate). Pass
+  `skipToday: DailyLog.hasCompletedLog(on:in:)` wherever a context is at hand.
 - **Custom trackers:** `CustomTracker` (`@Attribute(.unique) id: UUID`, name,
   min/max, unit) defines user metrics; per-day values live on
   `DailyLog.customMetrics: [MetricEntry]` keyed by the tracker's stable `id` (so
@@ -229,7 +239,7 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   in a new detector. The framing is awareness, not diagnosis: the Insights tab
   and the doctor PDF both carry a "not medical advice" disclaimer next to the
   pattern cards.
-- **Date-windowed views** (`DashboardView`, `DailyLogView`, `WeeklyReviewView`,
+- **Date-windowed views** (`DashboardView`, `WeeklyReviewView`,
   `InsightsView`) take a `referenceDate` and derive their `@Query` cutoff from
   it. `ContentView` passes `today` (refreshed on `scenePhase == .active`) so a
   midnight rollover re-inits the child with a new window — updating the `@Query`
@@ -238,7 +248,7 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   shape for **any** new date-scoped `@Query` over `DailyLog`/`WeeklyReview`: a
   `referenceDate: Date = .now` init param binding `_logs = Query(filter:
   #Predicate<DailyLog> { $0.date >= cutoff }, ...)` in `init` — see
-  `DashboardView` (90d), `DailyLogView` (30d), `WeeklyReviewView` (14d),
+  `DashboardView` (90d), `WeeklyReviewView` (14d),
   `InsightsView` (180d). Unbounded `@Query` is only for small reference
   tables (`SymptomTag`, `CustomTracker`, `Medication`, `Flare`) or
   DEBUG-only tooling, not log/review data. **`HealthSnapshot` counts as
@@ -599,6 +609,17 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   static `HistoryView.logMatches(...)` (unit-tested) — keep filtering logic there,
   not inline, so it stays testable. `LogDetailView` shows metrics, symptoms,
   factors, notes, and HealthKit data.
+- **There is no separate Log tab** (it duplicated the Today card and History
+  and was removed). Today's log opens from the dashboard; every other day
+  goes through History: tapping a past day **without** a log opens
+  `LogInputFlow(existingLog: nil, day:)` to fill it in, and `LogDetailView`'s
+  Edit reopens any existing day. `LogInputFlow` writes to its `day`
+  (`ensureLog` re-fetches and creates by that date) and runs the HealthKit
+  prefill only when `day` is today, since the prefill reads today's samples.
+- `LogDetailView` shows only values the person entered: the metric rows gate
+  on `didEditMood`/`didEditMetrics` (same as `PatternEngine`, the trend charts
+  and the dashboard averages), because an untouched field still holds
+  `DailyLog`'s defaults. It also shows the Basics and both daily reflections.
 
 ## Export
 
@@ -825,8 +846,9 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   the built `.app`.
 - **Known English-only surfaces** (plain `String` literals that never reach
   the catalog, each a deliberate follow-up, not an accident): `PDFBuilder`
-  report copy, `PatternEngine` insight titles/details, `NotificationService`
-  notification bodies, and the widget/watch targets (which would need their
+  report copy, `PatternEngine` insight titles/details (which also means the
+  new-insight notification's BODY, though its title is localized), and the
+  widget/watch targets (which would need their
   own `Localizable.xcstrings` in their synchronized folders).
 
 ## Testing
