@@ -3,7 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cadence — Daily Symptom Tracking for iOS</title>
+  <title>Cadence — Symptom, Mood &amp; Sleep Tracker for iPhone</title>
+  <meta name="description" content="Track symptoms, mood, energy and sleep in about 2 minutes a day. Cadence finds patterns on your iPhone and turns them into a doctor-ready report. No account, no ads." />
+  <link rel="icon" href="./app_icon.png" />
+  <link rel="apple-touch-icon" href="./app_icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Cadence — Symptom, Mood &amp; Sleep Tracker" />
+  <meta property="og:description" content="A 2-minute daily check-in that finds patterns in how you feel — private, on-device, and ready for your next appointment." />
+  <meta property="og:image" content="https://jaguero21.github.io/Cadence/app_icon.png" />
+  <meta property="og:url" content="https://jaguero21.github.io/Cadence/" />
+  <meta name="twitter:card" content="summary" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -314,7 +323,7 @@
       <div class="step-card">
         <div class="step-num">Step 4</div>
         <div class="step-title">Bring it to your next appointment</div>
-        <div class="step-desc">Export a doctor-ready PDF or a spreadsheet, scoped to any date range.</div>
+        <div class="step-desc">Export a doctor-ready PDF (Pro) or a free spreadsheet — for any date range, or everything since your last appointment.</div>
       </div>
     </div>
   </section>
@@ -325,16 +334,20 @@
     <p>Cadence's core tracking is free — no trial, no time limit.</p>
     <ul>
       <li><strong>Daily Log</strong> — mood, energy, sleep, pain, symptoms, and contextual factors in about 2 minutes</li>
-      <li><strong>Weekly Review</strong> — guided reflection prompts and Intentions for Tomorrow</li>
+      <li><strong>Missed a day?</strong> — fill it in from History, or edit any past day</li>
+      <li><strong>Smart Reminders</strong> — a daily nudge at the time you choose that skips days you've already logged</li>
+      <li><strong>Weekly Review</strong> — guided reflection prompts and Intentions for Tomorrow, plus an on-device Apple Intelligence summary of your week (iOS 26+)</li>
       <li><strong>Custom Trackers</strong> — track any metric that matters to you, beyond the built-in set</li>
       <li><strong>Flares</strong> — multi-day symptom episode tracking with early-warning precursor detection</li>
       <li><strong>Medications</strong> — course tracking, symptom-effect correlation, and reminder notifications</li>
       <li><strong>HealthKit Sync</strong> — two-way sync for symptoms and mood, always optional</li>
+      <li><strong>Spreadsheet Export</strong> — all your entries as a CSV, any date range</li>
       <li><strong>iCloud Sync &amp; Backup</strong> — CloudKit sync plus a JSON backup/restore that merges, never overwrites</li>
       <li><strong>Widgets</strong> — Home Screen, Lock Screen, StandBy, and a Control Center check-in button</li>
       <li><strong>Apple Watch</strong> — wrist quick-log for mood and energy</li>
       <li><strong>Siri Shortcuts</strong> — log a check-in hands-free</li>
       <li><strong>Symptom Library</strong> — toggle from ~34 built-in symptoms to match what you're tracking, or add your own</li>
+      <li><strong>English &amp; Spanish</strong> — the whole app, in either language</li>
     </ul>
   </section>
 
@@ -354,7 +367,7 @@
         <div class="feature-icon">📄</div>
         <div>
           <div class="feature-title">PDF Export</div>
-          <div class="feature-desc">Doctor-ready and personal reports, previewed before you share them.</div>
+          <div class="feature-desc">A doctor-ready report with trends, averages, symptoms, medications and flares — clinical sections first, personal notes only if you include them. Previewed before you share.</div>
         </div>
       </div>
       <div class="feature-card">
@@ -362,6 +375,13 @@
         <div>
           <div class="feature-title">90-Day Trends</div>
           <div class="feature-desc">Full trend history across every metric you track, not just 30 days.</div>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔔</div>
+        <div>
+          <div class="feature-title">Pattern Alerts</div>
+          <div class="feature-desc">A notification when a new pattern shows up in your logs, plus a history of every one.</div>
         </div>
       </div>
     </div>
@@ -375,7 +395,8 @@
     <h2><span class="icon">🔒</span> Privacy &amp; Security</h2>
     <ul>
       <li><strong>No servers, period</strong> — Cadence has no backend of any kind. Purchases are verified on-device by Apple's StoreKit; there's no server to send a receipt to.</li>
-      <li><strong>HealthKit stays optional</strong> — reads and writes are always supplementary. No feature is ever gated on Health access, and nothing you type is overwritten by HealthKit data.</li>
+      <li><strong>HealthKit stays optional — and local</strong> — no feature is ever gated on Health access, nothing you type is overwritten, and values read from Health stay on your iPhone, never synced to iCloud.</li>
+      <li><strong>No account, no ads, no analytics</strong> — there's nothing to sign up for and nothing tracking you.</li>
       <li><strong>On-device pattern engine</strong> — insights are deterministic correlation detection that runs entirely on your phone. No ML, no cloud processing, no black box.</li>
       <li><strong>Your data, your iCloud</strong> — sync goes through your own private iCloud account. We never see it.</li>
     </ul>
