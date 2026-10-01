@@ -75,10 +75,32 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - Steps
 
     private func finishOnboarding() {
+        sleep(1); snap("00-onboarding-1-welcome")
         tap(app.buttons["Get Started"])
+        sleep(1); snap("00-onboarding-2-symptoms")
+        tap(app.buttons["Continue"])
+        sleep(1); snap("00-onboarding-3-reminders")
         tap(app.buttons["Skip"])
+        sleep(1); snap("00-onboarding-4-health")
         tap(app.buttons["Skip"])
-        tap(app.buttons["Open Cadence"])
+        sleep(1); snap("00-onboarding-5-ready")
+        tap(app.buttons["Explore first"])
+    }
+
+    // Onboarding at the largest accessibility text size — where a fixed,
+    // non-scrolling page layout runs out of room first.
+    @MainActor
+    func testCaptureOnboardingLargeText() throws {
+        app.terminate()
+        app.launchArguments = ["--uitest", "-AppleInterfaceStyle", "Light",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        sleep(1); snap("00-ax-onboarding-1-welcome")
+        let start = app.buttons["Get Started"]
+        if start.waitForExistence(timeout: 10), start.isHittable {
+            start.tap()
+            sleep(1); snap("00-ax-onboarding-2-symptoms")
+        }
     }
 
     private func seedSampleData() {

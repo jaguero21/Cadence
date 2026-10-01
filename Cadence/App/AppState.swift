@@ -11,6 +11,9 @@ final class AppState {
     // Top Pattern card); ContentView consumes it. Avoids pushing a tab's root
     // view, which carries its own NavigationStack, into another stack.
     var requestedTab: Tab?
+    // Set by onboarding's "Log how today feels": ContentView opens today's
+    // log as soon as it appears, so the first entry is one tap away.
+    var pendingFirstLog = false
 
     init() {
         // UI tests always start at onboarding and never persist the flag.
