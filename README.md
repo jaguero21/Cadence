@@ -100,9 +100,7 @@ CadenceUITests/               UI smoke test and opt-in App Store screenshot capt
 docs/                         The GitHub Pages website
 ```
 
-See [CLAUDE.md](CLAUDE.md) for the full architecture writeup: data flow, the
-app↔widget↔watch bridges, the CloudKit constraints, and the conventions and
-hard-won lessons behind each of the above.
+
 
 ## Requirements
 
