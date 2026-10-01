@@ -19,7 +19,7 @@ enum CSVBuilder {
     // the HealthKit columns, in the caller's tracker order; a day without an
     // entry for that tracker gets an empty cell.
     static func csvString(from logs: [DailyLogSnapshot], trackers: [CustomTrackerSnapshot] = []) -> String {
-        let headerLine = ([header] + trackers.map { escape(trackerColumnName($0)) }).joined(separator: ",")
+        let headerLine = ([header] + trackers.map { escape(neutralizeFormula(trackerColumnName($0))) }).joined(separator: ",")
         var rows = [headerLine]
         for log in logs.sorted(by: { $0.date < $1.date }) {
             // Unentered values are empty cells, the same convention as a
@@ -36,14 +36,17 @@ enum CSVBuilder {
                 m ? "\(log.brainFogLevel)" : "",
                 m ? "\(log.stressLevel)" : "",
             ]
+            // Free text goes through neutralizeFormula: this file is often
+            // opened in Excel by someone else (a clinician), and a note that
+            // starts with "=" would otherwise run as a formula there.
             fields += [
-                log.symptoms.map(\.name).joined(separator: "; "),
-                log.basicsCompleted.joined(separator: "; "),
-                log.factors.joined(separator: "; "),
-                log.peaksAndValleysNote,
+                neutralizeFormula(log.symptoms.map(\.name).joined(separator: "; ")),
+                neutralizeFormula(log.basicsCompleted.joined(separator: "; ")),
+                neutralizeFormula(log.factors.joined(separator: "; ")),
+                neutralizeFormula(log.peaksAndValleysNote),
                 log.hasPeaksAndValleysVoiceMemo ? "Yes" : "No",
-                log.intentionsForTomorrow,
-                log.freeNote,
+                neutralizeFormula(log.intentionsForTomorrow),
+                neutralizeFormula(log.freeNote),
             ]
             // Appended one at a time with an explicit helper — a combined array
             // literal of optional-map + format expressions blows the compiler's
@@ -69,12 +72,16 @@ enum CSVBuilder {
         return rows.joined(separator: "\n")
     }
 
-    static func build(logs: [DailyLogSnapshot], trackers: [CustomTrackerSnapshot] = []) -> URL? {
-        let url = ExportScratch.url(for: "cadence-export-\(UUID().uuidString).csv")
+    static func build(logs: [DailyLogSnapshot], trackers: [CustomTrackerSnapshot] = [], range: ClosedRange<Date>? = nil) -> URL? {
+        let url = ExportScratch.uniqueURL(named: PDFBuilder.fileName(range: range ?? PDFBuilder.logSpan(logs),
+                                                                     prefix: "Cadence Data", ext: "csv"))
         do {
             // Written as Data so the file gets ExportScratch's protection
             // options; String.write(to:atomically:) offers no equivalent.
-            guard let data = csvString(from: logs, trackers: trackers).data(using: .utf8) else { return nil }
+            // The UTF-8 byte-order mark is what makes Excel read the file as
+            // UTF-8; without it "Sueño" or an emoji in a note came out garbled.
+            // Numbers and Google Sheets ignore it.
+            guard let data = (byteOrderMark + csvString(from: logs, trackers: trackers)).data(using: .utf8) else { return nil }
             try ExportScratch.write(data, to: url)
             return url
         } catch {
@@ -94,6 +101,17 @@ enum CSVBuilder {
     }
 
     // Quote fields containing a comma, quote, or newline; double embedded quotes.
+    static let byteOrderMark = "\u{FEFF}"
+
+    // Spreadsheet apps evaluate a cell starting with = + - @ (or a tab/CR)
+    // as a formula. A leading apostrophe makes it plain text and is hidden by
+    // Excel. Only applied to free text — numeric cells stay numeric.
+    // Pure and unit-tested.
+    nonisolated static func neutralizeFormula(_ field: String) -> String {
+        guard let first = field.first, "=+-@\t\r".contains(first) else { return field }
+        return "'" + field
+    }
+
     private static func escape(_ field: String) -> String {
         guard field.contains(",") || field.contains("\"") || field.contains("\n") else { return field }
         return "\"" + field.replacingOccurrences(of: "\"", with: "\"\"") + "\""

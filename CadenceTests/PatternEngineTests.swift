@@ -1542,3 +1542,51 @@ struct MenopauseEffectsTests {
         #expect(PatternEngine.menopauseEffects(transitions: [], logs: []).isEmpty)
     }
 }
+
+// MARK: - StoreService trial wording
+
+import StoreKit
+
+@Suite("StoreService – trial length wording")
+struct TrialLengthTests {
+    private let en = Locale(identifier: "en_US")
+
+    @Test("Formats the common trial lengths in full words")
+    func formatsLengths() {
+        #expect(StoreService.trialLength(value: 1, unit: .month, locale: en) == "1 month")
+        #expect(StoreService.trialLength(value: 7, unit: .day, locale: en) == "7 days")
+        #expect(StoreService.trialLength(value: 2, unit: .week, locale: en) == "2 weeks")
+        #expect(StoreService.trialLength(value: 1, unit: .year, locale: en) == "1 year")
+    }
+}
+
+// MARK: - CSV safety
+
+@Suite("CSVBuilder – spreadsheet safety")
+struct CSVSafetyTests {
+    @Test("Free text that would run as a formula is neutralized; plain text is untouched")
+    func neutralizesFormulas() {
+        #expect(CSVBuilder.neutralizeFormula("=HYPERLINK(\"x\")") == "'=HYPERLINK(\"x\")")
+        #expect(CSVBuilder.neutralizeFormula("+1 hour sleep") == "'+1 hour sleep")
+        #expect(CSVBuilder.neutralizeFormula("-tired") == "'-tired")
+        #expect(CSVBuilder.neutralizeFormula("@mention") == "'@mention")
+        #expect(CSVBuilder.neutralizeFormula("Felt fine") == "Felt fine")
+        #expect(CSVBuilder.neutralizeFormula("") == "")
+    }
+
+    @Test("A note starting with = lands in the CSV as text")
+    func noteFormulaInRow() {
+        let log = DailyLog(date: .now)
+        log.freeNote = "=1+1"
+        let csv = CSVBuilder.csvString(from: [DailyLogSnapshot(log)])
+        #expect(csv.contains("'=1+1"))
+    }
+
+    @Test("The written file starts with a UTF-8 byte-order mark for Excel")
+    func fileHasBOM() throws {
+        let url = try #require(CSVBuilder.build(logs: [DailyLogSnapshot(DailyLog(date: .now))]))
+        let data = try Data(contentsOf: url)
+        #expect(Array(data.prefix(3)) == [0xEF, 0xBB, 0xBF])
+        #expect(url.lastPathComponent.hasPrefix("Cadence Data"))
+    }
+}

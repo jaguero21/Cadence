@@ -4,10 +4,24 @@ import Charts
 import OSLog
 
 enum PDFBuilder {
-    static func build(logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = [], menopause: [MenopausalTransition] = []) async -> URL? {
-        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
-        let uid = UUID().uuidString
-        let url = ExportScratch.url(for: "in-rhythm-cadence-report-\(uid).pdf")
+    // `range` is the period the person chose; the header reports coverage
+    // against it (nil = the span of the logs themselves, for callers with no
+    // chosen range). `includePersonalNotes` adds the diary-style sections —
+    // Peaks & Valleys, intentions, notes, weekly reflections — after the
+    // clinical ones; ExportView lets the person leave them out of a report
+    // they're handing to someone else.
+    static func build(logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot] = [], flares: [FlareSnapshot] = [], customTrackers: [CustomTrackerSnapshot] = [], menopause: [MenopausalTransition] = [], range: ClosedRange<Date>? = nil, includePersonalNotes: Bool = true, paper: PaperSize = .forCurrentRegion) async -> URL? {
+        // Title metadata so Mail/Files/Preview show a document name, not the
+        // file name.
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = [
+            kCGPDFContextTitle as String: reportTitle,
+            kCGPDFContextCreator as String: "Cadence",
+        ]
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: paper.size), format: format)
+        // A readable name — this is what lands in a clinician's inbox — in a
+        // per-export folder, so two reports for the same range can't collide.
+        let url = ExportScratch.uniqueURL(named: fileName(range: range ?? logSpan(logs)))
 
         let insights = PatternEngine.allInsights(from: logs, medications: medications, flares: flares, trackers: customTrackers, menopause: menopause)
         // Chart images render on the main actor (ImageRenderer requirement),
@@ -21,7 +35,7 @@ enum PDFBuilder {
         // JSON backup both get. Holding a report in memory briefly is a fair
         // price; these are hundreds of KB, not hundreds of MB.
         let data = renderer.pdfData { ctx in
-            renderReport(ctx: ctx, logs: logs, charts: charts, insights: insights, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, menopause: menopause)
+            renderReport(ctx: ctx, paper: paper, logs: logs, charts: charts, insights: insights, reviews: reviews, medications: medications, flares: flares, customTrackers: customTrackers, menopause: menopause, range: range, includePersonalNotes: includePersonalNotes)
         }
         do {
             try ExportScratch.write(data, to: url)
@@ -35,6 +49,70 @@ enum PDFBuilder {
     }
 
     private static let log = Logger(subsystem: "com.carpecadence", category: "PDFBuilder")
+
+    static let reportTitle = "In Rhythm: Your Cadence Report"
+
+    // MARK: - Paper
+
+    // The layout is designed on A4's 515pt content width. US Letter is wider
+    // and shorter, so each Letter page centres that same column (a horizontal
+    // translate in Cursor.beginPage) and moves the bottom margin and footer up.
+    enum PaperSize: Equatable {
+        case a4, letter
+
+        var size: CGSize {
+            switch self {
+            case .a4:     return CGSize(width: 595, height: 842)
+            case .letter: return CGSize(width: 612, height: 792)
+            }
+        }
+
+        // Letter is the paper standard in the US and Canada and across most of
+        // Latin America's Letter-using countries; everywhere else uses A4.
+        nonisolated static func forRegion(_ identifier: String?) -> PaperSize {
+            let letterRegions: Set<String> = ["US", "CA", "MX", "PR", "PH", "CL", "CO", "VE", "GT", "CR", "PA", "DO", "SV", "NI", "HN", "BZ"]
+            return identifier.map { letterRegions.contains($0) } == true ? .letter : .a4
+        }
+
+        static var forCurrentRegion: PaperSize { forRegion(Locale.current.region?.identifier) }
+    }
+
+    // MARK: - Naming and coverage
+
+    nonisolated static func logSpan(_ logs: [DailyLogSnapshot]) -> ClosedRange<Date>? {
+        guard let first = logs.map(\.date).min(), let last = logs.map(\.date).max() else { return nil }
+        return first...last
+    }
+
+    // "Cadence Report, Sep 1 – Sep 30, 2026.pdf". Abbreviated month names, so
+    // no locale can introduce a "/" into the file name.
+    nonisolated static func fileName(range: ClosedRange<Date>?, prefix: String = "Cadence Report", ext: String = "pdf") -> String {
+        guard let range else { return "\(prefix).\(ext)" }
+        return "\(prefix), \(rangeLabel(range)).\(ext)"
+    }
+
+    nonisolated static func rangeLabel(_ range: ClosedRange<Date>) -> String {
+        let cal = Calendar.current
+        let full = Date.FormatStyle().month(.abbreviated).day().year()
+        if cal.isDate(range.lowerBound, inSameDayAs: range.upperBound) {
+            return range.lowerBound.formatted(full)
+        }
+        let sameYear = cal.component(.year, from: range.lowerBound) == cal.component(.year, from: range.upperBound)
+        let start = range.lowerBound.formatted(sameYear ? Date.FormatStyle().month(.abbreviated).day() : full)
+        return "\(start) – \(range.upperBound.formatted(full))"
+    }
+
+    // The header's coverage line, measured against the CHOSEN range: picking
+    // Sep 1–30 having logged from Sep 10 must read "21 of 30 days logged", not
+    // "21 of 21" over a span quietly narrowed to the logs. Days after `today`
+    // aren't counted as missed.
+    nonisolated static func coverage(loggedDays: Int, range: ClosedRange<Date>, today: Date = .now) -> (label: String, totalDays: Int) {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: range.lowerBound)
+        let end = min(cal.startOfDay(for: range.upperBound), cal.startOfDay(for: today))
+        let total = max((cal.dateComponents([.day], from: start, to: end).day ?? 0) + 1, 1)
+        return ("\(rangeLabel(range)) · \(loggedDays) of \(total) days logged", total)
+    }
 
     // MARK: - Print palette
 
@@ -68,47 +146,80 @@ enum PDFBuilder {
     // Owns the vertical position, page breaks, and the per-page footer, so
     // renderers read as content ("section, line, bar") instead of geometry.
     private final class Cursor {
-        static let pageBottom: CGFloat = 790
+        static let top: CGFloat = 40
         let ctx: UIGraphicsPDFRendererContext
+        let paper: PaperSize
+        // Content stops 52pt above the page edge; the footer sits 28pt above it.
+        let pageBottom: CGFloat
+        private let footerY: CGFloat
         private(set) var page = 0
         var y: CGFloat = 40
 
-        init(ctx: UIGraphicsPDFRendererContext) {
+        init(ctx: UIGraphicsPDFRendererContext, paper: PaperSize) {
             self.ctx = ctx
+            self.paper = paper
+            pageBottom = paper.size.height - 52
+            footerY = paper.size.height - 28
         }
 
         func beginPage() {
             ctx.beginPage()
+            // Centre the 595pt-wide layout on wider paper (Letter).
+            ctx.cgContext.translateBy(x: (paper.size.width - 595) / 2, y: 0)
             page += 1
-            y = 40
+            y = Self.top
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 8),
                 .foregroundColor: UIColor(white: 0.55, alpha: 1),
             ]
             "Made with Cadence, from your own daily reflections."
-                .draw(in: CGRect(x: 40, y: 814, width: 440, height: 12), withAttributes: attrs)
+                .draw(in: CGRect(x: 40, y: footerY, width: 440, height: 12), withAttributes: attrs)
             let pageStyle = NSMutableParagraphStyle()
             pageStyle.alignment = .right
             var pageAttrs = attrs
             pageAttrs[.paragraphStyle] = pageStyle
-            "Page \(page)".draw(in: CGRect(x: 480, y: 814, width: 75, height: 12), withAttributes: pageAttrs)
+            "Page \(page)".draw(in: CGRect(x: 480, y: footerY, width: 75, height: 12), withAttributes: pageAttrs)
         }
 
         func breakIfNeeded(_ height: CGFloat) {
-            if y + height > Self.pageBottom { beginPage() }
+            if y + height > pageBottom { beginPage() }
         }
 
         func space(_ height: CGFloat) {
-            y = min(y + height, Self.pageBottom)
+            y = min(y + height, pageBottom)
         }
 
         // A body line; wraps and page-breaks as needed.
         func line(_ text: String, font: UIFont = .systemFont(ofSize: 11), color: UIColor = PDFBuilder.inkText, x: CGFloat = 50, width: CGFloat = 505, spacing: CGFloat = 3) {
             let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
             let h = PDFBuilder.textHeight(text, attrs: attrs, width: width)
-            breakIfNeeded(h)
-            text.draw(in: CGRect(x: x, y: y, width: width, height: h), withAttributes: attrs)
-            y += h + spacing
+            guard h > pageBottom - Self.top else {
+                breakIfNeeded(h)
+                text.draw(in: CGRect(x: x, y: y, width: width, height: h), withAttributes: attrs)
+                y += h + spacing
+                return
+            }
+            // Taller than a whole page (a very long note): a single draw
+            // would run through the footer and off the page. Emit it in
+            // whole-word chunks that each fit the space left on the page.
+            var chunk = ""
+            func flush() {
+                let ch = PDFBuilder.textHeight(chunk, attrs: attrs, width: width)
+                chunk.draw(in: CGRect(x: x, y: y, width: width, height: ch), withAttributes: attrs)
+                y += ch
+            }
+            for word in text.split(separator: " ", omittingEmptySubsequences: false) {
+                let candidate = chunk.isEmpty ? String(word) : chunk + " " + word
+                if !chunk.isEmpty, PDFBuilder.textHeight(candidate, attrs: attrs, width: width) > pageBottom - y {
+                    flush()
+                    beginPage()
+                    chunk = String(word)
+                } else {
+                    chunk = candidate
+                }
+            }
+            if !chunk.isEmpty { flush() }
+            y += spacing
         }
 
         // "Mar 4: took a long walk" — bold date run, regular body run.
@@ -126,6 +237,11 @@ enum PDFBuilder {
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 context: nil
             ).height)
+            // A note taller than a page goes through line(), which splits it.
+            guard h <= pageBottom - Self.top else {
+                line("\(date)  \(body)", x: x, width: width, spacing: 4)
+                return
+            }
             breakIfNeeded(h)
             text.draw(in: CGRect(x: x, y: y, width: width, height: h))
             y += h + 4
@@ -250,14 +366,19 @@ enum PDFBuilder {
 
     // MARK: - Report
 
-    private static func renderReport(ctx: UIGraphicsPDFRendererContext, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot], menopause: [MenopausalTransition] = []) {
-        let cursor = Cursor(ctx: ctx)
+    // Order: patterns and the clinical sections first — the parts a doctor
+    // reads — then, only when included, the person's own writing. The diary
+    // sections used to come before the averages and symptoms, so a report
+    // handed over at an appointment opened with private journal entries.
+    private static func renderReport(ctx: UIGraphicsPDFRendererContext, paper: PaperSize, logs: [DailyLogSnapshot], charts: [UIImage], insights: [InsightCard], reviews: [WeeklyReviewSnapshot], medications: [MedicationSnapshot], flares: [FlareSnapshot], customTrackers: [CustomTrackerSnapshot], menopause: [MenopausalTransition] = [], range: ClosedRange<Date>? = nil, includePersonalNotes: Bool = true) {
+        let cursor = Cursor(ctx: ctx, paper: paper)
         cursor.beginPage()
         drawReportHeader(
             cursor: cursor,
-            title: "In Rhythm: Your Cadence Report",
+            title: reportTitle,
             intro: "A look back at the days you logged — what shifted, what held steady, and a few patterns worth noticing.",
-            logs: logs
+            logs: logs,
+            range: range
         )
 
         let bodyFont = UIFont.systemFont(ofSize: 11)
@@ -266,7 +387,9 @@ enum PDFBuilder {
 
         // What we're noticing (Pattern Insights) — moved to the top.
         cursor.section("What we're noticing")
-        cursor.line("Patterns from your own logs, offered for reflection — not medical advice.",
+        // Computed over THIS report's date range, so it can differ from the
+        // Insights tab, which always looks at the last 90 days.
+        cursor.line("Patterns found in your logs from this date range, offered for reflection — not medical advice.",
                     font: .systemFont(ofSize: 9.5), color: inkSecondary, x: 40, width: 515, spacing: 8)
         if insights.isEmpty {
             cursor.line("No patterns detected from the current log set.", font: bodyFont, color: inkSecondary)
@@ -280,42 +403,6 @@ enum PDFBuilder {
 
         // Your rhythm at a glance (Trends). drawChartGrid draws its own section header.
         drawChartGrid(charts, cursor: cursor)
-
-        drawWeeklyReflections(reviews, cursor: cursor)
-
-        // Moments you marked (Peaks & Valleys).
-        let dayFmt = Date.FormatStyle().month(.abbreviated).day()
-        let peaksAndValleysDays = logs
-            .filter { !$0.peaksAndValleysNote.isEmpty || $0.hasPeaksAndValleysVoiceMemo }
-            .sorted { $0.date > $1.date }
-        if !peaksAndValleysDays.isEmpty {
-            cursor.section("Moments you marked")
-            for log in peaksAndValleysDays {
-                var body = log.peaksAndValleysNote.isEmpty ? "(voice memo only)" : log.peaksAndValleysNote
-                if log.hasPeaksAndValleysVoiceMemo && !log.peaksAndValleysNote.isEmpty {
-                    body += " (+ voice memo)"
-                }
-                cursor.datedLine(log.date.formatted(dayFmt), body)
-            }
-        }
-
-        // Notes to yourself (daily Intentions for Tomorrow).
-        let intentionDays = logs.filter { !$0.intentionsForTomorrow.isEmpty }.sorted { $0.date > $1.date }
-        if !intentionDays.isEmpty {
-            cursor.section("Notes to yourself")
-            for log in intentionDays {
-                cursor.datedLine(log.date.formatted(dayFmt), log.intentionsForTomorrow)
-            }
-        }
-
-        // In your words (Daily Notes).
-        let noteDays = logs.filter { !$0.freeNote.isEmpty }.sorted { $0.date > $1.date }
-        if !noteDays.isEmpty {
-            cursor.section("In your words")
-            for log in noteDays {
-                cursor.datedLine(log.date.formatted(dayFmt), log.freeNote)
-            }
-        }
 
         // ===== Part 2 · The details =====
 
@@ -445,11 +532,54 @@ enum PDFBuilder {
                 cursor.line("\(range): \(flare.durationDays) day\(flare.durationDays == 1 ? "" : "s"), peak \(flare.peakSeverity)/10", font: bodyFont)
             }
         }
+
+        // ===== Part 3 · In your own words (optional) =====
+        if includePersonalNotes {
+            drawPersonalNotes(logs: logs, reviews: reviews, cursor: cursor)
+        }
+    }
+
+    private static func drawPersonalNotes(logs: [DailyLogSnapshot], reviews: [WeeklyReviewSnapshot], cursor: Cursor) {
+        drawWeeklyReflections(reviews, cursor: cursor)
+
+        // Moments you marked (Peaks & Valleys).
+        let dayFmt = Date.FormatStyle().month(.abbreviated).day()
+        let peaksAndValleysDays = logs
+            .filter { !$0.peaksAndValleysNote.isEmpty || $0.hasPeaksAndValleysVoiceMemo }
+            .sorted { $0.date > $1.date }
+        if !peaksAndValleysDays.isEmpty {
+            cursor.section("Moments you marked")
+            for log in peaksAndValleysDays {
+                var body = log.peaksAndValleysNote.isEmpty ? "(voice memo only)" : log.peaksAndValleysNote
+                if log.hasPeaksAndValleysVoiceMemo && !log.peaksAndValleysNote.isEmpty {
+                    body += " (+ voice memo)"
+                }
+                cursor.datedLine(log.date.formatted(dayFmt), body)
+            }
+        }
+
+        // Notes to yourself (daily Intentions for Tomorrow).
+        let intentionDays = logs.filter { !$0.intentionsForTomorrow.isEmpty }.sorted { $0.date > $1.date }
+        if !intentionDays.isEmpty {
+            cursor.section("Notes to yourself")
+            for log in intentionDays {
+                cursor.datedLine(log.date.formatted(dayFmt), log.intentionsForTomorrow)
+            }
+        }
+
+        // In your words (Daily Notes).
+        let noteDays = logs.filter { !$0.freeNote.isEmpty }.sorted { $0.date > $1.date }
+        if !noteDays.isEmpty {
+            cursor.section("In your words")
+            for log in noteDays {
+                cursor.datedLine(log.date.formatted(dayFmt), log.freeNote)
+            }
+        }
     }
 
     // MARK: - Shared header
 
-    private static func drawReportHeader(cursor: Cursor, title: String, intro: String? = nil, logs: [DailyLogSnapshot]) {
+    private static func drawReportHeader(cursor: Cursor, title: String, intro: String? = nil, logs: [DailyLogSnapshot], range: ClosedRange<Date>? = nil) {
         title.draw(in: CGRect(x: 40, y: cursor.y, width: 420, height: 30),
                    withAttributes: [.font: UIFont.systemFont(ofSize: 23, weight: .bold), .foregroundColor: inkText])
 
@@ -461,7 +591,9 @@ enum PDFBuilder {
         cursor.y += 34
 
         let subtitle: String
-        if let earliest = logs.map(\.date).min(), let latest = logs.map(\.date).max() {
+        if let range {
+            subtitle = coverage(loggedDays: logs.count, range: range).label
+        } else if let earliest = logs.map(\.date).min(), let latest = logs.map(\.date).max() {
             let spanDays = (Calendar.current.dateComponents([.day], from: earliest, to: latest).day ?? 0) + 1
             subtitle = "\(earliest.formatted(date: .abbreviated, time: .omitted)) – \(latest.formatted(date: .abbreviated, time: .omitted))"
                 + " · \(logs.count) of \(spanDays) days logged"

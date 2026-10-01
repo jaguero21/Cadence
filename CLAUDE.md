@@ -663,9 +663,69 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   Symptom frequency renders as proportional bars carrying avg severity.
   The Export screen's "Includes" list must stay truthful to what the PDFs
   actually contain.
+- **Section order is clinical first.** Header → patterns → trend charts →
+  "How your days felt" → symptoms → triggers → basics → Health averages →
+  health context → medications → flares, then — only when
+  `includePersonalNotes` — the diary sections (weekly reflections, Peaks &
+  Valleys, intentions, daily notes) via `drawPersonalNotes`. ExportView's
+  toggle for that is stored in `UserDefaultsKey.exportIncludesPersonalNotes`
+  and is **off by default** (the report is usually handed to someone else);
+  `PDFBuilder.build`'s own default stays `true` so tests/DEBUG see everything.
+- **The header reports coverage against the CHOSEN range** (`range:` →
+  `PDFBuilder.coverage`, future days not counted), never the logs' own span —
+  that narrowed "Sep 1–30, logged from Sep 10" to "21 of 21 days". The pattern
+  section says it covers "this date range": it runs `PatternEngine` on the
+  export's logs, so it can legitimately differ from the 90-day Insights tab.
+- **Paper follows the region** (`PaperSize.forRegion`: Letter in the US,
+  Canada and Letter-using Latin America, A4 elsewhere). The layout is drawn on
+  A4's 515pt column and `Cursor.beginPage` centres it on Letter with a
+  translate; vertical limits come from the paper. Long text that exceeds a
+  page is split into page-sized word chunks in `Cursor.line`. Files are named
+  for people ("Cadence Report, Sep 1 – Sep 30, 2026.pdf", "Cadence Data, ….csv")
+  inside a UUID folder from `ExportScratch.uniqueURL(named:)`, and the PDF
+  carries a document title.
+- **CSV safety:** free-text cells go through `CSVBuilder.neutralizeFormula`
+  (a leading `= + - @` would run as a formula in Excel), and the written file
+  starts with a UTF-8 BOM so Excel decodes accents/emoji. `csvString` itself
+  stays BOM-free and pure.
 - "Appointment" flow: `UserDefaultsKey.lastVisitDate` stores a visit anchor
-  (`timeIntervalSinceReferenceDate`, 0 = unset) so a report can be scoped to
-  everything since the last visit.
+  (`timeIntervalSinceReferenceDate`, 0 = unset), set from Export's
+  Appointments section; "Report since last appointment" makes it the range
+  start.
+
+## Pro (StoreKit 2)
+
+- **What Pro gates:** pattern insight cards + insight history (InsightsView),
+  the 90D chart range, the PDF reports (ExportView), and new-pattern
+  notifications (`ContentView.checkForNewInsights`). Everything else is free —
+  including the CSV export and JSON backup ("users own their data"), custom
+  symptoms, and the dashboard's Top Pattern title (a deliberate teaser that
+  links into the gated Insights tab). The Export screen is linked for everyone
+  from Settings; it gates only the PDF. Keep the paywall's feature list
+  (`ProPaywallView.features`) truthful to these gates.
+- `StoreService` (unseamed singleton, see Code quality) verifies every
+  transaction (`checkVerified`), rebuilds `purchasedProductIDs` from
+  `currentEntitlements` at launch AND on every foreground (expiry never arrives
+  through `Transaction.updates`), and drops revoked transactions in the updates
+  listener. **An empty `Product.products` result is a load failure**, not
+  "loading" — it used to leave the paywall spinning forever, which App Review
+  reads as a broken purchase flow. **Restore calls `AppStore.sync()`** before
+  re-reading entitlements, and both Restore buttons report the outcome
+  (`StoreService.message(for:)`).
+- **Free trial wording is read from StoreKit, never hard-coded.**
+  `StoreService.monthlyFreeTrial` is set only when the monthly product's
+  `introductoryOffer` is a `.freeTrial` AND `isEligibleForIntroOffer` (one
+  intro offer per subscription group per Apple Account). The paywall then
+  shows "Try Free for 1 month / then $X / month" plus the full trial terms
+  beside the renewal disclosure; otherwise the plain monthly price. Apple
+  applies a configured trial at purchase whether or not the app mentions it,
+  so a trial set up in App Store Connect with no in-app disclosure is a
+  Guideline 3.1.2 problem — this keeps the two in step automatically.
+  `trialLength(value:unit:)` formats in the offer's own unit only (pure,
+  tested: an all-units formatter turned "7 days" into "1 week").
+- `Cadence/CarpeCadence.storekit` is for local testing only; select it in the
+  scheme (Run → Options → StoreKit Configuration) to buy Pro in the simulator.
+  App Store Connect is the source of truth for the live products.
 
 ## Backup & iCloud status
 

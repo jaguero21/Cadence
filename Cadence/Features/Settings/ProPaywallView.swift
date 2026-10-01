@@ -9,6 +9,7 @@ struct ProPaywallView: View {
     @State private var isPurchasing = false
     @State private var errorMessage: String?
     @State private var pendingMessage: String?
+    @State private var restoreMessage: String?
 
     // String(localized:) at the literal, not bare strings: these are read back
     // out as tuple members and rendered with Text(feature.title), which takes
@@ -24,6 +25,9 @@ struct ProPaywallView: View {
         ("chart.line.uptrend.xyaxis",
          String(localized: "90-Day Trends"),
          String(localized: "Full trend history across all your health metrics.")),
+        ("bell.badge.fill",
+         String(localized: "Pattern Alerts"),
+         String(localized: "A notification when a new pattern shows up, plus a history of every one.")),
     ]
 
     var body: some View {
@@ -32,6 +36,7 @@ struct ProPaywallView: View {
                 VStack(spacing: 28) {
                     header
                     featureList
+                    expectationNote
                     productButtons
                     restoreButton
                     legal
@@ -55,6 +60,14 @@ struct ProPaywallView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage ?? "")
+            }
+            .alert("Restore Purchases", isPresented: .init(
+                get: { restoreMessage != nil },
+                set: { if !$0 { restoreMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(restoreMessage ?? "")
             }
             .alert("Waiting for Approval", isPresented: .init(
                 get: { pendingMessage != nil },
@@ -112,12 +125,24 @@ struct ProPaywallView: View {
         .cadenceCard()
     }
 
+    // Set expectations before anyone pays: patterns need history, so a
+    // day-one buyer would otherwise open Insights to an empty section.
+    private var expectationNote: some View {
+        Text("Patterns appear once you've logged at least \(PatternThreshold.minimumLogs) days.")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+    }
+
     private var productButtons: some View {
         VStack(spacing: 12) {
             if let lifetime = store.lifetimeProduct {
                 purchaseButton(
                     product: lifetime,
-                    label: "Buy Lifetime Access",
+                    // String(localized:): purchaseButton takes a String, which
+                    // Text renders verbatim — as a bare literal this label
+                    // never reached the catalog.
+                    label: String(localized: "Buy Lifetime Access"),
                     sublabel: lifetime.displayPrice,
                     color: CadenceColor.accent,
                     prominent: true
@@ -125,13 +150,24 @@ struct ProPaywallView: View {
             }
 
             if let monthly = store.monthlyProduct {
-                purchaseButton(
-                    product: monthly,
-                    label: "Subscribe Monthly",
-                    sublabel: "\(monthly.displayPrice) / month",
-                    color: CadenceColor.sleepPurple,
-                    prominent: false
-                )
+                if let trial = store.monthlyFreeTrial {
+                    let length = StoreService.trialLength(value: trial.value, unit: trial.unit)
+                    purchaseButton(
+                        product: monthly,
+                        label: String(localized: "Try Free for \(length)"),
+                        sublabel: String(localized: "then \(monthly.displayPrice) / month"),
+                        color: CadenceColor.sleepPurple,
+                        prominent: false
+                    )
+                } else {
+                    purchaseButton(
+                        product: monthly,
+                        label: String(localized: "Subscribe Monthly"),
+                        sublabel: String(localized: "\(monthly.displayPrice) / month"),
+                        color: CadenceColor.sleepPurple,
+                        prominent: false
+                    )
+                }
             }
 
             if store.productsLoadFailed {
@@ -185,9 +221,13 @@ struct ProPaywallView: View {
         Button("Restore Purchases") {
             Task {
                 isPurchasing = true
-                await store.restorePurchases()
+                let outcome = await store.restorePurchases()
                 isPurchasing = false
-                if store.isPro { dismiss() }
+                if outcome == .restored {
+                    dismiss()
+                } else {
+                    restoreMessage = StoreService.message(for: outcome)
+                }
             }
         }
         .font(.subheadline)
@@ -201,6 +241,16 @@ struct ProPaywallView: View {
     // both links on this screen for as long as it sells a subscription.
     private var legal: some View {
         VStack(spacing: 10) {
+            // Trial terms sit with the renewal terms, in full, whenever a
+            // trial is on offer: length, the price that follows, and how to
+            // avoid the charge (Guideline 3.1.2).
+            if let trial = store.monthlyFreeTrial, let monthly = store.monthlyProduct {
+                let length = StoreService.trialLength(value: trial.value, unit: trial.unit)
+                Text("The monthly plan is free for \(length), then \(monthly.displayPrice) per month. Cancel at least 24 hours before the trial ends and you won't be charged.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
             Text("Payment charged to your Apple ID at purchase confirmation. Subscriptions auto-renew unless cancelled at least 24 hours before the renewal date. Manage or cancel in your Apple ID settings.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)

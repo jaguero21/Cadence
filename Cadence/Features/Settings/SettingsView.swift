@@ -21,6 +21,7 @@ struct SettingsView: View {
     // Kept apart from purchaseError so it can carry its own, non-alarming
     // title — see the alerts below.
     @State private var pendingMessage: String?
+    @State private var restoreMessage: String?
     @State private var showingManageSubscriptions = false
 
     #if DEBUG
@@ -38,6 +39,7 @@ struct SettingsView: View {
             proSection
             remindersSection
             trackingSection
+            exportSection
             healthKitSection
             SyncBackupSection()
             aboutSection
@@ -79,6 +81,14 @@ struct SettingsView: View {
         // purchaseError put that reassuring message under a red "Purchase Error"
         // heading, which reads as "your payment failed". Mirrors
         // ProPaywallView, which already keeps the two apart.
+        .alert("Restore Purchases", isPresented: .init(
+            get: { restoreMessage != nil },
+            set: { if !$0 { restoreMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(restoreMessage ?? "")
+        }
         .alert("Waiting for Approval", isPresented: .init(
             get: { pendingMessage != nil },
             set: { if !$0 { pendingMessage = nil } }
@@ -118,11 +128,6 @@ struct SettingsView: View {
                     Spacer()
                     Text("Active").foregroundStyle(CadenceColor.successGreen)
                 }
-                NavigationLink {
-                    ExportView()
-                } label: {
-                    Label("Export Report", systemImage: "doc.richtext.fill")
-                }
                 // Only meaningful for the auto-renewing plan — a lifetime
                 // purchase has nothing to manage, and showing the sheet to
                 // someone with no subscription just presents an empty list.
@@ -149,6 +154,36 @@ struct SettingsView: View {
                         .disabled(isPurchasing)
                     }
 
+                    // The monthly plan, with the same StoreKit-driven trial
+                    // wording as the paywall: "Try Free for 1 month" only when
+                    // a free trial is configured AND this account is eligible.
+                    if let monthly = store.monthlyProduct {
+                        Button {
+                            buy(monthly)
+                        } label: {
+                            if let trial = store.monthlyFreeTrial {
+                                Text("Try Free for \(StoreService.trialLength(value: trial.value, unit: trial.unit)), then \(monthly.displayPrice) / month")
+                            } else {
+                                Text("Subscribe — \(monthly.displayPrice) / month")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(CadenceColor.sleepPurple)
+                        .disabled(isPurchasing)
+
+                        // Guideline 3.1.2: a screen that sells an auto-renewing
+                        // subscription states the renewal terms (and any trial
+                        // terms) beside the button, not only on the paywall.
+                        if let trial = store.monthlyFreeTrial {
+                            Text("The monthly plan is free for \(StoreService.trialLength(value: trial.value, unit: trial.unit)), then \(monthly.displayPrice) per month. Cancel at least 24 hours before the trial ends and you won't be charged.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("Payment charged to your Apple ID at purchase confirmation. Subscriptions auto-renew unless cancelled at least 24 hours before the renewal date. Manage or cancel in your Apple ID settings.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+
                     Button("See all Pro options") {
                         appState.showingProPaywall = true
                     }
@@ -158,7 +193,7 @@ struct SettingsView: View {
                     Button("Restore Purchases") {
                         Task {
                             isPurchasing = true
-                            await store.restorePurchases()
+                            restoreMessage = StoreService.message(for: await store.restorePurchases())
                             isPurchasing = false
                         }
                     }
@@ -224,6 +259,21 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    // Export is for everyone: the CSV is free ("users own their data") and
+    // ExportView gates only the PDF. It used to be linked from the Pro-only
+    // block, which made the free CSV unreachable without buying Pro.
+    private var exportSection: some View {
+        Section {
+            NavigationLink {
+                ExportView()
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.up")
+            }
+        } footer: {
+            Text("Spreadsheet (CSV) export is free. Doctor-ready PDF reports are part of Pro.")
         }
     }
 

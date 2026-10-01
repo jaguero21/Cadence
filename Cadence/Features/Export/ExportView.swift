@@ -20,6 +20,12 @@ struct ExportView: View {
     @State private var previewItem: ReportPreviewItem?
     @State private var generationTask: Task<Void, Never>?
     @State private var exportError: String?
+    @AppStorage(UserDefaultsKey.lastVisitDate) private var lastVisitInterval: Double = 0
+    @AppStorage(UserDefaultsKey.exportIncludesPersonalNotes) private var includePersonalNotes = false
+
+    private var lastVisit: Date? {
+        lastVisitInterval > 0 ? Date(timeIntervalSinceReferenceDate: lastVisitInterval) : nil
+    }
 
     var body: some View {
         Form {
@@ -28,12 +34,15 @@ struct ExportView: View {
                 DatePicker("To",   selection: $endDate,   in: startDate..., displayedComponents: .date)
             }
 
+            appointmentSection
+
             Section {
                 includes
+                Toggle("Include personal notes", isOn: $includePersonalNotes)
             } header: {
                 Text("Includes")
             } footer: {
-                Text("Your personal insights and patterns — a warm look back at what you've logged, for reflection and self-discovery.")
+                Text("Personal notes are your Peaks & Valleys, intentions, daily notes and weekly reflections. Leave them out when the report is for someone else.")
             }
 
             Section {
@@ -92,15 +101,51 @@ struct ExportView: View {
         }
     }
 
+    // Must stay truthful to what PDFBuilder.renderReport draws, in its order.
     @ViewBuilder
     private var includes: some View {
         Label("Pattern insights",             systemImage: "checkmark")
         Label("Trend charts",                 systemImage: "checkmark")
-        Label("Weekly reflections",           systemImage: "checkmark")
-        Label("Your marked moments & notes",  systemImage: "checkmark")
         Label("Daily metrics & symptoms",     systemImage: "checkmark")
         Label("HealthKit averages",           systemImage: "checkmark")
         Label("Medications & flares",         systemImage: "checkmark")
+    }
+
+    // "Since my last appointment": the stored visit date becomes the report's
+    // start in one tap. The date is kept until changed or cleared.
+    @ViewBuilder
+    private var appointmentSection: some View {
+        Section {
+            if let lastVisit {
+                DatePicker("Last appointment",
+                           selection: Binding(
+                               get: { lastVisit },
+                               set: { lastVisitInterval = Calendar.current.startOfDay(for: $0).timeIntervalSinceReferenceDate }
+                           ),
+                           in: ...Date.now,
+                           displayedComponents: .date)
+                Button("Report since last appointment") {
+                    startDate = lastVisit
+                    endDate = .now
+                }
+                Button("Clear appointment date", role: .destructive) {
+                    lastVisitInterval = 0
+                }
+            } else {
+                Button("Add last appointment date") {
+                    lastVisitInterval = Calendar.current.startOfDay(for: .now).timeIntervalSinceReferenceDate
+                }
+            }
+        } header: {
+            Text("Appointments")
+        } footer: {
+            Text("Save the date of your last appointment to make a report covering everything since.")
+        }
+    }
+
+    // The chosen range as whole days, for the report header and file names.
+    private var chosenRange: ClosedRange<Date> {
+        rangeStart...max(rangeStart, endDate)
     }
 
     private var proPrompt: some View {
@@ -149,7 +194,7 @@ struct ExportView: View {
             exportError = String(localized: "There are no logs in the selected date range.")
             return
         }
-        if let url = CSVBuilder.build(logs: logSnapshots, trackers: trackerSnapshots) {
+        if let url = CSVBuilder.build(logs: logSnapshots, trackers: trackerSnapshots, range: chosenRange) {
             shareItem = url
             showingShare = true
         } else {
@@ -164,10 +209,9 @@ struct ExportView: View {
             return
         }
         isGenerating = true
-        let logSnapshots = DailyLogSnapshot.build(
-            from: dedupedByDay(logs.filter { $0.date >= rangeStart && $0.date <= endDate }),
-            in: modelContext
-        )
+        let logSnapshots = DailyLogSnapshot.build(from: inRange, in: modelContext)
+        let range = chosenRange
+        let includePersonalNotes = includePersonalNotes
         let reviewSnapshots = reviews
             .filter { $0.weekStartDate <= endDate && $0.weekEndDate >= rangeStart }
             .map(WeeklyReviewSnapshot.init)
@@ -192,7 +236,9 @@ struct ExportView: View {
                 medications: medicationSnapshots,
                 flares: flareSnapshots,
                 customTrackers: trackerSnapshots,
-                menopause: menopause
+                menopause: menopause,
+                range: range,
+                includePersonalNotes: includePersonalNotes
             )
             guard !Task.isCancelled else { return }
             await MainActor.run {
