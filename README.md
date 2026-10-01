@@ -4,7 +4,7 @@ A native SwiftUI + SwiftData iOS app for daily symptom, mood, and energy
 tracking — built for people managing a chronic condition who need to spot
 patterns and bring something concrete to a doctor's appointment.
 
-Log takes under 90 seconds, HealthKit fills in what it can, and an on-device
+A log takes about 2 minutes, HealthKit fills in what it can, and an on-device
 pattern engine (no ML, no server) surfaces correlations like "your headaches
 follow poor sleep" or "symptoms rise before this flare." Everything exports
 to a doctor-ready PDF or a spreadsheet.
@@ -24,8 +24,9 @@ to a doctor-ready PDF or a spreadsheet.
 - **HealthKit** — two-way sync (mapped symptoms, State of Mind mood),
   background delivery, always optional/supplementary — never gates a
   core feature or overwrites a user-entered value
-- **Export** — doctor and personal PDF reports (trend charts, symptom
-  frequency, pattern flags) and CSV, previewed in-app before sharing
+- **Export** — a doctor-ready PDF report (trend charts, symptom frequency,
+  pattern flags; personal notes optional) and CSV, previewed in-app before
+  sharing
 - **iCloud sync** — CloudKit-mirrored SwiftData store, plus a JSON
   backup/restore that merges rather than overwrites
 - **Apple Watch** — wrist quick-log (mood + energy) over WatchConnectivity
@@ -75,8 +76,8 @@ behind each of the above.
 
 ## Requirements
 
-- Xcode with iOS 26 / watchOS 26 SDKs (app deploys to iOS 17+; the widget
-  extension and Watch app target 26.4 / 26.2)
+- Xcode 27 (Swift 6 language mode, iOS 27 SDK). The app deploys to iOS 17+;
+  the widget extension and Watch app target 26.4 / 26.2
 - An Apple Developer account for HealthKit, CloudKit, and push entitlements
   (a free account covers on-device testing; a paid account is required for
   CloudKit and App Store submission)
@@ -106,4 +107,32 @@ or ⌘U in Xcode, using the `Cadence.xctestplan` test plan. GitHub Actions
 
 ## Status
 
-Private repo, in active development.
+In active development.
+
+## License
+
+Copyright © 2026 the Cadence authors.
+
+Cadence's source code is free software: you can redistribute it and/or modify
+it under the terms of the **GNU General Public License, version 3** (see
+[`LICENSE`](LICENSE)). It is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.
+
+**The name, icon and artwork are not covered.** The GPL licenses the code.
+The "Cadence" name, the app icon, the capybara mascot illustrations and other
+brand artwork remain © the Cadence authors, all rights reserved. A fork must use its
+own name and artwork.
+
+**The App Store build.** As the copyright holders, the Cadence authors
+distribute the official Cadence app through Apple's App Store under Apple's
+terms. That permission belongs to the copyright holders; it is not a grant
+under the GPL.
+
+## Contributing
+
+Issues and pull requests are welcome. By submitting a contribution, you agree
+that it is licensed under GPL-3.0. You also grant the Cadence authors a perpetual,
+irrevocable, worldwide, royalty-free right to distribute it under other terms,
+including as part of the App Store build. Without that grant, contributed code
+could not ship in the official app.

@@ -440,6 +440,7 @@ struct ContentView: View {
         .task { syncMedicationReminders() }
         .task { applyPendingQuickLogs() }
         .task { openCheckInIfRequested() }
+        .task { openFirstLogIfRequested() }
         .sheet(isPresented: $showingControlCheckIn) {
             LogInputFlow(existingLog: controlCheckInLog)
         }
@@ -515,6 +516,19 @@ struct ContentView: View {
             .max(by: { $0.confidence < $1.confidence }) {
             notificationService.sendInsightNotification(title: top.title)
         }
+    }
+
+    // Onboarding ended on "Log how today feels": present today's log the
+    // moment the main UI exists, through the same sheet the Control Center
+    // check-in uses.
+    private func openFirstLogIfRequested() {
+        guard appState.pendingFirstLog, !showingControlCheckIn else { return }
+        appState.pendingFirstLog = false
+        let today = Calendar.current.startOfDay(for: .now)
+        controlCheckInLog = try? modelContext.fetch(
+            FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == today })
+        ).first
+        showingControlCheckIn = true
     }
 
     // Consume a Control Center "Log Check-In" tap: fetch today's log (if any)

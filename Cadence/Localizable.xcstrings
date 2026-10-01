@@ -1,102 +1,142 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Add last appointment date" : {
+    "Back" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añadir fecha de la última cita"
+            "value" : "Atrás"
           }
         }
       }
     },
-    "Appointments" : {
+    "Choose a time for a gentle daily reminder. It skips any day you've already logged." : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Citas"
+            "value" : "Elige una hora para un recordatorio diario suave. Se omite los días que ya hayas registrado."
           }
         }
       }
     },
-    "Clear appointment date" : {
+    "Continue" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Borrar fecha de la cita"
+            "value" : "Continuar"
           }
         }
       }
     },
-    "Include personal notes" : {
+    "Double-tap to stop tracking" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Incluir notas personales"
+            "value" : "Toca dos veces para dejar de registrarlo"
           }
         }
       }
     },
-    "Last appointment" : {
+    "Double-tap to track" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Última cita"
+            "value" : "Toca dos veces para registrarlo"
           }
         }
       }
     },
-    "Personal notes are your Peaks & Valleys, intentions, daily notes and weekly reflections. Leave them out when the report is for someone else." : {
+    "Explore first" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Las notas personales son tus altibajos, intenciones, notas diarias y reflexiones semanales. Déjalas fuera cuando el informe sea para otra persona."
+            "value" : "Explorar primero"
           }
         }
       }
     },
-    "Report since last appointment" : {
+    "Log how today feels" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Informe desde la última cita"
+            "value" : "Registrar cómo va hoy"
           }
         }
       }
     },
-    "Save the date of your last appointment to make a report covering everything since." : {
+    "Pick the symptoms you'd like to log. You can change these anytime in Settings." : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guarda la fecha de tu última cita para crear un informe con todo lo registrado desde entonces."
+            "value" : "Elige los síntomas que quieres registrar. Puedes cambiarlos cuando quieras en Ajustes."
           }
         }
       }
     },
-    "Subscribe — %@ / month" : {
+    "Private by design. Your entries stay on your iPhone and in your own iCloud. No account, no ads." : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suscribirse — %@ / mes"
+            "value" : "Privado desde el diseño. Tus registros se quedan en tu iPhone y en tu propio iCloud. Sin cuenta, sin anuncios."
           }
         }
       }
     },
-    "Try Free for %@, then %@ / month" : {
+    "Remind me at" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prueba gratis durante %@, después %@ / mes"
+            "value" : "Recordarme a las"
+          }
+        }
+      }
+    },
+    "Reminders are off for now. You can turn them on anytime in the Settings app under Cadence → Notifications." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los recordatorios están desactivados por ahora. Puedes activarlos cuando quieras en la app Ajustes, en Cadence → Notificaciones."
+          }
+        }
+      }
+    },
+    "Track how you feel, sleep, and move in about 2 minutes a day. Over time, Cadence finds patterns you wouldn't notice on your own." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registra cómo te sientes, duermes y te mueves en unos 2 minutos al día. Con el tiempo, Cadence encuentra patrones que no notarías por tu cuenta."
+          }
+        }
+      }
+    },
+    "What do you want to track?" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Qué quieres registrar?"
+          }
+        }
+      }
+    },
+    "Your first check-in takes about 2 minutes. Start now and Cadence begins learning your rhythm today." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu primer registro lleva unos 2 minutos. Empieza ahora y Cadence comenzará a conocer tu ritmo hoy mismo."
           }
         }
       }
@@ -593,16 +633,6 @@
         }
       }
     },
-    "A gentle reminder at the right time keeps your streak alive. You choose when — and you can always change it in Settings." : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un recordatorio suave a la hora adecuada mantiene viva tu racha. Tú eliges cuándo, y siempre puedes cambiarlo en Ajustes."
-          }
-        }
-      }
-    },
     "A notification when a new pattern shows up, plus a history of every one." : {
       "localizations" : {
         "es" : {
@@ -679,6 +709,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Añadir síntoma personalizado"
+          }
+        }
+      }
+    },
+    "Add last appointment date" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir fecha de la última cita"
           }
         }
       }
@@ -781,6 +821,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ansiedad"
+          }
+        }
+      }
+    },
+    "Appointments" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Citas"
           }
         }
       }
@@ -1095,6 +1145,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chatea con la línea 988"
+          }
+        }
+      }
+    },
+    "Clear appointment date" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar fecha de la cita"
           }
         }
       }
@@ -2078,6 +2138,16 @@
         }
       }
     },
+    "Include personal notes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir notas personales"
+          }
+        }
+      }
+    },
     "Includes" : {
       "comment" : "A section that lets the user choose which data to include in their export.",
       "isCommentAutoGenerated" : true,
@@ -2190,6 +2260,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ir a este paso"
+          }
+        }
+      }
+    },
+    "Last appointment" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Última cita"
           }
         }
       }
@@ -2878,16 +2958,6 @@
         }
       }
     },
-    "Open Cadence" : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abrir Cadence"
-          }
-        }
-      }
-    },
     "Open Health" : {
       "comment" : "A link to open the Health app.",
       "isCommentAutoGenerated" : true,
@@ -3145,6 +3215,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ALTIBAJOS"
+          }
+        }
+      }
+    },
+    "Personal notes are your Peaks & Valleys, intentions, daily notes and weekly reflections. Leave them out when the report is for someone else." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las notas personales son tus altibajos, intenciones, notas diarias y reflexiones semanales. Déjalas fuera cuando el informe sea para otra persona."
           }
         }
       }
@@ -3912,6 +3992,16 @@
         }
       }
     },
+    "Report since last appointment" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informe desde la última cita"
+          }
+        }
+      }
+    },
     "Respiratory rate: %.1f/min" : {
       "localizations" : {
         "es" : {
@@ -4141,6 +4231,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Guardar y cerrar"
+          }
+        }
+      }
+    },
+    "Save the date of your last appointment to make a report covering everything since." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda la fecha de tu última cita para crear un informe con todo lo registrado desde entonces."
           }
         }
       }
@@ -4518,6 +4618,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fuerte"
+          }
+        }
+      }
+    },
+    "Subscribe — %@ / month" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suscribirse — %@ / mes"
           }
         }
       }
@@ -5003,16 +5113,6 @@
         }
       }
     },
-    "Track how you feel, sleep, and move — in under two minutes a day. Over time, Cadence finds patterns you wouldn't notice on your own." : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registra cómo te sientes, duermes y te mueves, en menos de dos minutos al día. Con el tiempo, Cadence encuentra patrones que no notarías por tu cuenta."
-          }
-        }
-      }
-    },
     "Tracking" : {
       "localizations" : {
         "es" : {
@@ -5088,6 +5188,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prueba gratis durante %@"
+          }
+        }
+      }
+    },
+    "Try Free for %@, then %@ / month" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prueba gratis durante %@, después %@ / mes"
           }
         }
       }
@@ -5315,6 +5425,7 @@
     },
     "Weekly reflections" : {
       "comment" : "A checkbox that can be toggled to include weekly reflections in a report.",
+      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "es" : {
@@ -5513,16 +5624,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tus datos están guardados y alimentarán tus análisis semanales."
-          }
-        }
-      }
-    },
-    "Your first log is waiting. It takes about 2 minutes — and every entry helps Cadence understand your patterns." : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu primer registro te espera. Tarda unos 2 minutos, y cada entrada ayuda a Cadence a entender tus patrones."
           }
         }
       }
