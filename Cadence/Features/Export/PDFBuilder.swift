@@ -176,7 +176,8 @@ enum PDFBuilder {
         let title: String
         let ink: UIColor
         let yDomain: ClosedRange<Double>
-        let value: (DailyLogSnapshot) -> Double
+        // nil for a day the person never set this value (see the gates below).
+        let value: (DailyLogSnapshot) -> Double?
     }
 
     @MainActor
@@ -185,13 +186,17 @@ enum PDFBuilder {
         guard logs.count >= 2 else { return [] }
         let sorted = logs.sorted { $0.date < $1.date }
         let specs: [TrendSpec] = [
-            TrendSpec(title: "Mood (1–5)",          ink: inkMood,   yDomain: 1...5)  { Double($0.mood) },
-            TrendSpec(title: "Energy (0–10)",       ink: inkEnergy, yDomain: 0...10) { Double($0.energy) },
-            TrendSpec(title: "Sleep quality (0–10)", ink: inkSleep,  yDomain: 0...10) { Double($0.sleepQuality) },
-            TrendSpec(title: "Anxiety (0–10)",      ink: inkStress, yDomain: 0...10) { Double($0.stressLevel) },
+            // Gated on the edit flags, like the in-app charts and PatternEngine:
+            // an untouched field holds DailyLog's default (mood 3, energy 5…),
+            // and a doctor's report must not chart that as a reading.
+            TrendSpec(title: "Mood (1–5)",          ink: inkMood,   yDomain: 1...5)  { $0.didEditMood ? Double($0.mood) : nil },
+            TrendSpec(title: "Energy (0–10)",       ink: inkEnergy, yDomain: 0...10) { $0.didEditMetrics ? Double($0.energy) : nil },
+            TrendSpec(title: "Sleep quality (0–10)", ink: inkSleep,  yDomain: 0...10) { $0.didEditMetrics ? Double($0.sleepQuality) : nil },
+            TrendSpec(title: "Anxiety (0–10)",      ink: inkStress, yDomain: 0...10) { $0.didEditMetrics ? Double($0.stressLevel) : nil },
         ]
         return specs.compactMap { spec in
-            let points = sorted.map { (date: $0.date, value: spec.value($0)) }
+            let points = sorted.compactMap { log in spec.value(log).map { (date: log.date, value: $0) } }
+            guard points.count >= 2 else { return nil }
             let average = points.map(\.value).reduce(0, +) / Double(points.count)
             let view = PDFTrendChart(
                 title: spec.title,
@@ -317,18 +322,27 @@ enum PDFBuilder {
         // How your days felt (Average Metrics).
         if !logs.isEmpty {
             cursor.section("How your days felt")
-            let count = Double(logs.count)
-            let avg: (KeyPath<DailyLogSnapshot, Int>) -> Double = { path in
-                Double(logs.map { $0[keyPath: path] }.reduce(0, +)) / count
+            // Each average runs only over days that actually recorded it —
+            // mood over didEditMood days, the sliders over didEditMetrics days.
+            // Averaging every log folded DailyLog's defaults (mood 3, energy 5,
+            // sleep 7h…) into figures a clinician reads as measurements.
+            let moodLogs = logs.filter(\.didEditMood)
+            let metricLogs = logs.filter(\.didEditMetrics)
+            func avg(_ subset: [DailyLogSnapshot], _ value: (DailyLogSnapshot) -> Double) -> String? {
+                guard !subset.isEmpty else { return nil }
+                return String(format: "%.1f", subset.map(value).reduce(0, +) / Double(subset.count))
+            }
+            func line(_ label: String, _ value: String?, _ suffix: String) -> String {
+                value.map { "\(label): \($0)\(suffix)" } ?? "\(label): not recorded"
             }
             let metricLines = [
-                "Mood: \(String(format: "%.1f", avg(\.mood)))/5",
-                "Energy: \(String(format: "%.1f", avg(\.energy)))/10",
-                "Avg sleep: \(String(format: "%.1f", logs.map(\.sleepHours).reduce(0,+) / count)) hrs",
-                "Sleep quality: \(String(format: "%.1f", avg(\.sleepQuality)))/10",
-                "Pain / ache: \(String(format: "%.1f", avg(\.painLevel)))/10",
-                "Brain fog: \(String(format: "%.1f", avg(\.brainFogLevel)))/10",
-                "Anxiety: \(String(format: "%.1f", avg(\.stressLevel)))/10",
+                line("Mood", avg(moodLogs) { Double($0.mood) }, "/5"),
+                line("Energy", avg(metricLogs) { Double($0.energy) }, "/10"),
+                line("Avg sleep", avg(metricLogs) { $0.sleepHours }, " hrs"),
+                line("Sleep quality", avg(metricLogs) { Double($0.sleepQuality) }, "/10"),
+                line("Pain / ache", avg(metricLogs) { Double($0.painLevel) }, "/10"),
+                line("Brain fog", avg(metricLogs) { Double($0.brainFogLevel) }, "/10"),
+                line("Anxiety", avg(metricLogs) { Double($0.stressLevel) }, "/10"),
             ]
             for line in metricLines {
                 cursor.line(line, font: bodyFont)
@@ -497,7 +511,10 @@ private struct PDFTrendChart: View {
             }
             Chart {
                 ForEach(Array(points.enumerated()), id: \.offset) { _, point in
-                    AreaMark(x: .value("Day", point.date), y: .value(title, point.value))
+                    // From the domain floor, not 0 — mood's axis starts at 1.
+                    AreaMark(x: .value("Day", point.date),
+                             yStart: .value(title, yDomain.lowerBound),
+                             yEnd: .value(title, point.value))
                         .foregroundStyle(
                             LinearGradient(colors: [color.opacity(0.22), color.opacity(0.02)],
                                            startPoint: .top, endPoint: .bottom)

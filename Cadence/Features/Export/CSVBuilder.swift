@@ -22,15 +22,19 @@ enum CSVBuilder {
         let headerLine = ([header] + trackers.map { escape(trackerColumnName($0)) }).joined(separator: ",")
         var rows = [headerLine]
         for log in logs.sorted(by: { $0.date < $1.date }) {
+            // Unentered values are empty cells, the same convention as a
+            // missing HealthKit measurement: an untouched mood or slider still
+            // holds DailyLog's default, which isn't a reading.
+            let m = log.didEditMetrics
             var fields: [String] = [
                 dateFormatter.string(from: log.date),
-                "\(log.mood)",
-                "\(log.energy)",
-                String(format: "%.1f", log.sleepHours),
-                "\(log.sleepQuality)",
-                "\(log.painLevel)",
-                "\(log.brainFogLevel)",
-                "\(log.stressLevel)",
+                log.didEditMood ? "\(log.mood)" : "",
+                m ? "\(log.energy)" : "",
+                m ? String(format: "%.1f", log.sleepHours) : "",
+                m ? "\(log.sleepQuality)" : "",
+                m ? "\(log.painLevel)" : "",
+                m ? "\(log.brainFogLevel)" : "",
+                m ? "\(log.stressLevel)" : "",
             ]
             fields += [
                 log.symptoms.map(\.name).joined(separator: "; "),

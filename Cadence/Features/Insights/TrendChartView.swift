@@ -107,9 +107,13 @@ struct TrendChartView: View {
             } else {
                 Chart {
                     ForEach(points, id: \.date) { point in
+                        // Filled from the domain's floor, not from 0: mood's
+                        // axis starts at 1, and an area to 0 spilled below the
+                        // plot and across the date labels.
                         AreaMark(
                             x: .value("Date", point.date),
-                            y: .value(series.label, point.value)
+                            yStart: .value(series.label, series.yDomain.lowerBound),
+                            yEnd: .value(series.label, point.value)
                         )
                         .foregroundStyle(series.color.opacity(0.15))
 
@@ -132,7 +136,10 @@ struct TrendChartView: View {
                         RuleMark(y: .value("Average", avg))
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                             .foregroundStyle(series.color.opacity(0.5))
-                            .annotation(position: .topLeading, alignment: .leading) {
+                            // .top + .leading keeps the label inside the plot; .topLeading
+                            // hung it off the left edge, clipped to "vg 3.7".
+                            .annotation(position: .top, alignment: .leading,
+                                        overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
                                 Text("avg \(String(format: "%.1f", avg))")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
