@@ -53,7 +53,7 @@ final class NotificationService: NotificationServiceProtocol {
         )
 
         let title = String(localized: "Time to check in")
-        let body = String(localized: "Your daily log takes under 90 seconds.")
+        let body = String(localized: "Your daily log takes about 2 minutes.")
         for fireDate in Self.dailyReminderDates(from: now, hour: hour, minute: minute,
                                                 count: ReminderThreshold.dailyWindowDays,
                                                 skipToday: skipToday, calendar: calendar) {

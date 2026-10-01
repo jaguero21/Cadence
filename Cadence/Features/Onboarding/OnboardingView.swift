@@ -119,7 +119,7 @@ struct OnboardingView: View {
             icon: "checkmark.seal.fill",
             iconColor: CadenceColor.successGreen,
             title: "You're all set!",
-            message: "Your first log is waiting. It takes about 90 seconds — and every entry helps Cadence understand your patterns.",
+            message: "Your first log is waiting. It takes about 2 minutes — and every entry helps Cadence understand your patterns.",
             primaryLabel: "Open Cadence",
             primaryAction: { appState.completeOnboarding() }
         )
