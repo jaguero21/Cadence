@@ -41,7 +41,8 @@ struct WeekSummaryView: View {
                 .font(.title3.bold())
 
             HStack(spacing: 0) {
-                summaryMetric(label: "Mood", value: review.avgMood, color: CadenceColor.moodBlue, icon: "face.smiling")
+                // Mood is a 1–5 scale; it was labelled "/ 10" like the sliders.
+                summaryMetric(label: "Mood", value: review.avgMood, color: CadenceColor.moodBlue, icon: "face.smiling", suffix: "/ 5")
                 Divider().frame(height: 50)
                 summaryMetric(label: "Energy", value: review.avgEnergy, color: CadenceColor.energyOrange, icon: "bolt.fill")
                 Divider().frame(height: 50)
@@ -68,10 +69,12 @@ struct WeekSummaryView: View {
         .cadenceCard()
     }
 
-    private func summaryMetric(label: String, value: Double, color: Color, icon: String, suffix: String = "/ 10") -> some View {
+    // LocalizedStringKey labels: as Strings they skipped the catalog. A value
+    // of 0 means no day that week recorded it (see populateSummary).
+    private func summaryMetric(label: LocalizedStringKey, value: Double, color: Color, icon: String, suffix: LocalizedStringKey = "/ 10") -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon).foregroundStyle(color)
-            Text(String(format: "%.1f", value))
+            Text(value > 0 ? String(format: "%.1f", value) : "—")
                 .font(.title2.bold())
                 .foregroundStyle(color)
             Text(label).font(.caption).foregroundStyle(.secondary)
