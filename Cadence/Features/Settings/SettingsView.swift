@@ -21,6 +21,7 @@ struct SettingsView: View {
     // Kept apart from purchaseError so it can carry its own, non-alarming
     // title — see the alerts below.
     @State private var pendingMessage: String?
+    @State private var restoreMessage: String?
     @State private var showingManageSubscriptions = false
 
     #if DEBUG
@@ -38,6 +39,7 @@ struct SettingsView: View {
             proSection
             remindersSection
             trackingSection
+            exportSection
             healthKitSection
             SyncBackupSection()
             aboutSection
@@ -79,6 +81,14 @@ struct SettingsView: View {
         // purchaseError put that reassuring message under a red "Purchase Error"
         // heading, which reads as "your payment failed". Mirrors
         // ProPaywallView, which already keeps the two apart.
+        .alert("Restore Purchases", isPresented: .init(
+            get: { restoreMessage != nil },
+            set: { if !$0 { restoreMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(restoreMessage ?? "")
+        }
         .alert("Waiting for Approval", isPresented: .init(
             get: { pendingMessage != nil },
             set: { if !$0 { pendingMessage = nil } }
@@ -118,11 +128,6 @@ struct SettingsView: View {
                     Spacer()
                     Text("Active").foregroundStyle(CadenceColor.successGreen)
                 }
-                NavigationLink {
-                    ExportView()
-                } label: {
-                    Label("Export Report", systemImage: "doc.richtext.fill")
-                }
                 // Only meaningful for the auto-renewing plan — a lifetime
                 // purchase has nothing to manage, and showing the sheet to
                 // someone with no subscription just presents an empty list.
@@ -158,7 +163,7 @@ struct SettingsView: View {
                     Button("Restore Purchases") {
                         Task {
                             isPurchasing = true
-                            await store.restorePurchases()
+                            restoreMessage = StoreService.message(for: await store.restorePurchases())
                             isPurchasing = false
                         }
                     }
@@ -224,6 +229,21 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    // Export is for everyone: the CSV is free ("users own their data") and
+    // ExportView gates only the PDF. It used to be linked from the Pro-only
+    // block, which made the free CSV unreachable without buying Pro.
+    private var exportSection: some View {
+        Section {
+            NavigationLink {
+                ExportView()
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.up")
+            }
+        } footer: {
+            Text("Spreadsheet (CSV) export is free. Doctor-ready PDF reports are part of Pro.")
         }
     }
 

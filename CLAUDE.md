@@ -667,6 +667,29 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   (`timeIntervalSinceReferenceDate`, 0 = unset) so a report can be scoped to
   everything since the last visit.
 
+## Pro (StoreKit 2)
+
+- **What Pro gates:** pattern insight cards + insight history (InsightsView),
+  the 90D chart range, the PDF reports (ExportView), and new-pattern
+  notifications (`ContentView.checkForNewInsights`). Everything else is free —
+  including the CSV export and JSON backup ("users own their data"), custom
+  symptoms, and the dashboard's Top Pattern title (a deliberate teaser that
+  links into the gated Insights tab). The Export screen is linked for everyone
+  from Settings; it gates only the PDF. Keep the paywall's feature list
+  (`ProPaywallView.features`) truthful to these gates.
+- `StoreService` (unseamed singleton, see Code quality) verifies every
+  transaction (`checkVerified`), rebuilds `purchasedProductIDs` from
+  `currentEntitlements` at launch AND on every foreground (expiry never arrives
+  through `Transaction.updates`), and drops revoked transactions in the updates
+  listener. **An empty `Product.products` result is a load failure**, not
+  "loading" — it used to leave the paywall spinning forever, which App Review
+  reads as a broken purchase flow. **Restore calls `AppStore.sync()`** before
+  re-reading entitlements, and both Restore buttons report the outcome
+  (`StoreService.message(for:)`).
+- `Cadence/CarpeCadence.storekit` is for local testing only; select it in the
+  scheme (Run → Options → StoreKit Configuration) to buy Pro in the simulator.
+  App Store Connect is the source of truth for the live products.
+
 ## Backup & iCloud status
 
 - **JSON backup/restore** (`BackupService`, driven from `SyncBackupSection` in

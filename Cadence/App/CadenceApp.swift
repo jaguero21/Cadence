@@ -429,6 +429,12 @@ struct ContentView: View {
             syncMedicationReminders()
             reprobeCloudAccountStatus()
             Task { await rearmDailyReminder() }
+            // Transaction.updates doesn't fire when a subscription simply
+            // EXPIRES, so without this a lapsed monthly plan stayed Pro until
+            // the next cold launch.
+            if !AppLaunch.isUITesting {
+                Task { await store.refreshEntitlements() }
+            }
         }
         .task { seedSymptomTagsIfNeeded() }
         .task { syncMedicationReminders() }
