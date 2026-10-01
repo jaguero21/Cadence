@@ -617,9 +617,19 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   (`ensureLog` re-fetches and creates by that date) and runs the HealthKit
   prefill only when `day` is today, since the prefill reads today's samples.
 - `LogDetailView` shows only values the person entered: the metric rows gate
-  on `didEditMood`/`didEditMetrics` (same as `PatternEngine`, the trend charts
-  and the dashboard averages), because an untouched field still holds
+  on `didEditMood`/`didEditMetrics`, because an untouched field still holds
   `DailyLog`'s defaults. It also shows the Basics and both daily reflections.
+- **That gate is app-wide — every surface that reads mood or a slider value
+  must apply it.** Mood gates on `didEditMood`; energy, sleep, pain, brain fog
+  and anxiety gate on `didEditMetrics`. Current sites: `PatternEngine`, the
+  dashboard's 7-day stats, `ChartMetric.series` (trend charts),
+  `PDFBuilder`'s trend charts and "How your days felt" averages ("not
+  recorded" when no day has a value), `CSVBuilder` (empty cells),
+  `WeeklyReviewViewModel.populateSummary` (0 = not recorded, shown as a dash),
+  `LogDetailView`, the History preview/VoiceOver labels and
+  `WeekReflectionService`. Each of the non-PatternEngine ones was found
+  reporting defaults as readings before it was gated — a new surface that
+  averages or plots `log.mood`/`log.energy` without the flag repeats the bug.
 
 ## Export
 
@@ -902,6 +912,13 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   look at the newest `~/Library/Logs/DiagnosticReports/Cadence-*.ips`: the
   faulting thread shows `_dispatch_assert_queue_fail` →
   `swift_task_isCurrentExecutor…` → the helper and the test that called it.
+- **App Store screenshots** come from `CadenceUITests/ScreenshotTests`, which
+  skips itself unless `CADENCE_SCREENSHOTS=1` reaches the runner — so it never
+  runs in CI or a normal ⌘U. Run it per device with
+  `TEST_RUNNER_CADENCE_SCREENSHOTS=1 xcodebuild test … -only-testing:CadenceUITests/ScreenshotTests -resultBundlePath X`
+  (boot the simulator and `simctl status_bar … override --time 9:41` first),
+  then `xcrun xcresulttool export attachments --path X`. It drives the DEBUG
+  seed buttons, so it must run a Debug build.
 - Inject fakes that conform to the service protocols; use `ThrowingPersistence`
   (a `ModelPersisting` whose `save()` throws) to cover save-failure branches.
 
