@@ -139,7 +139,10 @@ struct ProPaywallView: View {
             if let lifetime = store.lifetimeProduct {
                 purchaseButton(
                     product: lifetime,
-                    label: "Buy Lifetime Access",
+                    // String(localized:): purchaseButton takes a String, which
+                    // Text renders verbatim — as a bare literal this label
+                    // never reached the catalog.
+                    label: String(localized: "Buy Lifetime Access"),
                     sublabel: lifetime.displayPrice,
                     color: CadenceColor.accent,
                     prominent: true
@@ -147,13 +150,24 @@ struct ProPaywallView: View {
             }
 
             if let monthly = store.monthlyProduct {
-                purchaseButton(
-                    product: monthly,
-                    label: "Subscribe Monthly",
-                    sublabel: "\(monthly.displayPrice) / month",
-                    color: CadenceColor.sleepPurple,
-                    prominent: false
-                )
+                if let trial = store.monthlyFreeTrial {
+                    let length = StoreService.trialLength(value: trial.value, unit: trial.unit)
+                    purchaseButton(
+                        product: monthly,
+                        label: String(localized: "Try Free for \(length)"),
+                        sublabel: String(localized: "then \(monthly.displayPrice) / month"),
+                        color: CadenceColor.sleepPurple,
+                        prominent: false
+                    )
+                } else {
+                    purchaseButton(
+                        product: monthly,
+                        label: String(localized: "Subscribe Monthly"),
+                        sublabel: String(localized: "\(monthly.displayPrice) / month"),
+                        color: CadenceColor.sleepPurple,
+                        prominent: false
+                    )
+                }
             }
 
             if store.productsLoadFailed {
@@ -227,6 +241,16 @@ struct ProPaywallView: View {
     // both links on this screen for as long as it sells a subscription.
     private var legal: some View {
         VStack(spacing: 10) {
+            // Trial terms sit with the renewal terms, in full, whenever a
+            // trial is on offer: length, the price that follows, and how to
+            // avoid the charge (Guideline 3.1.2).
+            if let trial = store.monthlyFreeTrial, let monthly = store.monthlyProduct {
+                let length = StoreService.trialLength(value: trial.value, unit: trial.unit)
+                Text("The monthly plan is free for \(length), then \(monthly.displayPrice) per month. Cancel at least 24 hours before the trial ends and you won't be charged.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
             Text("Payment charged to your Apple ID at purchase confirmation. Subscriptions auto-renew unless cancelled at least 24 hours before the renewal date. Manage or cancel in your Apple ID settings.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)

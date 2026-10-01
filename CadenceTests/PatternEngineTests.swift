@@ -1542,3 +1542,20 @@ struct MenopauseEffectsTests {
         #expect(PatternEngine.menopauseEffects(transitions: [], logs: []).isEmpty)
     }
 }
+
+// MARK: - StoreService trial wording
+
+import StoreKit
+
+@Suite("StoreService – trial length wording")
+struct TrialLengthTests {
+    private let en = Locale(identifier: "en_US")
+
+    @Test("Formats the common trial lengths in full words")
+    func formatsLengths() {
+        #expect(StoreService.trialLength(value: 1, unit: .month, locale: en) == "1 month")
+        #expect(StoreService.trialLength(value: 7, unit: .day, locale: en) == "7 days")
+        #expect(StoreService.trialLength(value: 2, unit: .week, locale: en) == "2 weeks")
+        #expect(StoreService.trialLength(value: 1, unit: .year, locale: en) == "1 year")
+    }
+}

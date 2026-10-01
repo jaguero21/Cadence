@@ -686,6 +686,17 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   reads as a broken purchase flow. **Restore calls `AppStore.sync()`** before
   re-reading entitlements, and both Restore buttons report the outcome
   (`StoreService.message(for:)`).
+- **Free trial wording is read from StoreKit, never hard-coded.**
+  `StoreService.monthlyFreeTrial` is set only when the monthly product's
+  `introductoryOffer` is a `.freeTrial` AND `isEligibleForIntroOffer` (one
+  intro offer per subscription group per Apple Account). The paywall then
+  shows "Try Free for 1 month / then $X / month" plus the full trial terms
+  beside the renewal disclosure; otherwise the plain monthly price. Apple
+  applies a configured trial at purchase whether or not the app mentions it,
+  so a trial set up in App Store Connect with no in-app disclosure is a
+  Guideline 3.1.2 problem — this keeps the two in step automatically.
+  `trialLength(value:unit:)` formats in the offer's own unit only (pure,
+  tested: an all-units formatter turned "7 days" into "1 week").
 - `Cadence/CarpeCadence.storekit` is for local testing only; select it in the
   scheme (Run → Options → StoreKit Configuration) to buy Pro in the simulator.
   App Store Connect is the source of truth for the live products.

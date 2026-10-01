@@ -9,6 +9,13 @@ final class StoreService {
     var products: [Product] = []
     var purchasedProductIDs: Set<String> = []
     var productsLoadFailed = false
+    // The monthly plan's free trial, when App Store Connect defines one AND
+    // this Apple Account is still eligible (one intro offer per subscription
+    // group, ever). nil = no trial to show. Read from StoreKit at runtime —
+    // never hard-coded — so the paywall can't promise a trial that isn't
+    // configured, or hide one that is (Guideline 3.1.2 requires disclosing
+    // its length and what's charged after it).
+    var monthlyFreeTrial: Product.SubscriptionPeriod?
     private var updates: Task<Void, Never>?
     private static let log = Logger(subsystem: "com.carpecadence", category: "StoreService")
     init() { updates = listenForTransactionUpdates() }
@@ -30,6 +37,7 @@ final class StoreService {
                 productsLoadFailed = true
                 Self.log.error("StoreKit returned no products for the Pro IDs")
             }
+            await refreshTrialEligibility()
         } catch {
             products = []
             productsLoadFailed = true
@@ -87,6 +95,45 @@ final class StoreService {
             await transaction.finish()
         }
         purchasedProductIDs = owned
+    }
+
+    // Only a `.freeTrial` offer changes the paywall wording; pay-as-you-go /
+    // pay-up-front intro prices would need their own disclosure copy.
+    func refreshTrialEligibility() async {
+        guard let subscription = monthlyProduct?.subscription,
+              let offer = subscription.introductoryOffer,
+              offer.paymentMode == .freeTrial,
+              await subscription.isEligibleForIntroOffer
+        else {
+            monthlyFreeTrial = nil
+            return
+        }
+        monthlyFreeTrial = offer.period
+    }
+
+    // Pure and unit-tested: "1 month", "7 days", "2 weeks" in the current
+    // locale, for "Free for 1 month, then $2.99/month".
+    nonisolated static func trialLength(value: Int, unit: Product.SubscriptionPeriod.Unit,
+                                        locale: Locale = .current) -> String {
+        var components = DateComponents()
+        let allowed: NSCalendar.Unit
+        switch unit {
+        case .day:   components.day = value;         allowed = .day
+        case .week:  components.weekOfMonth = value; allowed = .weekOfMonth
+        case .month: components.month = value;       allowed = .month
+        case .year:  components.year = value;        allowed = .year
+        @unknown default: components.day = value;   allowed = .day
+        }
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .full
+        // Only the offer's own unit: with every unit allowed the formatter
+        // normalizes "7 days" to "1 week", which no longer matches the offer
+        // as configured in App Store Connect.
+        formatter.allowedUnits = allowed
+        var calendar = Calendar.current
+        calendar.locale = locale
+        formatter.calendar = calendar
+        return formatter.string(from: components) ?? "\(value)"
     }
 
     enum RestoreOutcome {
