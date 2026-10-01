@@ -294,7 +294,9 @@ struct CadenceApp: App {
                                     let ud     = UserDefaults.standard
                                     let hour   = ud.object(forKey: UserDefaultsKey.dailyReminderHour)   as? Int  ?? 20
                                     let minute = ud.object(forKey: UserDefaultsKey.dailyReminderMinute) as? Int  ?? 0
-                                    NotificationService.shared.scheduleDailyReminder(at: hour, minute: minute)
+                                    NotificationService.shared.scheduleDailyReminder(
+                                        at: hour, minute: minute,
+                                        skipToday: DailyLog.hasCompletedLog(on: .now, in: container.mainContext))
                                     let weeklyOn = ud.object(forKey: UserDefaultsKey.weeklyReminderEnabled) as? Bool ?? true
                                     if weeklyOn { NotificationService.shared.scheduleWeeklyReviewReminder() }
                                 }
@@ -394,10 +396,6 @@ struct ContentView: View {
                 .tabItem { Label("Today", systemImage: "sun.max.fill") }
                 .tag(Tab.dashboard)
 
-            DailyLogView(referenceDate: today)
-                .tabItem { Label("Log", systemImage: "pencil.and.list.clipboard") }
-                .tag(Tab.dailyLog)
-
             WeeklyReviewView(referenceDate: today)
                 .tabItem { Label("Review", systemImage: "calendar.badge.checkmark") }
                 .tag(Tab.weeklyReview)
@@ -415,6 +413,11 @@ struct ContentView: View {
         .adaptableTabBar()
         // iOS 26: the tab bar tucks away while scrolling charts/history.
         .minimizableTabBar()
+        .onChange(of: appState.requestedTab) { _, tab in
+            guard let tab else { return }
+            selectedTab = tab
+            appState.requestedTab = nil
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             let startOfToday = Calendar.current.startOfDay(for: .now)
@@ -425,6 +428,7 @@ struct ContentView: View {
             openCheckInIfRequested()
             syncMedicationReminders()
             reprobeCloudAccountStatus()
+            Task { await rearmDailyReminder() }
         }
         .task { seedSymptomTagsIfNeeded() }
         .task { syncMedicationReminders() }
@@ -450,6 +454,21 @@ struct ContentView: View {
                 Text("Cadence couldn't open its database and is running on temporary storage, so anything you log right now won't be kept. Force-quit and reopen. Nothing has been saved on this device yet, so reinstalling is safe if this keeps happening.")
             }
         }
+    }
+
+    // Daily reminders are a rolling window of one-shot requests (see
+    // NotificationService.scheduleDailyReminder), so every foreground tops the
+    // window back up — otherwise they'd run out ReminderThreshold.dailyWindowDays
+    // after the last launch. Only when permission is actually in place.
+    private func rearmDailyReminder() async {
+        guard !AppLaunch.isUITesting,
+              await notificationService.checkAuthorizationStatus() else { return }
+        let ud = UserDefaults.standard
+        notificationService.scheduleDailyReminder(
+            at: ud.object(forKey: UserDefaultsKey.dailyReminderHour) as? Int ?? 20,
+            minute: ud.object(forKey: UserDefaultsKey.dailyReminderMinute) as? Int ?? 0,
+            skipToday: DailyLog.hasCompletedLog(on: .now, in: modelContext)
+        )
     }
 
     // On foreground, reconcile scheduled medication reminders with the store —
@@ -670,5 +689,7 @@ struct StorageFatalErrorView: View {
 }
 
 enum Tab: Hashable {
-    case dashboard, dailyLog, weeklyReview, insights, history
+    // No separate Log tab: today's log lives on the dashboard's Today card and
+    // every earlier day in History (which also opens a missed day for logging).
+    case dashboard, weeklyReview, insights, history
 }

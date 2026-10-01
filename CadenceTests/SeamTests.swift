@@ -703,7 +703,7 @@ struct StreakBreadthTests {
 private final class StreakFakeNotificationService: NotificationServiceProtocol {
     func requestAuthorization() async -> Bool { true }
     func checkAuthorizationStatus() async -> Bool { true }
-    func scheduleDailyReminder(at hour: Int, minute: Int) {}
+    func scheduleDailyReminder(at hour: Int, minute: Int, skipToday: Bool) {}
     func scheduleWeeklyReviewReminder(weekday: Int, hour: Int) {}
     func scheduleStreakAtRisk() {}
     func sendInsightNotification(title: String) {}

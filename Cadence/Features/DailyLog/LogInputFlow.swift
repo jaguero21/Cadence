@@ -14,6 +14,10 @@ struct LogInputFlow: View {
     @Query(sort: \CustomTracker.sortOrder) private var customTrackers: [CustomTracker]
 
     private let existingLog: DailyLog?
+    // The day this flow writes to — today for the normal check-in, an earlier
+    // day when History opens it to fill in a missed day. Midnight-normalized.
+    private let day: Date
+    private var isToday: Bool { Calendar.current.isDateInToday(day) }
 
     // Plain defaults — hydrated from existingLog in .onAppear (see body).
     // Keeping @State init out of init() avoids the SwiftUI stale-state
@@ -21,6 +25,8 @@ struct LogInputFlow: View {
     // insertion, silently ignoring any future parent changes.
     @State private var mood: Int = 3
     @State private var didEditMood = false
+    @State private var moodTaps = 0
+    @State private var didFinish = false
     @State private var didEditMetrics = false
     @State private var energy: Int = 5
     @State private var sleepHours: Double = 7.0
@@ -53,8 +59,9 @@ struct LogInputFlow: View {
 
     private static let log = Logger(subsystem: "com.carpecadence", category: "LogInputFlow")
 
-    init(existingLog: DailyLog?) {
+    init(existingLog: DailyLog?, day: Date = .now) {
         self.existingLog = existingLog
+        self.day = Calendar.current.startOfDay(for: existingLog?.date ?? day)
     }
 
     var body: some View {
@@ -65,6 +72,9 @@ struct LogInputFlow: View {
                 }
                 ScrollView {
                     VStack(spacing: 20) {
+                        if !isToday && vm.currentStep != .done {
+                            pastDayBanner
+                        }
                         switch vm.currentStep {
                         case .mood:        moodStep
                         case .bodyMetrics: bodyMetricsStep
@@ -77,6 +87,7 @@ struct LogInputFlow: View {
                     }
                     .padding()
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .transition(.cadenceStepSlide(reduceMotion: reduceMotion))
                 .id(vm.currentStep)
                 .safeAreaInset(edge: .bottom) {
@@ -89,9 +100,10 @@ struct LogInputFlow: View {
                 // Declarative haptics: one tick per meaningful state change,
                 // regardless of which control caused it (chip, button, jump).
                 .sensoryFeedback(.impact(weight: .light), trigger: vm.currentStep)
-                .sensoryFeedback(.impact(weight: .medium), trigger: mood)
-                .sensoryFeedback(.impact(weight: .light), trigger: basicsCompleted)
-                .sensoryFeedback(.impact(weight: .light), trigger: selectedFactors)
+                // Driven by a tap counter, not by `mood` itself: the Health
+                // prefill and hydration also write `mood`, and the phone
+                // shouldn't buzz for a change the user didn't make.
+                .sensoryFeedback(.impact(weight: .medium), trigger: moodTaps)
             }
             .navigationTitle(vm.currentStep.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -125,7 +137,9 @@ struct LogInputFlow: View {
                     peaksAndValleysNote     = log.peaksAndValleysNote
                     intentionsForTomorrow   = log.intentionsForTomorrow
                     freeNote         = log.freeNote
-                } else {
+                } else if isToday {
+                    // Health prefill reads TODAY's samples, so it only makes
+                    // sense for today's log; a backfilled day stays manual.
                     hkTask = Task { await applyHealthKitData() }
                 }
             }
@@ -135,7 +149,7 @@ struct LogInputFlow: View {
                 // swipe-away) but only when a log is already in progress, to
                 // avoid phantom entries. Attachments count as progress — their
                 // binaries are already on disk and would be orphaned otherwise.
-                if existingLog != nil || createdLog != nil || !attachments.isEmpty {
+                if !didFinish, existingLog != nil || createdLog != nil || !attachments.isEmpty {
                     partialSave()
                 }
             }
@@ -168,6 +182,20 @@ struct LogInputFlow: View {
         }
     }
 
+    // Editing or filling in an earlier day: say which, on every step, so it's
+    // never mistaken for today's check-in.
+    private var pastDayBanner: some View {
+        Label {
+            Text("Logging for \(day.formatted(.dateTime.weekday(.wide).month().day()))")
+        } icon: {
+            Image(systemName: "calendar")
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(CadenceColor.accent)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+    }
+
     // MARK: - Step Indicator
 
     // Tappable replacement for the old anonymous progress bar: shows where you
@@ -197,7 +225,8 @@ struct LogInputFlow: View {
                             .fill(isCurrent ? CadenceColor.accent : .clear)
                             .frame(width: 18, height: 3)
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(step.title)
@@ -215,12 +244,13 @@ struct LogInputFlow: View {
 
     private var moodStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            LogSectionHeader(icon: "face.smiling", title: "OVERALL MOOD", time: "~30 sec")
+            LogSectionHeader(icon: "face.smiling", title: "OVERALL MOOD")
             HStack(spacing: 10) {
                 ForEach(1...5, id: \.self) { value in
                     Button {
                         withAnimation(CadenceAnimation.spring) { mood = value }
                         didEditMood = true
+                        moodTaps += 1
                     } label: {
                         Text(moodEmoji(value))
                             .font(.system(size: 34))
@@ -246,6 +276,9 @@ struct LogInputFlow: View {
                     .accessibilityAddTraits(mood == value ? [.isSelected] : [])
                 }
             }
+            // Five faces share one row, so cap how far they grow; the labels
+            // still carry full accessibility sizing for VoiceOver users.
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
         .cadenceCard()
     }
@@ -274,7 +307,7 @@ struct LogInputFlow: View {
 
     private var bodyMetricsStep: some View {
         VStack(alignment: .leading, spacing: 20) {
-            LogSectionHeader(icon: "waveform.path.ecg", title: "BODY METRICS", time: "~60 sec")
+            LogSectionHeader(icon: "waveform.path.ecg", title: "BODY METRICS")
             VStack(spacing: 16) {
                 BodyMetricRow(label: "Energy",        value: $energy,        onEdit: markMetricsEdited)
                 Divider()
@@ -329,47 +362,8 @@ struct LogInputFlow: View {
 
     private var basicsStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            LogSectionHeader(icon: "checklist", title: "BASICS DONE TODAY", time: "~30 sec")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(Self.basicItems, id: \.name) { item in
-                    let selected = basicsCompleted.contains(item.name)
-                    Button {
-                        withAnimation(CadenceAnimation.spring) {
-                            if selected {
-                                basicsCompleted.removeAll { $0 == item.name }
-                            } else {
-                                basicsCompleted.append(item.name)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
-                                .foregroundStyle(selected ? CadenceColor.successGreen : .secondary)
-                                .frame(width: 20)
-                                .contentTransition(.symbolEffect(.replace))
-                            Text(item.name)
-                                .font(.subheadline)
-                                .foregroundStyle(selected ? CadenceColor.successGreen : .primary)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 14)
-                        .background(
-                            selected
-                                ? CadenceColor.successGreen.opacity(0.1)
-                                : Color(.secondarySystemGroupedBackground),
-                            in: RoundedRectangle(cornerRadius: 12)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(selected ? CadenceColor.successGreen.opacity(0.4) : Color.clear, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(item.name)
-                    .accessibilityAddTraits(selected ? [.isSelected] : [])
-                }
-            }
+            LogSectionHeader(icon: "checklist", title: "BASICS DONE TODAY")
+            ToggleChipGrid(items: Self.basicItems, selection: $basicsCompleted, tint: CadenceColor.successGreen)
         }
         .cadenceCard()
     }
@@ -399,47 +393,8 @@ struct LogInputFlow: View {
 
     private var factorsStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            LogSectionHeader(icon: "exclamationmark.triangle", title: "POSSIBLE TRIGGERS", time: "~30 sec")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(Self.factorItems, id: \.name) { item in
-                    let selected = selectedFactors.contains(item.name)
-                    Button {
-                        withAnimation(CadenceAnimation.spring) {
-                            if selected {
-                                selectedFactors.removeAll { $0 == item.name }
-                            } else {
-                                selectedFactors.append(item.name)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
-                                .foregroundStyle(selected ? CadenceColor.stressRed : .secondary)
-                                .frame(width: 20)
-                                .contentTransition(.symbolEffect(.replace))
-                            Text(item.name)
-                                .font(.subheadline)
-                                .foregroundStyle(selected ? CadenceColor.stressRed : .primary)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 14)
-                        .background(
-                            selected
-                                ? CadenceColor.stressRed.opacity(0.1)
-                                : Color(.secondarySystemGroupedBackground),
-                            in: RoundedRectangle(cornerRadius: 12)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(selected ? CadenceColor.stressRed.opacity(0.4) : Color.clear, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(item.name)
-                    .accessibilityAddTraits(selected ? [.isSelected] : [])
-                }
-            }
+            LogSectionHeader(icon: "exclamationmark.triangle", title: "POSSIBLE TRIGGERS")
+            ToggleChipGrid(items: Self.factorItems, selection: $selectedFactors, tint: CadenceColor.stressRed)
         }
         .cadenceCard()
     }
@@ -448,7 +403,7 @@ struct LogInputFlow: View {
 
     private var symptomStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            LogSectionHeader(icon: "bandage", title: "SYMPTOMS TODAY", time: "~30 sec")
+            LogSectionHeader(icon: "bandage", title: "SYMPTOMS TODAY")
             SymptomPickerView(selectedSymptoms: $selectedSymptoms)
         }
         .cadenceCard()
@@ -471,7 +426,7 @@ struct LogInputFlow: View {
 
     private var peaksAndValleysStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            LogSectionHeader(icon: "arrow.up.arrow.down.circle", title: "PEAKS AND VALLEYS", time: "~60 sec")
+            LogSectionHeader(icon: "arrow.up.arrow.down.circle", title: "PEAKS AND VALLEYS")
             Text("What were the peaks and valleys of your day?")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -498,7 +453,7 @@ struct LogInputFlow: View {
 
     private var intentionsStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            LogSectionHeader(icon: "sunrise.fill", title: "INTENTIONS FOR TOMORROW", time: "~30 sec")
+            LogSectionHeader(icon: "sunrise.fill", title: "INTENTIONS FOR TOMORROW")
             Text("Write your intentions for tomorrow.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -525,7 +480,7 @@ struct LogInputFlow: View {
 
     private var noteStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            LogSectionHeader(icon: "pencil", title: "ONE-LINE NOTE", time: "~60 sec")
+            LogSectionHeader(icon: "pencil", title: "ONE-LINE NOTE")
             TextField(
                 "One thing that stood out today — a symptom, a win, or just how it felt…",
                 text: $freeNote,
@@ -579,7 +534,7 @@ struct LogInputFlow: View {
             HStack(spacing: 24) {
                 summaryPill(label: "Mood",   value: moodEmoji(mood),      color: CadenceColor.moodBlue)
                 summaryPill(label: "Energy", value: "\(energy)/10",        color: CadenceColor.energyOrange)
-                summaryPill(label: "Sleep",  value: "\(sleepQuality)/10",  color: CadenceColor.sleepPurple)
+                summaryPill(label: "Sleep quality",  value: "\(sleepQuality)/10",  color: CadenceColor.sleepPurple)
             }
 
             Button("Close") { Task { @MainActor in dismiss() } }
@@ -628,8 +583,8 @@ struct LogInputFlow: View {
                             }
                             return
                         }
-                        logPersisted = true
-                        publishToHealth(log)
+                        didFinish = true
+                        afterPersist(log)
                     }
                     vm.nextStep()
                 } label: {
@@ -659,17 +614,17 @@ struct LogInputFlow: View {
         if let existing = existingLog { return existing }
         if let created = createdLog { return created }
         // existingLog was captured when the sheet opened; with no DB-level
-        // unique constraint (CloudKit), today's log may have been created since
-        // (watch quick-log, CloudKit import). Re-fetch at save time and adopt
-        // it rather than inserting a same-date duplicate.
-        let today = Calendar.current.startOfDay(for: .now)
-        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == today })
+        // unique constraint (CloudKit), this day's log may have been created
+        // since (watch quick-log, CloudKit import). Re-fetch at save time and
+        // adopt it rather than inserting a same-date duplicate.
+        let day = self.day
+        let descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == day })
         if let concurrent = try? modelContext.fetch(descriptor).first {
             createdLog = concurrent
             logPersisted = true   // already in the store — never rollback-delete it
             return concurrent
         }
-        let newLog = DailyLog()
+        let newLog = DailyLog(date: day)
         createdLog = newLog
         return newLog
     }
@@ -775,22 +730,27 @@ struct LogInputFlow: View {
         Task { await service.publish(log: snapshot) }
     }
 
+    // Everything that follows a successful save, shared by Finish and the
+    // partial-save safety net so neither path can skip a step the other does.
+    private func afterPersist(_ log: DailyLog) {
+        logPersisted = true
+        // The save dropped the references to removed persisted attachments;
+        // now their binaries can safely go.
+        pendingFileDeletions.forEach(attachmentStore.delete)
+        pendingFileDeletions.removeAll()
+        // Keep the home-screen widget current without requiring a visit to
+        // the Dashboard tab.
+        DashboardViewModel.publishWidgetSummary(in: modelContext)
+        publishToHealth(log)
+    }
+
     private func partialSave() {
         let log = ensureLog()
         apply(to: log)
         if existingLog == nil { modelContext.insert(log) }
         do {
             try modelContext.save()
-            logPersisted = true
-            // The save dropped the references to removed persisted attachments;
-            // now their binaries can safely go.
-            pendingFileDeletions.forEach(attachmentStore.delete)
-            pendingFileDeletions.removeAll()
-            // Keep the home-screen widget current without requiring a visit to
-            // the Dashboard tab.
-            let logs = (try? modelContext.fetch(FetchDescriptor<DailyLog>())) ?? []
-            DashboardViewModel.publishWidgetSummary(logs: logs, activeFlare: DashboardViewModel.activeFlare(in: modelContext))
-            publishToHealth(log)
+            afterPersist(log)
         } catch {
             Self.log.error("Partial save failed: \(error, privacy: .public)")
             if existingLog == nil, !logPersisted {
@@ -857,8 +817,10 @@ private struct AttachmentControls: View {
                         onRemove(memo)
                     } label: {
                         Image(systemName: "trash").foregroundStyle(.secondary)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Delete voice memo")
                 }
             }
 
@@ -898,6 +860,104 @@ private struct AttachmentControls: View {
     }
 }
 
+// Two-column multi-select chip grid shared by the Basics and Triggers steps.
+// `name` is the stored identity (PatternEngine and the reports key off it), so
+// it stays English; the DISPLAYED text is looked up in the catalog through
+// LocalizedStringKey, which is why these names carry manual catalog entries.
+private struct ToggleChipGrid: View {
+    let items: [(name: String, icon: String)]
+    @Binding var selection: [String]
+    let tint: Color
+
+    // Counts user taps only, so Health-driven preselection (which writes
+    // `selection` directly) never triggers a haptic.
+    @State private var taps = 0
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            ForEach(items, id: \.name) { item in
+                let selected = selection.contains(item.name)
+                Button {
+                    taps += 1
+                    withAnimation(CadenceAnimation.spring) {
+                        if selected {
+                            selection.removeAll { $0 == item.name }
+                        } else {
+                            selection.append(item.name)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: selected ? "checkmark.circle.fill" : item.icon)
+                            .foregroundStyle(selected ? tint : .secondary)
+                            .frame(width: 20)
+                            .contentTransition(.symbolEffect(.replace))
+                        Text(LocalizedStringKey(item.name))
+                            .font(.subheadline)
+                            .foregroundStyle(selected ? tint : .primary)
+                            .multilineTextAlignment(.leading)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                    .background(
+                        selected ? tint.opacity(0.1) : Color(.secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(selected ? tint.opacity(0.4) : Color.clear, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(LocalizedStringKey(item.name)))
+                .accessibilityAddTraits(selected ? [.isSelected] : [])
+            }
+        }
+        .sensoryFeedback(.impact(weight: .light), trigger: taps)
+    }
+}
+
+// Label + slider + value, laid out side by side normally and stacked at
+// accessibility text sizes, where a fixed 100pt label column truncates
+// ("Sleep quality") and squeezes the slider to nothing. The visible label and
+// value are hidden from VoiceOver: the slider itself carries both.
+private struct MetricRowLayout<Slider: View>: View {
+    let label: Text
+    let value: Text
+    let valueWidth: CGFloat
+    @ViewBuilder let slider: Slider
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .subheadline) private var labelWidth: CGFloat = 100
+
+    var body: some View {
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    label.font(.subheadline).accessibilityHidden(true)
+                    Spacer()
+                    value.font(.headline.monospacedDigit()).accessibilityHidden(true)
+                }
+                slider
+            }
+        } else {
+            HStack(spacing: 14) {
+                label
+                    .font(.subheadline)
+                    .lineLimit(2)
+                    .frame(width: labelWidth, alignment: .leading)
+                    .accessibilityHidden(true)
+                slider
+                value
+                    .font(.headline.monospacedDigit())
+                    .frame(minWidth: valueWidth, alignment: .trailing)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
 private struct LogSectionHeader: View {
     let icon: String
     // LocalizedStringKey, not String: as plain Strings these reached
@@ -906,21 +966,14 @@ private struct LogSectionHeader: View {
     // sec", …) stayed English in every language and never entered the catalog.
     // `icon` stays a String — it's an SF Symbol name, not user-facing copy.
     let title: LocalizedStringKey
-    let time: LocalizedStringKey
 
+    // No per-step time estimate: the chips summed to ~5 minutes while the
+    // app promises a ~90-second check-in, so they contradicted the copy.
     var body: some View {
-        HStack {
-            Label(title, systemImage: icon)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(time)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Color(.systemFill), in: Capsule())
-        }
+        Label(title, systemImage: icon)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -932,10 +985,7 @@ private struct SleepHoursRow: View {
     var onEdit: () -> Void = {}
 
     var body: some View {
-        HStack(spacing: 14) {
-            Text("Sleep hours")
-                .font(.subheadline)
-                .frame(width: 100, alignment: .leading)
+        MetricRowLayout(label: Text("Sleep hours"), value: Text(String(format: "%.1f", hours)), valueWidth: 36) {
             Slider(
                 value: Binding(
                     get: { hours },
@@ -951,12 +1001,9 @@ private struct SleepHoursRow: View {
             .sensoryFeedback(.impact(weight: .light), trigger: hours)
             .accessibilityLabel("Sleep hours")
             .accessibilityValue(String(format: "%.1f hours", hours))
-            Text(String(format: "%.1f", hours))
-                .font(.headline.monospacedDigit())
-                .frame(width: 36, alignment: .trailing)
-                .contentTransition(.numericText())
-                .animation(CadenceAnimation.smooth, value: hours)
         }
+        .contentTransition(.numericText())
+        .animation(CadenceAnimation.smooth, value: hours)
     }
 }
 
@@ -968,12 +1015,10 @@ private struct CustomMetricRow: View {
     let range: ClosedRange<Int>
     @Binding var value: Int
 
+    private var valueText: String { unit.isEmpty ? "\(value)" : "\(value) \(unit)" }
+
     var body: some View {
-        HStack(spacing: 14) {
-            Text(label)
-                .font(.subheadline)
-                .frame(width: 100, alignment: .leading)
-                .lineLimit(2)
+        MetricRowLayout(label: Text(verbatim: label), value: Text(verbatim: valueText), valueWidth: 32) {
             Slider(
                 value: Binding(
                     get: { Double(value) },
@@ -987,14 +1032,11 @@ private struct CustomMetricRow: View {
             )
             .tint(Color(.systemGray3))
             .sensoryFeedback(.impact(weight: .light), trigger: value)
-            .accessibilityLabel(label)
-            .accessibilityValue(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
-            Text(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
-                .font(.headline.monospacedDigit())
-                .frame(minWidth: 32, alignment: .trailing)
-                .contentTransition(.numericText())
-                .animation(CadenceAnimation.smooth, value: value)
+            .accessibilityLabel(Text(verbatim: label))
+            .accessibilityValue(valueText)
         }
+        .contentTransition(.numericText())
+        .animation(CadenceAnimation.smooth, value: value)
     }
 }
 
@@ -1010,10 +1052,7 @@ private struct BodyMetricRow: View {
     var onEdit: () -> Void = {}
 
     var body: some View {
-        HStack(spacing: 14) {
-            Text(label)
-                .font(.subheadline)
-                .frame(width: 100, alignment: .leading)
+        MetricRowLayout(label: Text(label), value: Text("\(value)"), valueWidth: 24) {
             Slider(
                 value: Binding(
                     get: { Double(value) },
@@ -1029,11 +1068,8 @@ private struct BodyMetricRow: View {
             .sensoryFeedback(.impact(weight: .light), trigger: value)
             .accessibilityLabel(label)
             .accessibilityValue("\(value) out of 10")
-            Text("\(value)")
-                .font(.headline.monospacedDigit())
-                .frame(width: 24, alignment: .trailing)
-                .contentTransition(.numericText())
-                .animation(CadenceAnimation.smooth, value: value)
         }
+        .contentTransition(.numericText())
+        .animation(CadenceAnimation.smooth, value: value)
     }
 }

@@ -119,7 +119,7 @@ struct OnboardingView: View {
             icon: "checkmark.seal.fill",
             iconColor: CadenceColor.successGreen,
             title: "You're all set!",
-            message: "Your first log is waiting. It takes about 90 seconds — and every entry helps Cadence understand your patterns.",
+            message: "Your first log is waiting. It takes about 2 minutes — and every entry helps Cadence understand your patterns.",
             primaryLabel: "Open Cadence",
             primaryAction: { appState.completeOnboarding() }
         )
@@ -143,10 +143,12 @@ private enum OnboardingStep: CaseIterable {
 private struct OnboardingPage: View {
     let icon: String
     let iconColor: Color
-    let title: String
-    let message: String
+    // LocalizedStringKey, not String: as plain Strings these reached Text
+    // through its non-localizing overload, so onboarding never translated.
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey
     var isBusy: Bool = false
-    let primaryLabel: String
+    let primaryLabel: LocalizedStringKey
     let primaryAction: () -> Void
     var skipAction: (() -> Void)? = nil
     // Set only by the welcome page. Replaces the SF Symbol rather than
@@ -212,6 +214,7 @@ private struct OnboardingPage: View {
                     Button("Skip", action: skipAction)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .frame(minHeight: 44)
                 }
             }
             .padding(.horizontal, 32)

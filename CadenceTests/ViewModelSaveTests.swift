@@ -28,7 +28,7 @@ private final class FakeNotificationService: NotificationServiceProtocol {
 
     func requestAuthorization() async -> Bool { true }
     func checkAuthorizationStatus() async -> Bool { true }
-    func scheduleDailyReminder(at hour: Int, minute: Int) {}
+    func scheduleDailyReminder(at hour: Int, minute: Int, skipToday: Bool) {}
     func scheduleWeeklyReviewReminder(weekday: Int, hour: Int) {}
     func scheduleStreakAtRisk() {}
     func sendInsightNotification(title: String) {}
@@ -83,6 +83,33 @@ struct DailyLogViewModelSaveTests {
         _ = vm.save(log: log, context: context, notifications: notifications)
 
         #expect(notifications.removedIDs.contains(NotificationID.streakRisk))
+    }
+
+    @Test("Completing today's log cancels today's check-in reminder")
+    func save_today_clearsDailyReminder() throws {
+        let context = try makeContext()
+        let vm = DailyLogViewModel()
+        let log = DailyLog()
+        context.insert(log)
+        let notifications = FakeNotificationService()
+
+        _ = vm.save(log: log, context: context, notifications: notifications)
+
+        #expect(notifications.removedIDs.contains(NotificationService.dailyReminderID(for: .now)))
+    }
+
+    @Test("Backfilling an earlier day leaves today's reminder alone")
+    func save_pastDay_keepsDailyReminder() throws {
+        let context = try makeContext()
+        let vm = DailyLogViewModel()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .now
+        let log = DailyLog(date: yesterday)
+        context.insert(log)
+        let notifications = FakeNotificationService()
+
+        _ = vm.save(log: log, context: context, notifications: notifications)
+
+        #expect(!notifications.removedIDs.contains(NotificationService.dailyReminderID(for: .now)))
     }
 
     @Test("Failed save reverts isComplete and reports an error")
@@ -308,6 +335,8 @@ struct WeeklyReviewPopulateSummaryTests {
         l.energy = energy
         l.sleepHours = sleep
         l.symptoms = symptoms
+        l.didEditMood = true
+        l.didEditMetrics = true
         return l
     }
 
@@ -333,6 +362,22 @@ struct WeeklyReviewPopulateSummaryTests {
         #expect(abs(review.avgSleep - 7.0) < 0.001)  // (8+6+7)/3
         #expect(review.topSymptoms.first == "Headache") // 2 occurrences vs 1
         #expect(review.topSymptoms.contains("Fatigue"))
+    }
+
+    @Test("Days that never recorded a value don't drag the averages toward the defaults")
+    func populateSummary_ignoresUnenteredValues() {
+        let vm = WeeklyReviewViewModel()
+        let review = WeeklyReview(weekStartDate: .now)
+        let start = review.weekStartDate
+        let cal = Calendar.current
+        let rated = log(on: start, mood: 5, energy: 9, sleep: 8)
+        let untouched = DailyLog(date: cal.date(byAdding: .day, value: 1, to: start) ?? start)  // defaults, no flags
+
+        vm.populateSummary(review: review, from: [rated, untouched])
+
+        #expect(abs(review.avgMood - 5.0) < 0.001)
+        #expect(abs(review.avgEnergy - 9.0) < 0.001)
+        #expect(abs(review.avgSleep - 8.0) < 0.001)
     }
 
     @Test("Leaves the review untouched when no logs fall in the week")

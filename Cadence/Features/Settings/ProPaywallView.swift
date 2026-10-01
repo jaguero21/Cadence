@@ -167,6 +167,15 @@ struct ProPaywallView: View {
             .padding(.vertical, 14)
             .background(prominent ? color : color.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
             .foregroundStyle(prominent ? .white : color)
+            .overlay(alignment: .trailing) {
+                // Without this a tap during the StoreKit round-trip looks like
+                // it did nothing, and the button just goes dim.
+                if isPurchasing {
+                    ProgressView()
+                        .tint(prominent ? .white : color)
+                        .padding(.trailing, 16)
+                }
+            }
         }
         .buttonStyle(.plain)
         .disabled(isPurchasing)

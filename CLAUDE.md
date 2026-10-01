@@ -32,6 +32,16 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   exists. `medicationReminderID(name:minute:)` and the
   `Medication.minuteOfDay`/`timeToday` picker conversions are pure and
   unit-tested; reminders round-trip through `BackupService`.
+- **Daily check-in reminder** is a rolling window of **one-shot, per-day
+  requests** (`ReminderThreshold.dailyWindowDays`, ids from the pure
+  `NotificationService.dailyReminderID(for:)`), not one repeating trigger — a
+  repeating trigger can't skip a single occurrence, so it reminded people who
+  had already logged. Completing today's log removes today's request
+  (`DailyLogViewModel.save`); `scheduleDailyReminder(at:minute:skipToday:)`
+  sweeps the legacy `daily-log` id plus the window deterministically and
+  re-adds it, and `ContentView` re-arms it on every foreground (a lapsed user
+  stops being nudged once the window runs out — deliberate). Pass
+  `skipToday: DailyLog.hasCompletedLog(on:in:)` wherever a context is at hand.
 - **Custom trackers:** `CustomTracker` (`@Attribute(.unique) id: UUID`, name,
   min/max, unit) defines user metrics; per-day values live on
   `DailyLog.customMetrics: [MetricEntry]` keyed by the tracker's stable `id` (so
@@ -183,7 +193,8 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   handler.
 - **Symptom library:** `SymptomTag.optionalCatalog` (~34 entries) is the
   toggleable symptom list in Settings → Symptoms (`SymptomLibraryView`, free —
-  only free-text custom symptoms are Pro). A toggle inserts/deletes the
+  free-text custom symptoms are free too, since `929e390`; Pro is insights,
+  90-day trends and the PDF). A toggle inserts/deletes the
   `SymptomTag` row itself (name-deduped at save time), not an `isEnabled`
   flag, so the picker's `@Query` is untouched. Every catalog name must resolve
   via `HealthKitService.symptomTypeIdentifier` (unit-test-pinned) so enabled
@@ -228,7 +239,7 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   in a new detector. The framing is awareness, not diagnosis: the Insights tab
   and the doctor PDF both carry a "not medical advice" disclaimer next to the
   pattern cards.
-- **Date-windowed views** (`DashboardView`, `DailyLogView`, `WeeklyReviewView`,
+- **Date-windowed views** (`DashboardView`, `WeeklyReviewView`,
   `InsightsView`) take a `referenceDate` and derive their `@Query` cutoff from
   it. `ContentView` passes `today` (refreshed on `scenePhase == .active`) so a
   midnight rollover re-inits the child with a new window — updating the `@Query`
@@ -237,7 +248,7 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   shape for **any** new date-scoped `@Query` over `DailyLog`/`WeeklyReview`: a
   `referenceDate: Date = .now` init param binding `_logs = Query(filter:
   #Predicate<DailyLog> { $0.date >= cutoff }, ...)` in `init` — see
-  `DashboardView` (90d), `DailyLogView` (30d), `WeeklyReviewView` (14d),
+  `DashboardView` (90d), `WeeklyReviewView` (14d),
   `InsightsView` (180d). Unbounded `@Query` is only for small reference
   tables (`SymptomTag`, `CustomTracker`, `Medication`, `Flare`) or
   DEBUG-only tooling, not log/review data. **`HealthSnapshot` counts as
@@ -398,6 +409,15 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   reference pattern to copy. Standard `Form`/`List`/`Button(label:)` rows get
   this for free and need nothing extra. Matters more than usual here since
   Cadence is a health app.
+
+## Navigation
+
+- **A view that is pushed must not wrap its own `NavigationStack`.** `SettingsView`
+  and `ExportView` are pushed from the Dashboard/Settings, so they have none; a
+  nested stack gives a second nav bar and broken back/title behavior. Tab roots
+  (`InsightsView`, etc.) and sheets do own one, which is why a tab root must
+  never be pushed — the Dashboard's Top Pattern card sets
+  `AppState.requestedTab = .insights` and `ContentView` switches the tab instead.
 
 ## iPad
 
@@ -589,6 +609,27 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   static `HistoryView.logMatches(...)` (unit-tested) — keep filtering logic there,
   not inline, so it stays testable. `LogDetailView` shows metrics, symptoms,
   factors, notes, and HealthKit data.
+- **There is no separate Log tab** (it duplicated the Today card and History
+  and was removed). Today's log opens from the dashboard; every other day
+  goes through History: tapping a past day **without** a log opens
+  `LogInputFlow(existingLog: nil, day:)` to fill it in, and `LogDetailView`'s
+  Edit reopens any existing day. `LogInputFlow` writes to its `day`
+  (`ensureLog` re-fetches and creates by that date) and runs the HealthKit
+  prefill only when `day` is today, since the prefill reads today's samples.
+- `LogDetailView` shows only values the person entered: the metric rows gate
+  on `didEditMood`/`didEditMetrics`, because an untouched field still holds
+  `DailyLog`'s defaults. It also shows the Basics and both daily reflections.
+- **That gate is app-wide — every surface that reads mood or a slider value
+  must apply it.** Mood gates on `didEditMood`; energy, sleep, pain, brain fog
+  and anxiety gate on `didEditMetrics`. Current sites: `PatternEngine`, the
+  dashboard's 7-day stats, `ChartMetric.series` (trend charts),
+  `PDFBuilder`'s trend charts and "How your days felt" averages ("not
+  recorded" when no day has a value), `CSVBuilder` (empty cells),
+  `WeeklyReviewViewModel.populateSummary` (0 = not recorded, shown as a dash),
+  `LogDetailView`, the History preview/VoiceOver labels and
+  `WeekReflectionService`. Each of the non-PatternEngine ones was found
+  reporting defaults as readings before it was gated — a new surface that
+  averages or plots `log.mood`/`log.energy` without the flag repeats the bug.
 
 ## Export
 
@@ -815,8 +856,9 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   the built `.app`.
 - **Known English-only surfaces** (plain `String` literals that never reach
   the catalog, each a deliberate follow-up, not an accident): `PDFBuilder`
-  report copy, `PatternEngine` insight titles/details, `NotificationService`
-  notification bodies, and the widget/watch targets (which would need their
+  report copy, `PatternEngine` insight titles/details (which also means the
+  new-insight notification's BODY, though its title is localized), and the
+  widget/watch targets (which would need their
   own `Localizable.xcstrings` in their synchronized folders).
 
 ## Testing
@@ -870,6 +912,13 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   look at the newest `~/Library/Logs/DiagnosticReports/Cadence-*.ips`: the
   faulting thread shows `_dispatch_assert_queue_fail` →
   `swift_task_isCurrentExecutor…` → the helper and the test that called it.
+- **App Store screenshots** come from `CadenceUITests/ScreenshotTests`, which
+  skips itself unless `CADENCE_SCREENSHOTS=1` reaches the runner — so it never
+  runs in CI or a normal ⌘U. Run it per device with
+  `TEST_RUNNER_CADENCE_SCREENSHOTS=1 xcodebuild test … -only-testing:CadenceUITests/ScreenshotTests -resultBundlePath X`
+  (boot the simulator and `simctl status_bar … override --time 9:41` first),
+  then `xcrun xcresulttool export attachments --path X`. It drives the DEBUG
+  seed buttons, so it must run a Debug build.
 - Inject fakes that conform to the service protocols; use `ThrowingPersistence`
   (a `ModelPersisting` whose `save()` throws) to cover save-failure branches.
 

@@ -61,9 +61,15 @@ final class WeeklyReviewViewModel {
             log.date >= review.weekStartDate && log.date <= review.weekEndDate
         }
         guard !weekLogs.isEmpty else { return }
-        review.avgMood   = Double(weekLogs.map(\.mood).reduce(0, +)) / Double(weekLogs.count)
-        review.avgEnergy = Double(weekLogs.map(\.energy).reduce(0, +)) / Double(weekLogs.count)
-        review.avgSleep  = weekLogs.map(\.sleepHours).reduce(0, +) / Double(weekLogs.count)
+        // Each average covers only the days that recorded it (didEditMood /
+        // didEditMetrics) — an untouched field holds DailyLog's default, and
+        // averaging it in reported a week nobody rated as "mood 3, energy 5".
+        // 0 means "not recorded"; WeekSummaryView shows it as a dash.
+        let moodDays = weekLogs.filter(\.didEditMood)
+        let metricDays = weekLogs.filter(\.didEditMetrics)
+        review.avgMood   = moodDays.isEmpty ? 0 : Double(moodDays.map(\.mood).reduce(0, +)) / Double(moodDays.count)
+        review.avgEnergy = metricDays.isEmpty ? 0 : Double(metricDays.map(\.energy).reduce(0, +)) / Double(metricDays.count)
+        review.avgSleep  = metricDays.isEmpty ? 0 : metricDays.map(\.sleepHours).reduce(0, +) / Double(metricDays.count)
 
         let symptomCounts = weekLogs.flatMap(\.symptoms)
             .reduce(into: [:]) { $0[$1.name, default: 0] += 1 }

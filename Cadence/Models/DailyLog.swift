@@ -270,3 +270,14 @@ extension Int {
         Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
+
+extension DailyLog {
+    // Whether `day` already has a completed log. Used to leave that day out
+    // when the daily reminder window is (re)scheduled.
+    static func hasCompletedLog(on day: Date, in context: ModelContext) -> Bool {
+        let start = Calendar.current.startOfDay(for: day)
+        var descriptor = FetchDescriptor<DailyLog>(predicate: #Predicate { $0.date == start && $0.isComplete })
+        descriptor.fetchLimit = 1
+        return !((try? context.fetch(descriptor)) ?? []).isEmpty
+    }
+}

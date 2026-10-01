@@ -136,6 +136,17 @@ final class DashboardViewModel {
         return (try? context.fetch(descriptor))?.first
     }
 
+    // Convenience for save paths that hold a context rather than fetched logs:
+    // fetches the unbounded table (the streak must never be computed from a
+    // windowed slice) and publishes. Returns the logs so a caller that needs
+    // them doesn't fetch twice.
+    @discardableResult
+    static func publishWidgetSummary(in context: ModelContext) -> [DailyLog] {
+        let logs = (try? context.fetch(FetchDescriptor<DailyLog>())) ?? []
+        publishWidgetSummary(logs: logs, activeFlare: activeFlare(in: context))
+        return logs
+    }
+
     // Single publish point for the home-screen widget, callable from any save
     // path (dashboard refresh, watch quick-log, log flow). Skips the write AND
     // the timeline reload when nothing changed — reloads are system-budgeted,

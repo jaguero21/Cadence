@@ -107,9 +107,13 @@ struct TrendChartView: View {
             } else {
                 Chart {
                     ForEach(points, id: \.date) { point in
+                        // Filled from the domain's floor, not from 0: mood's
+                        // axis starts at 1, and an area to 0 spilled below the
+                        // plot and across the date labels.
                         AreaMark(
                             x: .value("Date", point.date),
-                            y: .value(series.label, point.value)
+                            yStart: .value(series.label, series.yDomain.lowerBound),
+                            yEnd: .value(series.label, point.value)
                         )
                         .foregroundStyle(series.color.opacity(0.15))
 
@@ -132,7 +136,10 @@ struct TrendChartView: View {
                         RuleMark(y: .value("Average", avg))
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                             .foregroundStyle(series.color.opacity(0.5))
-                            .annotation(position: .topLeading, alignment: .leading) {
+                            // .top + .leading keeps the label inside the plot; .topLeading
+                            // hung it off the left edge, clipped to "vg 3.7".
+                            .annotation(position: .top, alignment: .leading,
+                                        overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
                                 Text("avg \(String(format: "%.1f", avg))")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -267,16 +274,30 @@ enum ChartMetric: CaseIterable {
             color: color,
             yDomain: yDomain,
             higherIsBetter: higherIsBetter,
-            value: { [self] log in value(for: log) }
+            // nil for a day the user never set this value: DailyLog's defaults
+            // (mood 3, energy 5, …) are not measurements, and drawing them
+            // would plot a flat line of invented data. PatternEngine and the
+            // dashboard averages already gate on the same two flags.
+            value: { [self] log in isRecorded(in: log) ? value(for: log) : nil }
         )
     }
 
+    // String(localized:), not bare literals: the label reaches Label(_:) as a
+    // plain String, which would skip the catalog.
     var label: String {
         switch self {
-        case .mood:   return "Mood"
-        case .energy: return "Energy"
-        case .sleep:  return "Sleep Quality"
-        case .stress: return "Stress"
+        case .mood:   return String(localized: "Mood")
+        case .energy: return String(localized: "Energy")
+        case .sleep:  return String(localized: "Sleep Quality")
+        case .stress: return String(localized: "Stress")
+        }
+    }
+
+    // Mood has its own edit flag; every slider metric shares didEditMetrics.
+    func isRecorded(in log: DailyLog) -> Bool {
+        switch self {
+        case .mood: return log.didEditMood
+        case .energy, .sleep, .stress: return log.didEditMetrics
         }
     }
 

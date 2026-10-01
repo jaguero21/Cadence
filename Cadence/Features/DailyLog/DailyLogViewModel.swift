@@ -56,6 +56,12 @@ final class DailyLogViewModel {
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         notifications.removeNotification(id: NotificationID.streakRisk)
+        // Completing today's log silences today's check-in reminder. Daily
+        // reminders are individual per-day requests for exactly this reason
+        // (see NotificationService.scheduleDailyReminder).
+        if Calendar.current.isDateInToday(log.date) {
+            notifications.removeNotification(id: NotificationService.dailyReminderID(for: log.date))
+        }
         return true
     }
 }

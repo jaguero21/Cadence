@@ -18,6 +18,7 @@ private func makeSnapshot(
     factors: [String] = [],
     customMetrics: [MetricEntry] = [],
     didEditMetrics: Bool = false,
+    didEditMood: Bool = false,
     peaksAndValleysNote: String = "",
     hasPeaksAndValleysVoiceMemo: Bool = false,
     intentionsForTomorrow: String = "",
@@ -47,6 +48,7 @@ private func makeSnapshot(
         factors: factors,
         customMetrics: customMetrics,
         didEditMetrics: didEditMetrics,
+        didEditMood: didEditMood,
         peaksAndValleysNote: peaksAndValleysNote,
         hasPeaksAndValleysVoiceMemo: hasPeaksAndValleysVoiceMemo,
         intentionsForTomorrow: intentionsForTomorrow,
@@ -460,6 +462,7 @@ struct CSVBuilderTests {
             symptoms: [headacheEntry()],
             basicsCompleted: ["Hydration", "Movement"],
             factors: ["Travel"],
+            didEditMetrics: true, didEditMood: true,
             peaksAndValleysNote: "peak note",
             intentionsForTomorrow: "rest more",
             freeNote: "long day",
@@ -471,6 +474,14 @@ struct CSVBuilderTests {
         #expect(row.contains("Hydration; Movement"))
         #expect(row.contains("long day"))
         #expect(row.contains("9500,61,,,,"))            // steps + HR present; HRV/sleep/energy/mindful empty
+    }
+
+    @Test("Values the person never entered are empty cells, not DailyLog's defaults")
+    func csv_unenteredValuesAreEmpty() {
+        let logs = [makeSnapshot(daysAgo: 0, symptoms: [headacheEntry()])]   // no edit flags
+        let row = CSVBuilder.csvString(from: logs).split(separator: "\n")[1]
+        // Date, then seven empty metric cells, then the symptom.
+        #expect(row.contains(",,,,,,,,Headache"))
     }
 
     @Test("Includes Peaks & Valleys note, voice memo flag, and Intentions for Tomorrow")

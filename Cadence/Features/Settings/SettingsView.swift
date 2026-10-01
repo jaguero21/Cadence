@@ -34,35 +34,30 @@ struct SettingsView: View {
     #endif
 
     var body: some View {
-        NavigationStack {
-            List {
-                proSection
-                remindersSection
-                medicationsSection
-                flaresSection
-                symptomsSection
-                customTrackersSection
-                healthKitSection
-                SyncBackupSection()
-                aboutSection
-                #if DEBUG
-                debugSection
-                #endif
-            }
-            .navigationTitle("Settings")
+        List {
+            proSection
+            remindersSection
+            trackingSection
+            healthKitSection
+            SyncBackupSection()
+            aboutSection
             #if DEBUG
-            .alert("Seed Result", isPresented: $showingSeedResult) {
-                Button("OK", role: .cancel) { seedResultMessage = nil }
-            } message: {
-                Text(seedResultMessage ?? "")
-            }
-            .sheet(isPresented: $showingPDFShare) {
-                if let url = pdfShareURL {
-                    ShareSheet(items: [url])
-                }
-            }
+            debugSection
             #endif
         }
+        .navigationTitle("Settings")
+        #if DEBUG
+        .alert("Seed Result", isPresented: $showingSeedResult) {
+            Button("OK", role: .cancel) { seedResultMessage = nil }
+        } message: {
+            Text(seedResultMessage ?? "")
+        }
+        .sheet(isPresented: $showingPDFShare) {
+            if let url = pdfShareURL {
+                ShareSheet(items: [url])
+            }
+        }
+        #endif
         .task { await store.loadProducts() }
         .task { appState.notificationsAuthorized = await notificationService.checkAuthorizationStatus() }
         .task { appState.healthKitAuthorized = healthKitService.isAuthorized }
@@ -119,7 +114,7 @@ struct SettingsView: View {
             if store.isPro {
                 HStack {
                     Label("Cadence Pro", systemImage: "star.fill")
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(CadenceColor.energyOrange)
                     Spacer()
                     Text("Active").foregroundStyle(CadenceColor.successGreen)
                 }
@@ -202,7 +197,9 @@ struct SettingsView: View {
                     set: {
                         dailyHour = Calendar.current.component(.hour, from: $0)
                         dailyMinute = Calendar.current.component(.minute, from: $0)
-                        notificationService.scheduleDailyReminder(at: dailyHour, minute: dailyMinute)
+                        notificationService.scheduleDailyReminder(
+                            at: dailyHour, minute: dailyMinute,
+                            skipToday: DailyLog.hasCompletedLog(on: .now, in: modelContext))
                     }
                 ),
                 displayedComponents: .hourAndMinute
@@ -216,10 +213,9 @@ struct SettingsView: View {
         } header: {
             Label("Reminders", systemImage: "bell.fill")
         } footer: {
-            if appState.notificationsAuthorized {
-                Label("Notifications are enabled.", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(CadenceColor.successGreen)
-            } else {
+            // Only the problem state gets a footer; "enabled" is the default
+            // and doesn't need a line of its own.
+            if !appState.notificationsAuthorized {
                 HStack(spacing: 4) {
                     Label("Notifications are disabled.", systemImage: "exclamationmark.circle.fill")
                         .foregroundStyle(CadenceColor.stressRed)
@@ -231,55 +227,35 @@ struct SettingsView: View {
         }
     }
 
-    private var symptomsSection: some View {
-        Section {
-            NavigationLink {
-                SymptomLibraryView()
-            } label: {
-                Label("Symptoms", systemImage: "tag.fill")
-            }
-        } header: {
-            Label("Symptoms", systemImage: "tag.fill")
-        } footer: {
-            Text("Choose which symptoms appear in the daily log's picker, including custom ones you add yourself.")
-        }
-    }
-
-    private var medicationsSection: some View {
+    // One section for the four "what Cadence tracks" screens. They used to be
+    // four single-row sections, two of which repeated the row's own label in
+    // their header.
+    private var trackingSection: some View {
         Section {
             NavigationLink {
                 MedicationsView()
             } label: {
                 Label("Medications", systemImage: "pills.fill")
             }
-        } header: {
-            Label("Medications", systemImage: "pills.fill")
-        } footer: {
-            Text("Track what you take so Cadence can correlate it with your symptoms.")
-        }
-    }
-
-    private var customTrackersSection: some View {
-        Section {
-            NavigationLink {
-                CustomTrackersView()
-            } label: {
-                Label("Custom Trackers", systemImage: "slider.horizontal.3")
-            }
-        } footer: {
-            Text("Define your own metrics to log alongside the built-in ones.")
-        }
-    }
-
-    private var flaresSection: some View {
-        Section {
             NavigationLink {
                 FlaresView()
             } label: {
                 Label("Flares", systemImage: "flame.fill")
             }
+            NavigationLink {
+                SymptomLibraryView()
+            } label: {
+                Label("Symptoms", systemImage: "tag.fill")
+            }
+            NavigationLink {
+                CustomTrackersView()
+            } label: {
+                Label("Custom Trackers", systemImage: "slider.horizontal.3")
+            }
+        } header: {
+            Label("Tracking", systemImage: "list.bullet.clipboard")
         } footer: {
-            Text("Log multi-day symptom flares to track their frequency and duration.")
+            Text("Medications, flares, symptoms, and your own metrics — everything Cadence tracks beyond the basics.")
         }
     }
 
@@ -311,15 +287,17 @@ struct SettingsView: View {
             if !healthKitService.isAvailable {
                 Text("HealthKit is not available on this device.")
             } else if appState.healthKitAuthorized {
-                Label("HealthKit access granted.", systemImage: "checkmark.circle.fill")
+                // HealthKit only reveals whether SHARING is authorized, never
+                // read access, so claim only what can be known.
+                Label("Sharing with Apple Health is on.", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(CadenceColor.successGreen)
             } else {
                 // Health permissions live in the Health app (Profile → Apps),
                 // NOT on the app's page in Settings — openSettingsURLString
                 // would land the user somewhere with no HealthKit row at all.
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("Some HealthKit access is off.", systemImage: "exclamationmark.circle.fill")
-                        .foregroundStyle(CadenceColor.stressRed)
+                    Label("Sharing with Apple Health is off.", systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
                     HStack(spacing: 4) {
                         Text("Manage it in the Health app under Profile → Apps → Cadence.")
                         if let url = URL(string: "x-apple-health://") {
