@@ -154,6 +154,36 @@ struct SettingsView: View {
                         .disabled(isPurchasing)
                     }
 
+                    // The monthly plan, with the same StoreKit-driven trial
+                    // wording as the paywall: "Try Free for 1 month" only when
+                    // a free trial is configured AND this account is eligible.
+                    if let monthly = store.monthlyProduct {
+                        Button {
+                            buy(monthly)
+                        } label: {
+                            if let trial = store.monthlyFreeTrial {
+                                Text("Try Free for \(StoreService.trialLength(value: trial.value, unit: trial.unit)), then \(monthly.displayPrice) / month")
+                            } else {
+                                Text("Subscribe — \(monthly.displayPrice) / month")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(CadenceColor.sleepPurple)
+                        .disabled(isPurchasing)
+
+                        // Guideline 3.1.2: a screen that sells an auto-renewing
+                        // subscription states the renewal terms (and any trial
+                        // terms) beside the button, not only on the paywall.
+                        if let trial = store.monthlyFreeTrial {
+                            Text("The monthly plan is free for \(StoreService.trialLength(value: trial.value, unit: trial.unit)), then \(monthly.displayPrice) per month. Cancel at least 24 hours before the trial ends and you won't be charged.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("Payment charged to your Apple ID at purchase confirmation. Subscriptions auto-renew unless cancelled at least 24 hours before the renewal date. Manage or cancel in your Apple ID settings.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+
                     Button("See all Pro options") {
                         appState.showingProPaywall = true
                     }

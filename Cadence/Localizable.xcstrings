@@ -81,6 +81,26 @@
         }
       }
     },
+    "Subscribe — %@ / month" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suscribirse — %@ / mes"
+          }
+        }
+      }
+    },
+    "Try Free for %@, then %@ / month" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prueba gratis durante %@, después %@ / mes"
+          }
+        }
+      }
+    },
     "· %@ signal" : {
       "localizations" : {
         "es" : {
