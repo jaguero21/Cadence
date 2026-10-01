@@ -32,14 +32,23 @@ struct ContentView: View {
                     }
                 }
 
+                // watchOS draws a Stepper's label large BETWEEN its − and +
+                // buttons, and .labelsHidden() doesn't remove it there: the old
+                // Stepper("Energy") rendered a giant clipped "En…" that pushed
+                // the controls off screen. The label is the value instead, with
+                // the metric name as a caption above.
                 VStack(spacing: 2) {
-                    Text("Energy: \(energy)").font(.caption)
-                    Stepper("Energy", value: $energy, in: 0...10)
-                        .labelsHidden()
-                        .onChange(of: energy) { _, _ in
-                            sendState = .idle
-                            energyEdited = true
-                        }
+                    Text("Energy").font(.caption).foregroundStyle(.secondary)
+                    Stepper(value: $energy, in: 0...10) {
+                        Text("\(energy)")
+                            .font(.title3.monospacedDigit())
+                    }
+                    .accessibilityLabel("Energy")
+                    .accessibilityValue("\(energy) out of 10")
+                    .onChange(of: energy) { _, _ in
+                        sendState = .idle
+                        energyEdited = true
+                    }
                 }
 
                 Button {
