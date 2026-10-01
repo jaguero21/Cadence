@@ -70,9 +70,7 @@ CadenceTests/                 Swift Testing unit tests
 CadenceUITests/               XCUIApplication smoke test
 ```
 
-See [CLAUDE.md](CLAUDE.md) for the full architecture writeup — data flow,
-the app↔widget↔watch bridges, CloudKit constraints, and the conventions
-behind each of the above.
+
 
 ## Requirements
 
