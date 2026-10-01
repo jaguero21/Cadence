@@ -28,6 +28,16 @@ enum ExportScratch {
         return directory.appendingPathComponent(filename)
     }
 
+    // A human-readable file name inside its own UUID folder: the name is what
+    // the recipient sees ("Cadence Report, Sep 1 – Sep 30, 2026.pdf"), and the
+    // folder keeps two exports of the same range from overwriting each other.
+    // purge() removes the folders along with everything else.
+    static func uniqueURL(named filename: String) -> URL {
+        let folder = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder.appendingPathComponent(filename)
+    }
+
     // Write options every export should use: atomic, plus complete protection
     // so a generated report can't be read off a locked device. (Without it the
     // default is completeUntilFirstUserAuthentication, which stays readable

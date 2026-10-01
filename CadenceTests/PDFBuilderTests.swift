@@ -98,4 +98,81 @@ import PDFKit
         #expect(text.contains("Weekly reflections"))
         #expect(text.contains("Distinctive weekly intentions marker XYZZY-42."))
     }
+
+    // MARK: - Range, personal notes, long text, paper
+
+    private func day(_ offset: Int) -> Date {
+        Calendar.current.startOfDay(for: Calendar.current.date(byAdding: .day, value: offset, to: .now) ?? .now)
+    }
+
+    private func text(of url: URL?) throws -> (String, PDFDocument) {
+        let resolved = try #require(url)
+        let document = try #require(PDFDocument(url: resolved))
+        return ((0..<document.pageCount).compactMap { document.page(at: $0)?.string }.joined(), document)
+    }
+
+    @Test("Header coverage is measured against the chosen range, not the logs' own span")
+    func header_usesChosenRange() async throws {
+        // 3 logs in the last 3 days, inside a 10-day chosen range.
+        let logs = (0..<3).map { DailyLogSnapshot(DailyLog(date: day(-$0))) }
+        let url = await PDFBuilder.build(logs: logs, reviews: [], range: day(-9)...day(0))
+        let (text, _) = try text(of: url)
+        #expect(text.contains("3 of 10 days logged"))
+    }
+
+    @Test("Coverage never counts future days as missed")
+    func coverage_capsAtToday() {
+        let result = PDFBuilder.coverage(loggedDays: 2, range: day(-1)...day(5), today: .now)
+        #expect(result.totalDays == 2)
+    }
+
+    @Test("Personal notes are left out unless included, and come after the clinical sections")
+    func personalNotes_optionalAndLast() async throws {
+        let log = DailyLog(date: day(0))
+        log.freeNote = "Private diary marker QWERTY-7."
+        log.symptoms = [SymptomEntry(name: "Headache", severity: 4, emoji: "🤕")]
+        let logs = [DailyLogSnapshot(log)]
+
+        let (without, _) = try text(of: await PDFBuilder.build(logs: logs, reviews: [], includePersonalNotes: false))
+        #expect(!without.contains("QWERTY-7"))
+
+        let (with, _) = try text(of: await PDFBuilder.build(logs: logs, reviews: [], includePersonalNotes: true))
+        let note = try #require(with.range(of: "QWERTY-7"))
+        let symptoms = try #require(with.range(of: "avg severity"))
+        #expect(symptoms.lowerBound < note.lowerBound)
+    }
+
+    @Test("A note longer than a page is split across pages instead of running off the page")
+    func longNote_spansPages() async throws {
+        let log = DailyLog(date: day(0))
+        log.freeNote = Array(repeating: "word", count: 6000).joined(separator: " ") + " ENDMARKER"
+        let (text, document) = try text(of: await PDFBuilder.build(logs: [DailyLogSnapshot(log)], reviews: []))
+        #expect(document.pageCount >= 3)
+        #expect(text.contains("ENDMARKER"))
+    }
+
+    @Test("Letter paper in the US, A4 elsewhere")
+    func paperSizeByRegion() {
+        #expect(PDFBuilder.PaperSize.forRegion("US") == .letter)
+        #expect(PDFBuilder.PaperSize.forRegion("MX") == .letter)
+        #expect(PDFBuilder.PaperSize.forRegion("ES") == .a4)
+        #expect(PDFBuilder.PaperSize.forRegion(nil) == .a4)
+    }
+
+    @Test("Letter reports use Letter pages and carry a document title")
+    func letterPagesAndTitle() async throws {
+        let url = await PDFBuilder.build(logs: [DailyLogSnapshot(DailyLog(date: day(0)))], reviews: [], paper: .letter)
+        let (_, document) = try text(of: url)
+        let bounds = try #require(document.page(at: 0)).bounds(for: .mediaBox)
+        #expect(bounds.width == 612 && bounds.height == 792)
+        #expect(document.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String == PDFBuilder.reportTitle)
+    }
+
+    @Test("The file name is readable and carries the range")
+    func readableFileName() async throws {
+        let url = try #require(await PDFBuilder.build(logs: [], reviews: [], range: day(-29)...day(0)))
+        #expect(url.lastPathComponent.hasPrefix("Cadence Report, "))
+        #expect(url.pathExtension == "pdf")
+        #expect(!url.lastPathComponent.contains("/"))
+    }
 }

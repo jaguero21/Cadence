@@ -67,6 +67,12 @@ enum UserDefaultsKey {
     // has fallen back to in-memory storage, to decide whether "reinstalling is
     // safe" is true advice or the thing that destroys the user's history.
     static let persistentStoreOpened  = "cadence.persistentStoreOpened"
+    // Date of the person's last appointment (timeIntervalSinceReferenceDate of
+    // that day's midnight; 0 = unset). Export offers "since last appointment".
+    static let lastVisitDate          = "lastVisitDate"
+    // Whether the PDF includes the diary-style sections. Off by default: the
+    // report is usually handed to someone else.
+    static let exportIncludesPersonalNotes = "export.includesPersonalNotes"
 }
 
 enum PatternThreshold {

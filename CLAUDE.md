@@ -663,9 +663,35 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   Symptom frequency renders as proportional bars carrying avg severity.
   The Export screen's "Includes" list must stay truthful to what the PDFs
   actually contain.
+- **Section order is clinical first.** Header → patterns → trend charts →
+  "How your days felt" → symptoms → triggers → basics → Health averages →
+  health context → medications → flares, then — only when
+  `includePersonalNotes` — the diary sections (weekly reflections, Peaks &
+  Valleys, intentions, daily notes) via `drawPersonalNotes`. ExportView's
+  toggle for that is stored in `UserDefaultsKey.exportIncludesPersonalNotes`
+  and is **off by default** (the report is usually handed to someone else);
+  `PDFBuilder.build`'s own default stays `true` so tests/DEBUG see everything.
+- **The header reports coverage against the CHOSEN range** (`range:` →
+  `PDFBuilder.coverage`, future days not counted), never the logs' own span —
+  that narrowed "Sep 1–30, logged from Sep 10" to "21 of 21 days". The pattern
+  section says it covers "this date range": it runs `PatternEngine` on the
+  export's logs, so it can legitimately differ from the 90-day Insights tab.
+- **Paper follows the region** (`PaperSize.forRegion`: Letter in the US,
+  Canada and Letter-using Latin America, A4 elsewhere). The layout is drawn on
+  A4's 515pt column and `Cursor.beginPage` centres it on Letter with a
+  translate; vertical limits come from the paper. Long text that exceeds a
+  page is split into page-sized word chunks in `Cursor.line`. Files are named
+  for people ("Cadence Report, Sep 1 – Sep 30, 2026.pdf", "Cadence Data, ….csv")
+  inside a UUID folder from `ExportScratch.uniqueURL(named:)`, and the PDF
+  carries a document title.
+- **CSV safety:** free-text cells go through `CSVBuilder.neutralizeFormula`
+  (a leading `= + - @` would run as a formula in Excel), and the written file
+  starts with a UTF-8 BOM so Excel decodes accents/emoji. `csvString` itself
+  stays BOM-free and pure.
 - "Appointment" flow: `UserDefaultsKey.lastVisitDate` stores a visit anchor
-  (`timeIntervalSinceReferenceDate`, 0 = unset) so a report can be scoped to
-  everything since the last visit.
+  (`timeIntervalSinceReferenceDate`, 0 = unset), set from Export's
+  Appointments section; "Report since last appointment" makes it the range
+  start.
 
 ## Pro (StoreKit 2)
 
