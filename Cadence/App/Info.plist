@@ -51,8 +51,19 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<!-- Launch screen: the app's own background colour (LaunchBackground
+	     matches systemGroupedBackground in light and dark) with the icon
+	     centred, so the hand-off into onboarding/the dashboard has no white
+	     flash. Kept static and brief by design — no artificial delay. -->
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+		<key>UIImageName</key>
+		<string>LaunchIcon</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<true/>
+	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
