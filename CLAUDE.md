@@ -193,7 +193,7 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   handler.
 - **Symptom library:** `SymptomTag.optionalCatalog` (~34 entries) is the
   toggleable symptom list in Settings → Symptoms (`SymptomLibraryView`, free —
-  free-text custom symptoms are free too, since `929e390`; Pro is insights,
+  free-text custom symptoms are free too, since `bc6833c`; Pro is insights,
   90-day trends and the PDF). A toggle inserts/deletes the
   `SymptomTag` row itself (name-deduped at save time), not an `isEnabled`
   flag, so the picker's `@Query` is untouched. Every catalog name must resolve
@@ -309,7 +309,7 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   with a silent push. Remove either key and remote changes stop importing until
   the next launch, with no error surfaced anywhere. This is the configuration
   Apple's Core Data + CloudKit setup prescribes, so it is an intended background
-  use under Guideline 2.5.4, not a 2.5.4 risk. Both were dropped in `3786b68` on
+  use under Guideline 2.5.4, not a 2.5.4 risk. Both were dropped in `446264f` on
   exactly that reasoning and restored afterwards; keep Push Notifications
   enabled on the App ID too, and note that HealthKit background delivery is a
   separate entitlement that needs neither key.
