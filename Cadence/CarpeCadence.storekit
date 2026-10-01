@@ -20,8 +20,8 @@
       "internalID" : "1E881DE5",
       "localizations" : [
         {
-          "description" : "",
-          "displayName" : "",
+          "description" : "Unlock pattern insights, 90-day trends and PDF reports, forever.",
+          "displayName" : "Cadence Pro (Lifetime)",
           "locale" : "en_US"
         }
       ],
@@ -68,8 +68,8 @@
           ],
           "localizations" : [
             {
-              "description" : "",
-              "displayName" : "",
+              "description" : "Pattern insights, 90-day trends and PDF reports, billed monthly.",
+              "displayName" : "Cadence Pro (Monthly)",
               "locale" : "en_US"
             }
           ],

@@ -21,6 +21,15 @@ final class StoreService {
         productsLoadFailed = false
         do {
             products = try await Product.products(for: [StoreKitID.proOneTime, StoreKitID.proMonthly])
+            // An EMPTY answer is a failure too, not "still loading": StoreKit
+            // returns [] without throwing when the IDs aren't available (not
+            // yet approved, wrong storefront, sandbox hiccup). Treating that
+            // as success left the paywall on an endless "Loading…" spinner —
+            // exactly what an App Reviewer would see as a broken purchase flow.
+            if products.isEmpty {
+                productsLoadFailed = true
+                Self.log.error("StoreKit returned no products for the Pro IDs")
+            }
         } catch {
             products = []
             productsLoadFailed = true
@@ -80,8 +89,42 @@ final class StoreService {
         purchasedProductIDs = owned
     }
 
-    func restorePurchases() async {
+    enum RestoreOutcome {
+        case restored
+        case nothingToRestore
+        case cancelled
+        case failed
+    }
+
+    // `AppStore.sync()` first: it asks the App Store for the account's
+    // transactions (prompting sign-in if needed), which is what Apple documents
+    // for a Restore button. `currentEntitlements` alone only re-reads what this
+    // device already has, so a restore on a new device could find nothing.
+    // Returns an outcome so the button can say what happened — a restore that
+    // silently does nothing reads as broken.
+    func restorePurchases() async -> RestoreOutcome {
+        do {
+            try await AppStore.sync()
+        } catch StoreKitError.userCancelled {
+            await refreshEntitlements()
+            return isPro ? .restored : .cancelled
+        } catch {
+            Self.log.error("AppStore.sync failed: \(error, privacy: .public)")
+            await refreshEntitlements()
+            return isPro ? .restored : .failed
+        }
         await refreshEntitlements()
+        return isPro ? .restored : .nothingToRestore
+    }
+
+    // User-facing text for a restore outcome (nil = say nothing).
+    static func message(for outcome: RestoreOutcome) -> String? {
+        switch outcome {
+        case .restored:         return String(localized: "Your purchase has been restored. Cadence Pro is active.")
+        case .nothingToRestore: return String(localized: "No previous purchases were found for this Apple Account.")
+        case .failed:           return String(localized: "Couldn't reach the App Store. Check your connection and try again.")
+        case .cancelled:        return nil
+        }
     }
 
     var isPro: Bool {
