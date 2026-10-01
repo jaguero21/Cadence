@@ -25,6 +25,11 @@ final class CadenceUITests: XCTestCase {
         XCTAssertTrue(getStarted.waitForExistence(timeout: 10), "Onboarding should start at the welcome page")
         getStarted.tap()
 
+        // What-you-track page: keep the default symptoms.
+        let continueButton = app.buttons["Continue"]
+        XCTAssertTrue(continueButton.waitForExistence(timeout: 15), "Onboarding should ask what to track")
+        continueButton.tap()
+
         let skipNotifications = app.buttons["Skip"]
         XCTAssertTrue(skipNotifications.waitForExistence(timeout: 15))
         skipNotifications.tap()
@@ -33,16 +38,10 @@ final class CadenceUITests: XCTestCase {
         XCTAssertTrue(skipHealthKit.waitForExistence(timeout: 15))
         skipHealthKit.tap()
 
-        let openCadence = app.buttons["Open Cadence"]
-        XCTAssertTrue(openCadence.waitForExistence(timeout: 15))
-        openCadence.tap()
-
-        // Dashboard: open today's log.
-        let todayCard = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Today's Log")
-        ).firstMatch
-        XCTAssertTrue(todayCard.waitForExistence(timeout: 10), "Dashboard should show the Today's Log card")
-        todayCard.tap()
+        // The last page opens the first log directly.
+        let logToday = app.buttons["Log how today feels"]
+        XCTAssertTrue(logToday.waitForExistence(timeout: 15))
+        logToday.tap()
 
         // Log flow: pick a mood, then step through to the note page.
         let happyMood = app.buttons["Happy, 4 of 5"]

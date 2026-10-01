@@ -410,6 +410,24 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
   this for free and need nothing extra. Matters more than usual here since
   Cadence is a health app.
 
+## Onboarding
+
+- Five pages (`OnboardingStep`): welcome + privacy line → **what you track**
+  (symptom chips: the five defaults preselected + `optionalCatalog`) →
+  reminder **time picker** + permission → Apple Health → first log. Every page
+  has Back; content scrolls over a fixed button bar so the largest
+  accessibility sizes never push the buttons off screen or truncate copy; each
+  page shows a mascot pose over `AmbientMeshBackground`.
+- The symptoms page **inserts the chosen tags and sets
+  `UserDefaultsKey.symptomTagsSeeded`**, so `seedSymptomTagsIfNeeded` doesn't
+  re-add a default the person deselected. It never deletes a tag that existed
+  before onboarding (a reinstall over an iCloud store preselects those).
+- "Log how today feels" sets `AppState.pendingFirstLog`; `ContentView`
+  consumes it and opens today's log through the Control Center sheet.
+  "Explore first" just finishes. A declined notification prompt keeps the
+  person on the reminders page with a note, rather than advancing as if it
+  had worked. The UI smoke test walks this exact path.
+
 ## Navigation
 
 - **A view that is pushed must not wrap its own `NavigationStack`.** `SettingsView`
