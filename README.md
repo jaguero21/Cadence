@@ -124,9 +124,10 @@ The "Cadence" name, the app icon, the capybara mascot illustrations and other
 brand artwork remain © the Cadence authors, all rights reserved. A fork must use its
 own name and artwork.
 
-**The App Store build.** As the copyright holder, the author distributes the
-official Cadence app through Apple's App Store under Apple's terms. That
-permission belongs to the copyright holder; it is not a grant under the GPL.
+**The App Store build.** As the copyright holders, the Cadence authors
+distribute the official Cadence app through Apple's App Store under Apple's
+terms. That permission belongs to the copyright holders; it is not a grant
+under the GPL.
 
 ## Contributing
 
