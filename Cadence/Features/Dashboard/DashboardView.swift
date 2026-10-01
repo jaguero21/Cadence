@@ -92,6 +92,7 @@ struct DashboardView: View {
                     Image(systemName: "gearshape.fill")
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityLabel("Settings")
             }
         }
     }
