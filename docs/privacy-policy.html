@@ -146,7 +146,7 @@
     <span class="logo-name">Cadence</span>
   </div>
   <h1>Privacy Policy</h1>
-  <p class="meta">Effective date: July 23, 2026 &nbsp;·&nbsp; Last updated: July 23, 2026</p>
+  <p class="meta">Effective date: July 23, 2026 &nbsp;·&nbsp; Last updated: October 1, 2026</p>
 </header>
 
 <main>
@@ -186,8 +186,10 @@
     <ul>
       <li>HealthKit access is always optional — no feature in Cadence is ever gated behind it</li>
       <li>Data you enter yourself is never overwritten by a HealthKit-sourced value</li>
-      <li>HealthKit data is stored on your device and in your personal iCloud Health account — Cadence's own servers never see it, because Cadence has no servers</li>
-      <li>We do not share HealthKit data with third parties, advertisers, or analytics services</li>
+      <li>Values Cadence reads from Health are kept in a separate, local-only store on your device. They are <strong>never synced to iCloud</strong> and never included in iCloud backups of Cadence's data — only in a JSON backup file you create yourself</li>
+      <li>Symptoms and mood you choose to share are written to Apple Health, where Apple's own privacy protections apply; Cadence can only ever change or remove the entries it wrote itself</li>
+      <li>Cadence has no servers, so no HealthKit data is ever sent to us</li>
+      <li>We do not share HealthKit data with third parties, advertisers, or analytics services, and it is never used for advertising or marketing</li>
       <li>You can revoke HealthKit permission at any time in <strong>Settings → Privacy &amp; Security → Health → Cadence</strong></li>
     </ul>
   </section>
@@ -214,6 +216,30 @@
   </section>
 
   <section>
+    <h2><span class="icon">🔐</span> Device Permissions</h2>
+    <p>Cadence asks for each permission only when you choose a feature that needs it, and works without any of them:</p>
+    <ul>
+      <li><strong>Notifications</strong> — local reminders (daily check-in, weekly review, medications, new patterns), scheduled on your device. Nothing is sent from a server.</li>
+      <li><strong>Microphone</strong> — only while you record a voice note attached to a log entry.</li>
+      <li><strong>Photos</strong> — you pick photos with Apple's photo picker; Cadence sees only the photos you choose and needs no library access.</li>
+      <li><strong>Siri &amp; Shortcuts</strong> — a spoken check-in is processed by Apple's Siri; Cadence receives only the mood and energy values.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="icon">✨</span> On-Device Processing</h2>
+    <ul>
+      <li><strong>Pattern insights</strong> are calculated on your iPhone from your own entries.</li>
+      <li><strong>Week Reflection</strong> (iOS 26 and later, on devices that support Apple Intelligence) uses Apple's on-device language model to summarize your week when you tap it. Your entries are not sent to Apple or to us to produce it.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="icon">📤</span> Exports &amp; Sharing</h2>
+    <p>PDF reports, spreadsheets (CSV), and backup files are created on your device, protected with iOS file encryption while your phone is locked, and cleared from Cadence's temporary storage the next time you open the app. They leave your device only when you share them yourself — you choose the recipient. Personal notes are left out of PDF reports unless you turn them on.</p>
+  </section>
+
+  <section>
     <h2><span class="icon">🔗</span> Third-Party Services</h2>
     <p>None. Cadence is built entirely on Apple's own frameworks — HealthKit, CloudKit, StoreKit, WidgetKit, WatchConnectivity, and App Intents — and does not integrate any third-party analytics, advertising, or backend service. Apple's handling of the data described above is governed by <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener">Apple's own Privacy Policy</a>.</p>
   </section>
@@ -225,8 +251,14 @@
 
   <section>
     <h2><span class="icon">🌍</span> Data Retention &amp; Deletion</h2>
-    <p>All log data is stored locally on your device and is deleted when you delete the app. If you use iCloud Sync, your data also lives in your own private iCloud account, and deleting the app on all your devices removes it from there too.</p>
-    <p>Because Cadence has no backend, there is no copy of your data anywhere for us to delete on your behalf — deleting the app is deleting your data.</p>
+    <p>Your data stays until you delete it. You can delete any individual entry, medication, tracker, or flare inside the app at any time.</p>
+    <p>To delete everything:</p>
+    <ul>
+      <li><strong>On this device:</strong> delete the Cadence app. This removes the on-device database, attachments, any Health values Cadence stored locally, and any generated export files.</li>
+      <li><strong>In iCloud:</strong> deleting the app does <em>not</em> remove the copy in your iCloud account. To remove it, go to <strong>Settings → [your name] → iCloud → Manage Account Storage (or Manage Storage) → Cadence → Delete Data</strong>.</li>
+      <li><strong>In Apple Health:</strong> entries Cadence wrote (symptoms, mood) stay in Health until you remove them in the Health app.</li>
+    </ul>
+    <p>Because Cadence has no backend, there is no copy of your data anywhere for us to delete on your behalf — the steps above remove every copy.</p>
   </section>
 
   <section>
