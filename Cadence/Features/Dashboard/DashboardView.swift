@@ -210,7 +210,7 @@ struct DashboardView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     } else {
-                        Text("Not started — 90 seconds")
+                        Text("Not started — about 2 minutes")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -401,7 +401,7 @@ struct DashboardView: View {
                 ? String(localized: "Today's Log, completed")
                 : String(localized: "Today's Log, in progress")
         }
-        return String(localized: "Today's Log, not started. Takes about 90 seconds.")
+        return String(localized: "Today's Log, not started. Takes about 2 minutes.")
     }
 
     private var greetingText: String {
