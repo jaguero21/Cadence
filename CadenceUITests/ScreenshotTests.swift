@@ -77,12 +77,16 @@ final class ScreenshotTests: XCTestCase {
     private func finishOnboarding() {
         sleep(1); snap("00-onboarding-1-welcome")
         tap(app.buttons["Get Started"])
+        _ = app.staticTexts["What do you want to track?"].waitForExistence(timeout: 15)
         sleep(1); snap("00-onboarding-2-symptoms")
         tap(app.buttons["Continue"])
+        _ = app.staticTexts["Stay consistent"].waitForExistence(timeout: 15)
         sleep(1); snap("00-onboarding-3-reminders")
-        tap(app.buttons["Skip"])
+        tap(app.buttons["Continue"])
+        _ = app.staticTexts["Less typing, more insight"].waitForExistence(timeout: 15)
         sleep(1); snap("00-onboarding-4-health")
-        tap(app.buttons["Skip"])
+        tap(app.buttons["Continue"])
+        _ = app.staticTexts["You're all set!"].waitForExistence(timeout: 15)
         sleep(1); snap("00-onboarding-5-ready")
         tap(app.buttons["Explore first"])
     }

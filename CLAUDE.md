@@ -414,8 +414,17 @@ weekly reviews, pattern insights, HealthKit import, and PDF export.
 
 - Five pages (`OnboardingStep`): welcome + privacy line → **what you track**
   (symptom chips: the five defaults preselected + `optionalCatalog`) →
-  reminder **time picker** + permission → Apple Health → first log. Every page
-  has Back; content scrolls over a fixed button bar so the largest
+  reminder **time picker** + permission → Apple Health → first log.
+- **Permission pages have exactly one button, "Continue", which always shows
+  the system prompt — no Skip, no Back.** App Review rejected 1.0 (9) under
+  Guideline 5.1.1(iv) because the Health page offered Skip: a screen that
+  explains a permission must always proceed to the request (the person can
+  still decline on iOS's own sheet). The reminders page had the same pattern,
+  and Back on either page was another way to leave without the request, so
+  both went. Don't reintroduce a Skip/"Not now"/Back on a page that primes a
+  permission. Under `--uitest` those pages advance without calling the system
+  (no dialogs in UI runs), and the smoke test asserts no Skip exists. The other
+  pages have Back; content scrolls over a fixed button bar so the largest
   accessibility sizes never push the buttons off screen or truncate copy; each
   page shows a mascot pose over `AmbientMeshBackground`.
 - The symptoms page **inserts the chosen tags and sets
