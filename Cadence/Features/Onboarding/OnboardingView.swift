@@ -110,18 +110,22 @@ struct OnboardingView: View {
         }
     }
 
+    // App Review Guideline 5.1.1(iv): a screen that explains a permission must
+    // always lead to the system request. Version 1.0 (9) was rejected because
+    // the Health page had a Skip button; this page had the same pattern for
+    // notifications, and Back on either page also let someone leave without
+    // ever seeing the system sheet. So permission pages have one button,
+    // "Continue", which always shows iOS's own prompt (where the person can
+    // still say no), and no Skip or Back.
     private var remindersPage: some View {
         OnboardingPage(
             step: step,
             pose: .sleepy,
             title: "Stay consistent",
-            message: "Choose a time for a gentle daily reminder. It skips any day you've already logged.",
+            message: "Choose a time for a gentle daily reminder. It skips any day you've already logged. Next, iOS will ask whether Cadence can send notifications.",
             isBusy: isRequestingPermission,
-            primaryLabel: notificationsDeclined ? "Continue" : "Enable Reminders",
-            primaryAction: notificationsDeclined ? { go(to: .health) } : enableReminders,
-            secondaryLabel: notificationsDeclined ? nil : "Skip",
-            secondaryAction: { go(to: .health) },
-            onBack: back
+            primaryLabel: "Continue",
+            primaryAction: notificationsDeclined ? { go(to: .health) } : enableReminders
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 // "You choose when" used to be a promise the page didn't keep:
@@ -146,20 +150,19 @@ struct OnboardingView: View {
             step: step,
             pose: .soaking,
             title: "Less typing, more insight",
-            message: "Connect Apple Health to auto-fill sleep, activity, cycle data and more — and keep your logged symptoms and mood in your health record. You'll choose exactly what to share, and everything still works without it.",
+            message: "Apple Health can auto-fill sleep, activity, cycle data and more, and keep your logged symptoms and mood in your health record. Next, iOS will ask what to share. You can turn on any of it, or none, and everything in Cadence still works.",
             isBusy: isRequestingPermission,
-            primaryLabel: "Connect Apple Health",
+            primaryLabel: "Continue",
             primaryAction: {
+                // UI tests promise no system dialogs (AppLaunch.isUITesting).
+                guard !AppLaunch.isUITesting else { go(to: .ready); return }
                 isRequestingPermission = true
                 Task {
                     appState.healthKitAuthorized = (try? await healthKitService.requestAuthorization()) ?? healthKitService.isAuthorized
                     isRequestingPermission = false
                     go(to: .ready)
                 }
-            },
-            secondaryLabel: "Skip",
-            secondaryAction: { go(to: .ready) },
-            onBack: back
+            }
         )
         .disabled(isRequestingPermission)
     }
@@ -196,6 +199,8 @@ struct OnboardingView: View {
     }
 
     private func enableReminders() {
+        // UI tests promise no system dialogs (AppLaunch.isUITesting).
+        guard !AppLaunch.isUITesting else { go(to: .health); return }
         isRequestingPermission = true
         Task {
             let granted = await notificationService.requestAuthorization()

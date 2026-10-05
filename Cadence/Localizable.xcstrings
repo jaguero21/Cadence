@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Apple Health can auto-fill sleep, activity, cycle data and more, and keep your logged symptoms and mood in your health record. Next, iOS will ask what to share. You can turn on any of it, or none, and everything in Cadence still works." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Salud puede rellenar automáticamente el sueño, la actividad, el ciclo y más, y guardar tus síntomas y estado de ánimo en tu historial de salud. A continuación, iOS te preguntará qué compartir. Puedes activar lo que quieras, o nada, y todo en Cadence seguirá funcionando."
+          }
+        }
+      }
+    },
     "Back" : {
       "localizations" : {
         "es" : {
@@ -11,12 +21,12 @@
         }
       }
     },
-    "Choose a time for a gentle daily reminder. It skips any day you've already logged." : {
+    "Choose a time for a gentle daily reminder. It skips any day you've already logged. Next, iOS will ask whether Cadence can send notifications." : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elige una hora para un recordatorio diario suave. Se omite los días que ya hayas registrado."
+            "value" : "Elige una hora para un recordatorio diario suave. Se omite los días que ya hayas registrado. A continuación, iOS te preguntará si Cadence puede enviarte notificaciones."
           }
         }
       }
@@ -1226,26 +1236,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Completada esta semana"
-          }
-        }
-      }
-    },
-    "Connect Apple Health" : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conectar Apple Salud"
-          }
-        }
-      }
-    },
-    "Connect Apple Health to auto-fill sleep, activity, cycle data and more — and keep your logged symptoms and mood in your health record. You'll choose exactly what to share, and everything still works without it." : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conecta Apple Salud para rellenar automáticamente el sueño, la actividad, el ciclo y más, y guarda tus síntomas y estado de ánimo en tu historial de salud. Tú eliges exactamente qué compartir, y todo sigue funcionando sin ello."
           }
         }
       }

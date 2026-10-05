@@ -25,18 +25,16 @@ final class CadenceUITests: XCTestCase {
         XCTAssertTrue(getStarted.waitForExistence(timeout: 10), "Onboarding should start at the welcome page")
         getStarted.tap()
 
-        // What-you-track page: keep the default symptoms.
-        let continueButton = app.buttons["Continue"]
-        XCTAssertTrue(continueButton.waitForExistence(timeout: 15), "Onboarding should ask what to track")
-        continueButton.tap()
-
-        let skipNotifications = app.buttons["Skip"]
-        XCTAssertTrue(skipNotifications.waitForExistence(timeout: 15))
-        skipNotifications.tap()
-
-        let skipHealthKit = app.buttons["Skip"]
-        XCTAssertTrue(skipHealthKit.waitForExistence(timeout: 15))
-        skipHealthKit.tap()
+        // What-you-track, reminders and Apple Health pages each have one
+        // "Continue". Permission pages have no Skip (Guideline 5.1.1(iv));
+        // under --uitest they advance without showing the system prompt.
+        // Wait for each page's title first so a tap never lands on the
+        // outgoing page's button mid-transition.
+        for title in ["What do you want to track?", "Stay consistent", "Less typing, more insight"] {
+            XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 15), "Onboarding should show \(title)")
+            XCTAssertFalse(app.buttons["Skip"].exists, "Onboarding pages must not offer Skip")
+            app.buttons["Continue"].tap()
+        }
 
         // The last page opens the first log directly.
         let logToday = app.buttons["Log how today feels"]
