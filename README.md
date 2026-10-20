@@ -13,6 +13,7 @@ on-device pattern engine (deterministic, no server) surfaces correlations such
 as "your headaches follow poor sleep" or "symptoms rise before a flare."
 Everything exports to a doctor-ready PDF or a spreadsheet.
 
+**[Download on the App Store](https://apps.apple.com/us/app/cadence-symptom-journal/id6784458293)** ·
 **Website:** <https://jaguero21.github.io/Cadence/> ·
 [Privacy Policy](https://jaguero21.github.io/Cadence/privacy-policy.html) ·
 [Terms of Use](https://jaguero21.github.io/Cadence/eula.html)
@@ -147,7 +148,7 @@ xcrun xcresulttool export attachments --path Screens.xcresult --output-path Scre
 
 ## Status
 
-Version 1.0 has been submitted to the App Store, and development is ongoing.
+Version 1.0 is [available on the App Store](https://apps.apple.com/us/app/cadence-symptom-journal/id6784458293), and development is ongoing.
 
 ## License
 
